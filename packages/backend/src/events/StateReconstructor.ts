@@ -85,6 +85,18 @@ export class StateReconstructor {
       if (event.changes.style !== undefined) {
         node.style = { ...node.style, ...event.changes.style };
       }
+      if (event.changes.size !== undefined) {
+        node.size = event.changes.size;
+      }
+      if (event.changes.color !== undefined) {
+        node.color = event.changes.color;
+      }
+      if (event.changes.shapeType !== undefined) {
+        node.shapeType = event.changes.shapeType;
+      }
+      if (event.changes.points !== undefined) {
+        node.points = event.changes.points;
+      }
       node.version = event.version;
       node.updatedAt = event.timestamp;
     }
@@ -139,6 +151,18 @@ export class StateReconstructor {
           }
           if (updateEvent.changes.style !== undefined) {
             result.style = { ...result.style, ...updateEvent.changes.style };
+          }
+          if (updateEvent.changes.size !== undefined) {
+            result.size = updateEvent.changes.size;
+          }
+          if (updateEvent.changes.color !== undefined) {
+            result.color = updateEvent.changes.color;
+          }
+          if (updateEvent.changes.shapeType !== undefined) {
+            result.shapeType = updateEvent.changes.shapeType;
+          }
+          if (updateEvent.changes.points !== undefined) {
+            result.points = updateEvent.changes.points;
           }
           result.version = updateEvent.version;
           result.updatedAt = updateEvent.timestamp;

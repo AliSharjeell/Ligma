@@ -3,7 +3,83 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useCanvasStore } from '@/store/canvas-store';
-import type { CanvasElement, Position, User } from '@/types/canvas';
+import type { CanvasElement, Position, ShapeType, Size, User } from '@/types/canvas';
+
+type NodeCreatedEvent = {
+  id: string;
+  type: 'NodeCreated';
+  canvasId: string;
+  userId: string;
+  nodeId: string;
+  nodeType: 'text' | 'shape' | 'image' | 'sticky' | 'drawing';
+  position: Position;
+  content: string;
+  timestamp: number;
+  metadata?: {
+    size?: Size;
+    color?: string;
+    shapeType?: ShapeType;
+    points?: Position[];
+  };
+};
+
+type NodeUpdatedEvent = {
+  id: string;
+  type: 'NodeUpdated';
+  canvasId: string;
+  userId: string;
+  nodeId: string;
+  changes: Partial<{
+    content: string;
+    position: Position;
+    style: Record<string, unknown>;
+    size: Size;
+    color: string;
+    shapeType: ShapeType;
+    points: Position[];
+  }>;
+  timestamp: number;
+};
+
+type NodeDeletedEvent = {
+  id: string;
+  type: 'NodeDeleted';
+  canvasId: string;
+  userId: string;
+  nodeId: string;
+  timestamp: number;
+};
+
+type NodeLockedEvent = {
+  id: string;
+  type: 'NodeLocked';
+  canvasId: string;
+  userId: string;
+  nodeId: string;
+  lockedBy: string;
+};
+
+type NodeUnlockedEvent = {
+  id: string;
+  type: 'NodeUnlocked';
+  canvasId: string;
+  userId: string;
+  nodeId: string;
+};
+
+type UserJoinedEvent = {
+  id: string;
+  type: 'UserJoined';
+  canvasId: string;
+  userId: string;
+  userName: string;
+  role: 'Lead' | 'Contributor' | 'Viewer';
+};
+
+type UserLeftEvent = {
+  userId: string;
+  userName?: string;
+};
 
 interface SocketContextType {
   socket: Socket | null;
@@ -41,7 +117,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
   const {
     userId,
     userName,
-    addElement,
+    addRemoteElement,
     updateElement,
     deleteElement,
     lockElement,
@@ -50,6 +126,42 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
     addUser,
     removeUser,
   } = useCanvasStore();
+
+  const canvasId = 'default';
+
+  const toCanvasElement = useCallback((event: NodeCreatedEvent): CanvasElement => {
+    const now = Date.now();
+    const defaultSizeByType: Partial<Record<NodeCreatedEvent['nodeType'], Size>> = {
+      sticky: { width: 200, height: 150 },
+      text: { width: 200, height: 40 },
+      shape: { width: 160, height: 120 },
+      drawing: { width: 0, height: 0 },
+      image: { width: 240, height: 180 },
+    };
+    const fallbackSize = defaultSizeByType[event.nodeType] || { width: 200, height: 120 };
+    return {
+      id: event.nodeId,
+      type: event.nodeType,
+      position: event.position,
+      size: event.metadata?.size || fallbackSize,
+      content: event.content || '',
+      color: event.metadata?.color || '#1f2937',
+      shapeType: event.metadata?.shapeType,
+      points: event.metadata?.points,
+      locked: false,
+      createdBy: event.userId,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }, []);
+
+  const toUser = useCallback((event: UserJoinedEvent): User => {
+    return {
+      id: event.userId,
+      name: event.userName,
+      color: '#16a34a',
+    };
+  }, []);
 
   useEffect(() => {
     const newSocket = io(url, {
@@ -60,6 +172,12 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
     newSocket.on('connect', () => {
       setConnected(true);
       console.log('Connected to WebSocket server');
+      newSocket.emit('join_canvas', {
+        canvasId,
+        userId,
+        userName,
+        role: 'Contributor',
+      });
     });
 
     newSocket.on('disconnect', () => {
@@ -67,24 +185,26 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
       console.log('Disconnected from WebSocket server');
     });
 
-    newSocket.on('node_created', (element: CanvasElement) => {
-      addElement(element);
+    newSocket.on('node_created', (event: NodeCreatedEvent) => {
+      addRemoteElement(toCanvasElement(event));
+      console.log('Node created:', event);
     });
 
-    newSocket.on('node_updated', (element: CanvasElement) => {
-      updateElement(element.id, element);
+    newSocket.on('node_updated', (event: NodeUpdatedEvent) => {
+      updateElement(event.nodeId, event.changes);
+      console.log('Node updated:', event);
     });
 
-    newSocket.on('node_deleted', (elementId: string) => {
-      deleteElement(elementId);
+    newSocket.on('node_deleted', (event: NodeDeletedEvent) => {
+      deleteElement(event.nodeId);
     });
 
-    newSocket.on('node_locked', ({ elementId }: { elementId: string; userId: string }) => {
-      lockElement(elementId);
+    newSocket.on('node_locked', (event: NodeLockedEvent) => {
+      lockElement(event.nodeId);
     });
 
-    newSocket.on('node_unlocked', (elementId: string) => {
-      unlockElement(elementId);
+    newSocket.on('node_unlocked', (event: NodeUnlockedEvent) => {
+      unlockElement(event.nodeId);
     });
 
     newSocket.on('cursor_moved', ({ userId: cursorUserId, position }: { userId: string; position: Position }) => {
@@ -93,12 +213,12 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
       }
     });
 
-    newSocket.on('user_joined', (user: User) => {
-      addUser(user);
+    newSocket.on('user_joined', (event: UserJoinedEvent) => {
+      addUser(toUser(event));
     });
 
-    newSocket.on('user_left', (leftUserId: string) => {
-      removeUser(leftUserId);
+    newSocket.on('user_left', (event: UserLeftEvent) => {
+      removeUser(event.userId);
     });
 
     setSocket(newSocket);
@@ -106,48 +226,66 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
     return () => {
       newSocket.disconnect();
     };
-  }, [url, userId, userName]);
+  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, toCanvasElement, toUser]);
 
   const emitElementCreate = useCallback((element: CanvasElement) => {
     // For drawing elements, use create_node with nodeType='drawing'
     if (element.type === 'drawing') {
       socket?.emit('create_node', {
-        canvasId: 'default',
+        canvasId,
+        nodeId: element.id,
         nodeType: 'drawing',
         position: element.position,
         content: '',
+        size: element.size,
         points: element.points,
         color: element.color,
       });
     } else {
       socket?.emit('create_node', {
-        canvasId: 'default',
+        canvasId,
+        nodeId: element.id,
         nodeType: element.type,
         position: element.position,
         content: element.content,
+        size: element.size,
+        color: element.color,
+        shapeType: element.shapeType,
       });
     }
-  }, [socket]);
+  }, [socket, canvasId]);
 
   const emitElementUpdate = useCallback((element: CanvasElement) => {
-    socket?.emit('update_node', element);
-  }, [socket]);
+    socket?.emit('update_node', {
+      canvasId,
+      nodeId: element.id,
+      changes: {
+        content: element.content,
+        position: element.position,
+        size: element.size,
+        color: element.color,
+        shapeType: element.shapeType,
+        points: element.points,
+      },
+      vectorClock: {},
+    });
+  }, [socket, canvasId]);
 
   const emitElementDelete = useCallback((elementId: string) => {
-    socket?.emit('delete_node', elementId);
-  }, [socket]);
+    socket?.emit('delete_node', { canvasId, nodeId: elementId });
+  }, [socket, canvasId]);
 
   const emitElementLock = useCallback((elementId: string) => {
-    socket?.emit('lock_node', elementId);
-  }, [socket]);
+    socket?.emit('lock_node', { canvasId, nodeId: elementId });
+  }, [socket, canvasId]);
 
   const emitElementUnlock = useCallback((elementId: string) => {
-    socket?.emit('unlock_node', elementId);
-  }, [socket]);
+    socket?.emit('unlock_node', { canvasId, nodeId: elementId });
+  }, [socket, canvasId]);
 
   const emitCursorMove = useCallback((position: Position) => {
-    socket?.emit('cursor_move', { userId, position });
-  }, [socket, userId]);
+    socket?.emit('cursor_move', { canvasId, position });
+  }, [socket, canvasId]);
 
   return (
     <SocketContext.Provider

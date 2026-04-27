@@ -87,22 +87,27 @@ export class SocketHandler {
     console.log(`Client connected: ${socket.id}`);
 
     socket.on('join_canvas', (data: { canvasId: string; userId: string; userName: string; role: 'Lead' | 'Contributor' | 'Viewer' }) => {
+      console.log(`Join canvas request from ${data.userName} for canvas ${data.canvasId}`);
       this.handleJoinCanvas(socket, data);
     });
 
-    socket.on('create_node', (data: { canvasId: string; nodeType: string; position: { x: number; y: number }; content: string }) => {
+    socket.on('create_node', (data: { canvasId: string; nodeId?: string; nodeType: string; position: { x: number; y: number }; content: string; size?: { width: number; height: number }; color?: string; shapeType?: 'rectangle' | 'circle'; points?: { x: number; y: number }[] }) => {
+      console.log(`Create node request for canvas ${data.canvasId}`);
       this.handleCreateNode(socket, data);
     });
 
     socket.on('update_node', (data: { canvasId: string; nodeId: string; changes: any; vectorClock: Record<string, number> }) => {
+      console.log(`Update node request for canvas ${data.canvasId}`);
       this.handleUpdateNode(socket, data);
     });
 
     socket.on('delete_node', (data: { canvasId: string; nodeId: string }) => {
+      console.log(`Delete node request for canvas ${data.canvasId}`);
       this.handleDeleteNode(socket, data);
     });
 
     socket.on('lock_node', (data: { canvasId: string; nodeId: string; durationMs?: number }) => {
+      
       this.handleLockNode(socket, data);
     });
 
@@ -173,8 +178,8 @@ export class SocketHandler {
     console.log(`User ${userName} joined canvas ${canvasId}`);
   }
 
-  private async handleCreateNode(socket: Socket, data: { canvasId: string; nodeType: string; position: { x: number; y: number }; content: string }): Promise<void> {
-    const { canvasId, nodeType, position, content } = data;
+  private async handleCreateNode(socket: Socket, data: { canvasId: string; nodeId?: string; nodeType: string; position: { x: number; y: number }; content: string; size?: { width: number; height: number }; color?: string; shapeType?: 'rectangle' | 'circle'; points?: { x: number; y: number }[] }): Promise<void> {
+    const { canvasId, nodeId: clientNodeId, nodeType, position, content, size, color, shapeType, points } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
 
     if (!userId || !this.rbac.canPerformAction(userId, canvasId, 'canCreate')) {
@@ -186,18 +191,24 @@ export class SocketHandler {
     const user = clientState?.users.get(userId);
     const vc = user?.vectorClock || new VectorClock();
 
-    const nodeId = uuidv4();
+    const nodeId = clientNodeId || uuidv4();
     const event: NodeCreatedEvent = {
       id: uuidv4(),
       type: 'NodeCreated',
       canvasId,
       userId,
       nodeId,
-      nodeType: nodeType as 'text' | 'shape' | 'image' | 'sticky',
+      nodeType: nodeType as 'text' | 'shape' | 'image' | 'sticky' | 'drawing',
       position,
       content,
       timestamp: Date.now(),
-      vectorClock: vc.increment(userId).toJSON()
+      vectorClock: vc.increment(userId).toJSON(),
+      metadata: {
+        size,
+        color,
+        shapeType,
+        points
+      }
     };
 
     this.eventStore.append(event);

@@ -20,6 +20,7 @@ interface CanvasStore extends CanvasState {
   setViewportZoom: (zoom: number) => void;
 
   addElement: (element: Omit<CanvasElement, 'id' | 'createdAt' | 'updatedAt'>) => CanvasElement;
+  addRemoteElement: (element: CanvasElement) => void;
   updateElement: (id: string, updates: Partial<CanvasElement>) => void;
   deleteElement: (id: string) => void;
   lockElement: (id: string) => boolean;
@@ -106,6 +107,17 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       details: `Created ${elementData.type}`,
     });
     return element;
+  },
+
+  addRemoteElement: (element) => {
+    set((state) => {
+      if (state.elements.has(element.id)) {
+        return state;
+      }
+      const newElements = new Map(state.elements);
+      newElements.set(element.id, element);
+      return { elements: newElements };
+    });
   },
 
   updateElement: (id, updates) => {

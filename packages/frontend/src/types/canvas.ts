@@ -1,4 +1,4 @@
-export type ElementType = 'sticky' | 'shape' | 'text' | 'drawing';
+export type ElementType = 'sticky' | 'shape' | 'text' | 'drawing' | 'image';
 export type ShapeType = 'rectangle' | 'circle';
 export type Tool = 'select' | 'sticky' | 'shape' | 'text' | 'draw' | 'pan' | 'eraser';
 

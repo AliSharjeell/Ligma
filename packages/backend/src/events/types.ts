@@ -23,7 +23,7 @@ export interface BaseEvent {
 export interface NodeCreatedEvent extends BaseEvent {
   type: 'NodeCreated';
   nodeId: string;
-  nodeType: 'text' | 'shape' | 'image' | 'sticky';
+  nodeType: 'text' | 'shape' | 'image' | 'sticky' | 'drawing';
   position: { x: number; y: number };
   content: string;
   metadata?: Record<string, unknown>;
@@ -36,6 +36,10 @@ export interface NodeUpdatedEvent extends BaseEvent {
     content: string;
     position: { x: number; y: number };
     style: Record<string, unknown>;
+    size: { width: number; height: number };
+    color: string;
+    shapeType: 'rectangle' | 'circle';
+    points: { x: number; y: number }[];
   }>;
   version: number;
   causallyDependsOn: string[];
@@ -97,9 +101,13 @@ export type CanvasEvent =
 
 export interface NodeState {
   id: string;
-  type: 'text' | 'shape' | 'image' | 'sticky';
+  type: 'text' | 'shape' | 'image' | 'sticky' | 'drawing';
   position: { x: number; y: number };
   content: string;
+  size?: { width: number; height: number };
+  color?: string;
+  shapeType?: 'rectangle' | 'circle';
+  points?: { x: number; y: number }[];
   style?: Record<string, unknown>;
   version: number;
   lockedBy?: string;
