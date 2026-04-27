@@ -47,10 +47,10 @@ function getBezierPath(points: Position[]): string {
 }
 
 export function Drawing({ element }: DrawingProps) {
-  const { selectedId, setSelectedId, updateElement, lockElement, unlockElement, userId, viewportPosition, viewportZoom } = useCanvasStore();
+  const { selectedIds, setSelectedId, setSelectedIds, updateElement, lockElement, unlockElement, userId, viewportPosition, viewportZoom } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
-  const isSelected = selectedId === element.id;
+  const isSelected = selectedIds.has(element.id);
   const isLocked = element.locked && element.lockedBy !== userId;
 
   if (!element.points || element.points.length < 2) return null;

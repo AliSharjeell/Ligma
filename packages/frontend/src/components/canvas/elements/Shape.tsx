@@ -20,10 +20,10 @@ const STROKE_COLORS = [
 ];
 
 export function Shape({ element }: ShapeProps) {
-  const { selectedId, setSelectedId, updateElement, lockElement, unlockElement, userId } = useCanvasStore();
+  const { selectedIds, setSelectedId, setSelectedIds, updateElement, lockElement, unlockElement, userId } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
-  const isSelected = selectedId === element.id;
+  const isSelected = selectedIds.has(element.id);
   const isLocked = element.locked && element.lockedBy !== userId;
   const isEditing = element.locked && element.lockedBy === userId;
   const strokeColor = element.color || STROKE_COLORS[0];
