@@ -69,12 +69,12 @@ export interface CanvasEvent {
 }
 
 export interface SocketEvents {
-  'element:create': CanvasElement;
-  'element:update': CanvasElement;
-  'element:delete': string;
-  'element:lock': { elementId: string; userId: string };
-  'element:unlock': string;
-  'cursor:move': { userId: string; position: Position };
-  'user:join': User;
-  'user:leave': string;
+  create_node: CanvasElement;
+  update_node: CanvasElement;
+  delete_node: string;
+  lock_node: { elementId: string; userId: string };
+  unlock_node: string;
+  cursor_move: { userId: string; position: Position };
+  user_joined: User;
+  user_left: string;
 }

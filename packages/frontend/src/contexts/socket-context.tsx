@@ -67,37 +67,37 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
       console.log('Disconnected from WebSocket server');
     });
 
-    newSocket.on('element:create', (element: CanvasElement) => {
+    newSocket.on('node_created', (element: CanvasElement) => {
       addElement(element);
     });
 
-    newSocket.on('element:update', (element: CanvasElement) => {
+    newSocket.on('node_updated', (element: CanvasElement) => {
       updateElement(element.id, element);
     });
 
-    newSocket.on('element:delete', (elementId: string) => {
+    newSocket.on('node_deleted', (elementId: string) => {
       deleteElement(elementId);
     });
 
-    newSocket.on('element:lock', ({ elementId }: { elementId: string; userId: string }) => {
+    newSocket.on('node_locked', ({ elementId }: { elementId: string; userId: string }) => {
       lockElement(elementId);
     });
 
-    newSocket.on('element:unlock', (elementId: string) => {
+    newSocket.on('node_unlocked', (elementId: string) => {
       unlockElement(elementId);
     });
 
-    newSocket.on('cursor:move', ({ userId: cursorUserId, position }: { userId: string; position: Position }) => {
+    newSocket.on('cursor_moved', ({ userId: cursorUserId, position }: { userId: string; position: Position }) => {
       if (cursorUserId !== userId) {
         updateUserCursor(cursorUserId, position);
       }
     });
 
-    newSocket.on('user:join', (user: User) => {
+    newSocket.on('user_joined', (user: User) => {
       addUser(user);
     });
 
-    newSocket.on('user:leave', (leftUserId: string) => {
+    newSocket.on('user_left', (leftUserId: string) => {
       removeUser(leftUserId);
     });
 
@@ -109,27 +109,27 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
   }, [url, userId, userName]);
 
   const emitElementCreate = useCallback((element: CanvasElement) => {
-    socket?.emit('element:create', element);
+    socket?.emit('create_node', element);
   }, [socket]);
 
   const emitElementUpdate = useCallback((element: CanvasElement) => {
-    socket?.emit('element:update', element);
+    socket?.emit('update_node', element);
   }, [socket]);
 
   const emitElementDelete = useCallback((elementId: string) => {
-    socket?.emit('element:delete', elementId);
+    socket?.emit('delete_node', elementId);
   }, [socket]);
 
   const emitElementLock = useCallback((elementId: string) => {
-    socket?.emit('element:lock', elementId);
+    socket?.emit('lock_node', elementId);
   }, [socket]);
 
   const emitElementUnlock = useCallback((elementId: string) => {
-    socket?.emit('element:unlock', elementId);
+    socket?.emit('unlock_node', elementId);
   }, [socket]);
 
   const emitCursorMove = useCallback((position: Position) => {
-    socket?.emit('cursor:move', { userId, position });
+    socket?.emit('cursor_move', { userId, position });
   }, [socket, userId]);
 
   return (
