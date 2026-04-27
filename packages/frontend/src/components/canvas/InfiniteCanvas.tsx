@@ -8,6 +8,9 @@ import { Shape } from './elements/Shape';
 import { TextBlock } from './elements/TextBlock';
 import { Drawing } from './elements/Drawing';
 import { CursorPresence } from './CursorPresence';
+import { PresenceHeatmap, usePresenceHeatmap } from './PresenceHeatmap';
+import { PresenceZones, usePresenceZones } from './PresenceZones';
+import { TimeTravel } from './TimeTravel';
 import { cn } from '@/lib/utils';
 import type { Position } from '@/types/canvas';
 
@@ -17,6 +20,11 @@ export function InfiniteCanvas() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<Position | null>(null);
   const [drawPoints, setDrawPoints] = useState<Position[]>([]);
+  const [showTimeTravel, setShowTimeTravel] = useState(false);
+
+  // Creative bonus feature toggles
+  const { isEnabled: heatmapEnabled, toggle: toggleHeatmap } = usePresenceHeatmap();
+  const { isEnabled: zonesEnabled, toggle: toggleZones } = usePresenceZones();
 
   const {
     elements,
