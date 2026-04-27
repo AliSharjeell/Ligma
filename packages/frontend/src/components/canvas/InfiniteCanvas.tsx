@@ -35,13 +35,15 @@ export function InfiniteCanvas() {
 
   const {
     elements,
-    selectedId,
+    selectedIds,
     tool,
     shapeType,
     viewportPosition,
     viewportZoom,
     userId,
     setSelectedId,
+    setSelectedIds,
+    clearSelection,
     setViewportPosition,
     setViewportZoom,
     addElement,
@@ -89,16 +91,19 @@ export function InfiniteCanvas() {
 
     // Select tool - click to select element OR start box selection
     if (tool === 'select') {
-      // Check if clicking on an element
       const elementsArray = Array.from(elements.values());
       const clickedElement = elementsArray.find((element) => isPointInElement(x, y, element));
 
       if (clickedElement) {
-        setSelectedId(clickedElement.id);
+        if (e.shiftKey) {
+          setSelectedId(clickedElement.id);
+        } else {
+          setSelectedIds(new Set([clickedElement.id]));
+        }
         setIsDragging(true);
         setDragStart({ x, y });
       } else {
-        // Start box selection on empty area
+        clearSelection();
         setIsBoxSelecting(true);
         setBoxStart({ x, y });
         setBoxEnd({ x, y });
@@ -246,13 +251,15 @@ export function InfiniteCanvas() {
         bottom: Math.max(boxStart.y, boxEnd.y),
       };
 
-      let firstId: string | null = null;
+      const selectedElementIds = new Set<string>();
       elements.forEach((element) => {
         if (isElementInBox(element, box)) {
-          if (!firstId) firstId = element.id;
+          selectedElementIds.add(element.id);
         }
       });
-      if (firstId) setSelectedId(firstId);
+      if (selectedElementIds.size > 0) {
+        setSelectedIds(selectedElementIds);
+      }
     }
 
     setIsDragging(false);
@@ -262,13 +269,13 @@ export function InfiniteCanvas() {
     setBoxStart(null);
     setBoxEnd(null);
     setDragStart(null);
-  }, [isPanning, isDragging, isDrawingShape, tool, drawPoints, userId, addElement, emitElementCreate, boxStart, boxEnd, elements, setSelectedId, shapePreview, shapeType, selectedId, updateElement, emitElementUpdate]);
+  }, [isPanning, isDragging, isDrawingShape, tool, drawPoints, userId, addElement, emitElementCreate, boxStart, boxEnd, elements, setSelectedId, shapePreview, shapeType, selectedIds, updateElement, emitElementUpdate]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
-      setSelectedId(null);
+      clearSelection();
     }
-  }, [setSelectedId]);
+  }, [clearSelection]);
 
   // Listen for element selection from child components
   useEffect(() => {
@@ -281,15 +288,17 @@ export function InfiniteCanvas() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
-        emitElementDelete(selectedId);
-        deleteElement(selectedId);
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size > 0) {
+        selectedIds.forEach((id) => {
+          emitElementDelete(id);
+          deleteElement(id);
+        });
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, deleteElement, emitElementDelete]);
+  }, [selectedIds, deleteElement, emitElementDelete]);
 
   return (
     <div
