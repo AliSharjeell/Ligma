@@ -31,6 +31,8 @@ export function PresenceHeatmap({ visible }: PresenceHeatmapProps) {
 
   // Track cursor movements and update heatmap
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const handleMouseMove = (e: MouseEvent) => {
       // Get the canvas element
       const canvas = document.querySelector('[data-canvas]');
@@ -68,6 +70,7 @@ export function PresenceHeatmap({ visible }: PresenceHeatmapProps) {
 
   // Calculate the visible grid range
   const visibleGridRange = useMemo(() => {
+    if (typeof window === 'undefined') return { minX: -10, maxX: 10, minY: -10, maxY: 10 };
     const canvas = document.querySelector('[data-canvas]');
     if (!canvas) return { minX: -10, maxX: 10, minY: -10, maxY: 10 };
 

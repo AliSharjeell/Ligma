@@ -22,6 +22,7 @@ export function InfiniteCanvas() {
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
   const [boxStart, setBoxStart] = useState<Position | null>(null);
   const [boxEnd, setBoxEnd] = useState<Position | null>(null);
+  const [shapeStart, setShapeStart] = useState<Position | null>(null);
   const [shapePreview, setShapePreview] = useState<{ start: Position; end: Position } | null>(null);
   const [dragStart, setDragStart] = useState<Position | null>(null);
   const [drawPoints, setDrawPoints] = useState<Position[]>([]);
@@ -89,12 +90,8 @@ export function InfiniteCanvas() {
     // Select tool - click to select element OR start box selection
     if (tool === 'select') {
       // Check if clicking on an element
-      let clickedElement: CanvasElement | null = null;
-      elements.forEach((element) => {
-        if (isPointInElement(x, y, element)) {
-          clickedElement = element;
-        }
-      });
+      const elementsArray = Array.from(elements.values());
+      const clickedElement = elementsArray.find((element) => isPointInElement(x, y, element));
 
       if (clickedElement) {
         setSelectedId(clickedElement.id);
