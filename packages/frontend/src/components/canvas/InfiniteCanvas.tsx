@@ -38,6 +38,10 @@ export function InfiniteCanvas() {
     selectedIds,
     tool,
     shapeType,
+    drawColor,
+    shapeColor,
+    stickyColor,
+    textColor,
     viewportPosition,
     viewportZoom,
     userId,
@@ -133,7 +137,7 @@ export function InfiniteCanvas() {
         position: { x: x - 100, y: y - 50 },
         size: { width: 200, height: 150 },
         content: '',
-        color: '#fef08a',
+        color: stickyColor,
         locked: false,
         createdBy: userId,
       });
@@ -145,13 +149,14 @@ export function InfiniteCanvas() {
         position: { x, y },
         size: { width: 200, height: 40 },
         content: 'Double-click to edit',
+        color: textColor,
         locked: false,
         createdBy: userId,
       });
       emitElementCreate(element);
       setSelectedId(element.id);
     }
-  }, [tool, viewportPosition, viewportZoom, userId, addElement, setSelectedId, shapeType, emitElementCreate, elements, deleteElement, emitElementDelete]);
+  }, [tool, viewportPosition, viewportZoom, userId, addElement, setSelectedId, shapeType, emitElementCreate, elements, deleteElement, emitElementDelete, stickyColor, textColor]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -209,7 +214,7 @@ export function InfiniteCanvas() {
         size: { width: 0, height: 0 },
         content: '',
         points: drawPoints,
-        color: '#1f2937',
+        color: drawColor,
         locked: false,
         createdBy: userId,
       });
@@ -231,7 +236,7 @@ export function InfiniteCanvas() {
           size: { width, height },
           content: '',
           shapeType,
-          color: '#374151',
+          color: shapeColor,
           locked: false,
           createdBy: userId,
         });
@@ -269,7 +274,7 @@ export function InfiniteCanvas() {
     setBoxStart(null);
     setBoxEnd(null);
     setDragStart(null);
-  }, [isPanning, isDragging, isDrawingShape, tool, drawPoints, userId, addElement, emitElementCreate, boxStart, boxEnd, elements, setSelectedId, shapePreview, shapeType, selectedIds, updateElement, emitElementUpdate]);
+  }, [isPanning, isDragging, isDrawingShape, tool, drawPoints, userId, addElement, emitElementCreate, boxStart, boxEnd, elements, setSelectedId, shapePreview, shapeType, selectedIds, updateElement, emitElementUpdate, drawColor, shapeColor]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
@@ -362,7 +367,7 @@ export function InfiniteCanvas() {
                   <path
                     d={path}
                     fill="none"
-                    stroke="#1f2937"
+                    stroke={drawColor}
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"

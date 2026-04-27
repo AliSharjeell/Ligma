@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { SocketProvider } from '@/contexts/socket-context';
 import { Header } from '@/components/layout/Header';
@@ -11,8 +9,9 @@ import { TimeTravel } from '@/components/canvas/TimeTravel';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
 
-export default function Home() {
-  const roomId = 'default';
+export default function RoomPage({ params }: { params: { id: string } }) {
+  const roomId = decodeURIComponent(params.id);
+
   return (
     <SocketProvider url={WS_URL} canvasId={roomId}>
       <main className="h-screen w-screen flex flex-col overflow-hidden">

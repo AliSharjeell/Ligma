@@ -152,10 +152,11 @@ export interface TaskBoardEntry {
   id: string;
   nodeId: string;
   title: string;
-  description: string;
+  description: string | undefined;
   status: 'pending' | 'in_progress' | 'completed';
   assignee?: string;
   dueDate?: string;
+  priority?: 'low' | 'medium' | 'high';
   createdAt: number;
   canvasId: string;
 }
@@ -182,6 +183,10 @@ export class TaskBoard {
     if (!task) return false;
     task.status = status;
     return true;
+  }
+
+  getTask(taskId: string): TaskBoardEntry | undefined {
+    return this.tasks.get(taskId);
   }
 
   getPendingTasks(canvasId: string): TaskBoardEntry[] {

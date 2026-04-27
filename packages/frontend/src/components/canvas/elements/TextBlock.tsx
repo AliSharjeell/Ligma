@@ -123,7 +123,10 @@ export function TextBlock({ element }: TextBlockProps) {
           className="px-2 py-1 text-lg font-medium bg-transparent border-none outline-none w-full min-w-[100px]"
         />
       ) : (
-        <div className="px-2 py-1 text-lg font-medium text-gray-800 whitespace-nowrap">
+        <div
+          className="px-2 py-1 text-lg font-medium whitespace-nowrap"
+          style={{ color: element.color || '#1f2937' }}
+        >
           {element.content || 'Double-click to edit'}
         </div>
       )}

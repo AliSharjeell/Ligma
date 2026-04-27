@@ -10,6 +10,10 @@ interface HistoryEntry {
 interface CanvasStore extends CanvasState {
   setTool: (tool: Tool) => void;
   setShapeType: (shapeType: ShapeType) => void;
+  setDrawColor: (color: string) => void;
+  setShapeColor: (color: string) => void;
+  setStickyColor: (color: string) => void;
+  setTextColor: (color: string) => void;
   setSelectedId: (id: string | null) => void;
   setSelectedIds: (ids: Set<string>) => void;
   addToSelection: (id: string) => void;
@@ -36,10 +40,12 @@ interface CanvasStore extends CanvasState {
   removeUser: (userId: string) => void;
 
   addTask: (task: Omit<Task, 'id'>) => void;
+  addRemoteTask: (task: Task) => void;
+  setTasks: (tasks: Task[]) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
-
-  addEvent: (event: Omit<CanvasEvent, 'id' | 'timestamp' | 'userId' | 'userName'>) => void;
+  addRemoteEvent: (event: CanvasEvent) => void;
+  setEventLog: (events: CanvasEvent[]) => void;
 
   getElement: (id: string) => CanvasElement | undefined;
 }
@@ -49,6 +55,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   selectedIds: new Set(),
   tool: 'select',
   shapeType: 'rectangle',
+  drawColor: '#1f2937',
+  shapeColor: '#374151',
+  stickyColor: '#fef08a',
+  textColor: '#1f2937',
   users: new Map(),
   tasks: [],
   eventLog: [],
@@ -61,6 +71,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   setTool: (tool) => set({ tool }),
   setShapeType: (shapeType) => set({ shapeType }),
+  setDrawColor: (color) => set({ drawColor: color }),
+  setShapeColor: (color) => set({ shapeColor: color }),
+  setStickyColor: (color) => set({ stickyColor: color }),
+  setTextColor: (color) => set({ textColor: color }),
   setSelectedId: (id) => set({ selectedIds: id ? new Set([id]) : new Set() }),
   setSelectedIds: (ids) => set({ selectedIds: ids }),
   addToSelection: (id) => set((state) => {
@@ -100,11 +114,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const newElements = new Map(state.elements);
       newElements.set(element.id, element);
       return { elements: newElements, history: newHistory, redoStack: [] };
-    });
-    get().addEvent({
-      type: 'create',
-      elementId: element.id,
-      details: `Created ${elementData.type}`,
     });
     return element;
   },
@@ -146,7 +155,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         redoStack: [],
       };
     });
-    get().addEvent({ type: 'delete', elementId: id });
   },
 
   lockElement: (id) => {
@@ -158,7 +166,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       newElements.set(id, { ...element, locked: true, lockedBy: userId });
       return { elements: newElements };
     });
-    get().addEvent({ type: 'lock', elementId: id });
     return true;
   },
 
@@ -170,7 +177,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       newElements.set(id, { ...element, locked: false, lockedBy: undefined });
       return { elements: newElements };
     });
-    get().addEvent({ type: 'unlock', elementId: id });
   },
 
   undo: () => {
@@ -251,6 +257,19 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     set((state) => ({ tasks: [...state.tasks, task] }));
   },
 
+  addRemoteTask: (task) => {
+    set((state) => {
+      if (state.tasks.some((existing) => existing.id === task.id)) {
+        return state;
+      }
+      return { tasks: [task, ...state.tasks] };
+    });
+  },
+
+  setTasks: (tasks) => {
+    set({ tasks });
+  },
+
   updateTask: (id, updates) => {
     set((state) => ({
       tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
@@ -263,18 +282,19 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     }));
   },
 
-  addEvent: (eventData) => {
-    const { userId, userName } = get();
-    const event: CanvasEvent = {
-      ...eventData,
-      id: uuidv4(),
-      userId,
-      userName,
-      timestamp: Date.now(),
-    };
-    set((state) => ({
-      eventLog: [event, ...state.eventLog].slice(0, 100),
-    }));
+  addRemoteEvent: (event) => {
+    set((state) => {
+      if (state.eventLog.some((existing) => existing.id === event.id)) {
+        return state;
+      }
+      const next = [event, ...state.eventLog].slice(0, 100);
+      return { eventLog: next };
+    });
+  },
+
+  setEventLog: (events) => {
+    const sorted = [...events].sort((a, b) => b.timestamp - a.timestamp).slice(0, 100);
+    set({ eventLog: sorted });
   },
 
   getElement: (id) => get().elements.get(id),

@@ -37,6 +37,16 @@ interface ClientState {
   cursors: Map<string, { x: number; y: number; userId: string; userName: string }>;
 }
 
+interface ActivityEvent {
+  id: string;
+  type: 'create' | 'update' | 'delete' | 'lock' | 'unlock';
+  elementId: string;
+  userId: string;
+  userName: string;
+  timestamp: number;
+  details?: string;
+}
+
 export class SocketHandler {
   private io: Server;
   private eventStore: EventStore;
@@ -47,6 +57,8 @@ export class SocketHandler {
   private taskBoard: TaskBoard;
   private clientStates: Map<string, ClientState> = new Map();
   private lastEventPerClient: Map<string, string> = new Map();
+  private activityByCanvas: Map<string, ActivityEvent[]> = new Map();
+  private activityLimit = 200;
 
   constructor(io: Server) {
     this.io = io;
@@ -81,6 +93,22 @@ export class SocketHandler {
       });
     }
     return this.clientStates.get(canvasId)!;
+  }
+
+  private getOrCreateActivityLog(canvasId: string): ActivityEvent[] {
+    if (!this.activityByCanvas.has(canvasId)) {
+      this.activityByCanvas.set(canvasId, []);
+    }
+    return this.activityByCanvas.get(canvasId)!;
+  }
+
+  private pushActivity(canvasId: string, event: ActivityEvent): void {
+    const log = this.getOrCreateActivityLog(canvasId);
+    log.unshift(event);
+    if (log.length > this.activityLimit) {
+      log.length = this.activityLimit;
+    }
+    this.io.to(canvasId).emit('activity_event', event);
   }
 
   handleConnection(socket: Socket): void {
@@ -131,8 +159,16 @@ export class SocketHandler {
       this.handleGetTasks(socket, data);
     });
 
+    socket.on('create_task', (data: { canvasId: string; title: string; description?: string; priority: 'low' | 'medium' | 'high' }) => {
+      this.handleCreateTask(socket, data);
+    });
+
     socket.on('update_task_status', (data: { taskId: string; status: 'pending' | 'in_progress' | 'completed' }) => {
       this.handleUpdateTaskStatus(socket, data);
+    });
+
+    socket.on('delete_task', (data: { taskId: string }) => {
+      this.handleDeleteTask(socket, data);
     });
 
     socket.on('disconnect', () => {
@@ -171,6 +207,12 @@ export class SocketHandler {
 
     this.eventStore.append(joinEvent);
     this.io.to(canvasId).emit('user_joined', joinEvent);
+
+    const activityLog = this.getOrCreateActivityLog(canvasId);
+    socket.emit('activity_sync', { events: activityLog });
+
+    const tasks = this.taskBoard.getTasksByCanvas(canvasId);
+    socket.emit('tasks_list', { tasks });
 
     const existingCursors = Array.from(clientState.cursors.values());
     socket.emit('existing_cursors', existingCursors);
@@ -217,15 +259,27 @@ export class SocketHandler {
     socket.to(canvasId).emit('node_created', event);
     socket.emit('node_created_ack', { nodeId, eventId: event.id });
 
+    const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
+    this.pushActivity(canvasId, {
+      id: event.id,
+      type: 'create',
+      elementId: nodeId,
+      userId,
+      userName,
+      timestamp: event.timestamp,
+      details: `Created ${nodeType}`
+    });
+
     const intent = this.intentExtractor.analyze(content);
     if (intent.type === 'action_item' && intent.suggestedTask) {
-      this.taskBoard.addTask({
+      const task = this.taskBoard.addTask({
         nodeId,
         ...intent.suggestedTask,
         status: 'pending',
-        canvasId
+        canvasId,
+        priority: 'medium'
       });
-      socket.emit('task_created', this.taskBoard.getPendingTasks(canvasId));
+      this.io.to(canvasId).emit('task_created', task);
     }
   }
 
@@ -272,6 +326,17 @@ export class SocketHandler {
     socket.to(canvasId).emit('node_updated', event);
     socket.emit('node_updated_ack', { eventId: event.id });
 
+    const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
+    this.pushActivity(canvasId, {
+      id: event.id,
+      type: 'update',
+      elementId: nodeId,
+      userId,
+      userName,
+      timestamp: event.timestamp,
+      details: 'Updated node'
+    });
+
     if (changes.content) {
       const intent = this.intentExtractor.analyze(changes.content);
       if (intent.type === 'action_item' && intent.suggestedTask) {
@@ -317,6 +382,17 @@ export class SocketHandler {
 
     socket.to(canvasId).emit('node_deleted', event);
     socket.emit('node_deleted_ack', { eventId: event.id });
+
+    const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
+    this.pushActivity(canvasId, {
+      id: event.id,
+      type: 'delete',
+      elementId: nodeId,
+      userId,
+      userName,
+      timestamp: event.timestamp,
+      details: 'Deleted node'
+    });
   }
 
   private handleLockNode(socket: Socket, data: { canvasId: string; nodeId: string; durationMs?: number }): void {
@@ -349,6 +425,17 @@ export class SocketHandler {
 
     this.eventStore.append(event);
     this.io.to(canvasId).emit('node_locked', event);
+
+    const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
+    this.pushActivity(canvasId, {
+      id: event.id,
+      type: 'lock',
+      elementId: nodeId,
+      userId,
+      userName,
+      timestamp: event.timestamp,
+      details: 'Locked node'
+    });
   }
 
   private handleUnlockNode(socket: Socket, data: { canvasId: string; nodeId: string }): void {
@@ -379,6 +466,17 @@ export class SocketHandler {
 
     this.eventStore.append(event);
     this.io.to(canvasId).emit('node_unlocked', event);
+
+    const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
+    this.pushActivity(canvasId, {
+      id: event.id,
+      type: 'unlock',
+      elementId: nodeId,
+      userId,
+      userName,
+      timestamp: event.timestamp,
+      details: 'Unlocked node'
+    });
   }
 
   private handleCursorMove(socket: Socket, data: { canvasId: string; position: { x: number; y: number } }): void {
@@ -454,8 +552,52 @@ export class SocketHandler {
 
   private handleUpdateTaskStatus(socket: Socket, data: { taskId: string; status: 'pending' | 'in_progress' | 'completed' }): void {
     const { taskId, status } = data;
+    const task = this.taskBoard.getTask(taskId);
     const success = this.taskBoard.updateTaskStatus(taskId, status);
     socket.emit('task_status_updated', { taskId, success });
+    if (success) {
+      const canvasId = task?.canvasId;
+      if (canvasId) {
+        this.io.to(canvasId).emit('task_updated', { taskId, status });
+      } else {
+        this.io.emit('task_updated', { taskId, status });
+      }
+    }
+  }
+
+  private handleCreateTask(socket: Socket, data: { canvasId: string; title: string; description?: string; priority: 'low' | 'medium' | 'high' }): void {
+    const { canvasId, title, description, priority } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+    const userName = this.clientStates.get(canvasId)?.users.get(userId || '')?.userName || 'Unknown';
+
+    if (!userId) return;
+
+    const task = this.taskBoard.addTask({
+      nodeId: `manual-${Date.now()}`,
+      title,
+      description,
+      status: 'pending',
+      canvasId,
+      assignee: userName,
+      dueDate: undefined,
+      priority
+    });
+
+    this.io.to(canvasId).emit('task_created', task);
+  }
+
+  private handleDeleteTask(socket: Socket, data: { taskId: string }): void {
+    const { taskId } = data;
+    const task = this.taskBoard.getTask(taskId);
+    const success = this.taskBoard.deleteTask(taskId);
+    if (success) {
+      const canvasId = task?.canvasId;
+      if (canvasId) {
+        this.io.to(canvasId).emit('task_deleted', { taskId });
+      } else {
+        this.io.emit('task_deleted', { taskId });
+      }
+    }
   }
 
   private handleDisconnect(socket: Socket): void {

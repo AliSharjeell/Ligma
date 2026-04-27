@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useCanvasStore } from '@/store/canvas-store';
-import type { CanvasElement, Position, ShapeType, Size, User } from '@/types/canvas';
+import type { CanvasElement, CanvasEvent, Position, ShapeType, Size, Task, User } from '@/types/canvas';
 
 type NodeCreatedEvent = {
   id: string;
@@ -81,6 +81,23 @@ type UserLeftEvent = {
   userName?: string;
 };
 
+type ActivitySyncPayload = {
+  events: CanvasEvent[];
+};
+
+type TaskDto = {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  assignee?: string;
+  priority?: 'low' | 'medium' | 'high';
+};
+
+type TasksListPayload = {
+  tasks: TaskDto[];
+};
+
 interface SocketContextType {
   socket: Socket | null;
   connected: boolean;
@@ -90,6 +107,9 @@ interface SocketContextType {
   emitElementLock: (elementId: string) => void;
   emitElementUnlock: (elementId: string) => void;
   emitCursorMove: (position: Position) => void;
+  emitTaskCreate: (task: { title: string; description?: string; priority: 'low' | 'medium' | 'high' }) => void;
+  emitTaskUpdate: (taskId: string, status: 'pending' | 'in-progress' | 'completed') => void;
+  emitTaskDelete: (taskId: string) => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -101,6 +121,9 @@ const SocketContext = createContext<SocketContextType>({
   emitElementLock: () => {},
   emitElementUnlock: () => {},
   emitCursorMove: () => {},
+  emitTaskCreate: () => {},
+  emitTaskUpdate: () => {},
+  emitTaskDelete: () => {},
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -108,9 +131,10 @@ export const useSocket = () => useContext(SocketContext);
 interface SocketProviderProps {
   children: React.ReactNode;
   url?: string;
+  canvasId?: string;
 }
 
-export function SocketProvider({ children, url = 'http://localhost:3001' }: SocketProviderProps) {
+export function SocketProvider({ children, url = 'http://localhost:3001', canvasId = 'default' }: SocketProviderProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
 
@@ -125,9 +149,24 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
     updateUserCursor,
     addUser,
     removeUser,
+    addRemoteEvent,
+    setEventLog,
+    setTasks,
+    addRemoteTask,
+    updateTask,
+    deleteTask,
   } = useCanvasStore();
 
-  const canvasId = 'default';
+  const toTask = useCallback((task: TaskDto): Task => {
+    return {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status === 'in_progress' ? 'in-progress' : task.status,
+      assignee: task.assignee,
+      priority: task.priority || 'medium',
+    };
+  }, []);
 
   const toCanvasElement = useCallback((event: NodeCreatedEvent): CanvasElement => {
     const now = Date.now();
@@ -178,6 +217,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
         userName,
         role: 'Contributor',
       });
+      newSocket.emit('get_tasks', { canvasId });
     });
 
     newSocket.on('disconnect', () => {
@@ -221,12 +261,36 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
       removeUser(event.userId);
     });
 
+    newSocket.on('activity_sync', (payload: ActivitySyncPayload) => {
+      setEventLog(payload.events || []);
+    });
+
+    newSocket.on('activity_event', (event: CanvasEvent) => {
+      addRemoteEvent(event);
+    });
+
+    newSocket.on('tasks_list', (payload: TasksListPayload) => {
+      setTasks((payload.tasks || []).map(toTask));
+    });
+
+    newSocket.on('task_created', (task: TaskDto) => {
+      addRemoteTask(toTask(task));
+    });
+
+    newSocket.on('task_updated', ({ taskId, status }: { taskId: string; status: TaskDto['status'] }) => {
+      updateTask(taskId, { status: status === 'in_progress' ? 'in-progress' : status });
+    });
+
+    newSocket.on('task_deleted', ({ taskId }: { taskId: string }) => {
+      deleteTask(taskId);
+    });
+
     setSocket(newSocket);
 
     return () => {
       newSocket.disconnect();
     };
-  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, toCanvasElement, toUser]);
+  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask]);
 
   const emitElementCreate = useCallback((element: CanvasElement) => {
     // For drawing elements, use create_node with nodeType='drawing'
@@ -287,6 +351,18 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
     socket?.emit('cursor_move', { canvasId, position });
   }, [socket, canvasId]);
 
+  const emitTaskCreate = useCallback((task: { title: string; description?: string; priority: 'low' | 'medium' | 'high' }) => {
+    socket?.emit('create_task', { canvasId, ...task });
+  }, [socket, canvasId]);
+
+  const emitTaskUpdate = useCallback((taskId: string, status: 'pending' | 'in-progress' | 'completed') => {
+    socket?.emit('update_task_status', { taskId, status: status === 'in-progress' ? 'in_progress' : status });
+  }, [socket]);
+
+  const emitTaskDelete = useCallback((taskId: string) => {
+    socket?.emit('delete_task', { taskId });
+  }, [socket]);
+
   return (
     <SocketContext.Provider
       value={{
@@ -298,6 +374,9 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
         emitElementLock,
         emitElementUnlock,
         emitCursorMove,
+        emitTaskCreate,
+        emitTaskUpdate,
+        emitTaskDelete,
       }}
     >
       {children}

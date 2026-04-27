@@ -1,18 +1,41 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { TaskBoard } from '@/components/panels/TaskBoard';
 import { EventLog } from '@/components/panels/EventLog';
 import { useSocket } from '@/contexts/socket-context';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Wifi, WifiOff, Users } from 'lucide-react';
 
 interface HeaderProps {
   className?: string;
+  currentRoom?: string;
 }
 
-export function Header({ className }: HeaderProps) {
+export function Header({ className, currentRoom = 'default' }: HeaderProps) {
   const { connected } = useSocket();
+  const router = useRouter();
+  const [roomInput, setRoomInput] = useState(currentRoom);
+
+  useEffect(() => {
+    setRoomInput(currentRoom);
+  }, [currentRoom]);
+
+  const handleJoinRoom = () => {
+    const trimmed = roomInput.trim();
+    if (!trimmed) return;
+    router.push(`/room/${encodeURIComponent(trimmed)}`);
+  };
+
+  const handleCreateRoom = () => {
+    const generated = `room-${Math.random().toString(36).slice(2, 8)}`;
+    router.push(`/room/${generated}`);
+  };
 
   return (
     <header className={cn('h-14 border-b bg-white px-4 flex items-center justify-between', className)}>
@@ -27,6 +50,41 @@ export function Header({ className }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-4">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm">
+              Room: {currentRoom}
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Join or Create Room</DialogTitle>
+              <DialogDescription>
+                Use a room ID to collaborate with others.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="roomId">Room ID</Label>
+                <Input
+                  id="roomId"
+                  value={roomInput}
+                  onChange={(e) => setRoomInput(e.target.value)}
+                  placeholder="e.g. sprint-planning"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={handleCreateRoom}>
+                Create New
+              </Button>
+              <Button onClick={handleJoinRoom}>
+                Join Room
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <div className="flex items-center gap-2">
           <div className={cn(
             'flex items-center gap-1.5 px-2 py-1 rounded-full text-xs',

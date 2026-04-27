@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { Button } from '@/components/ui/button';
@@ -42,8 +42,32 @@ const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
 ];
 
 export function Toolbar() {
-  const { tool, shapeType, selectedIds, setTool, setShapeType, deleteElement, lockElement, unlockElement, getElement, userId, undo, redo, canUndo, canRedo } = useCanvasStore();
-  const { emitElementDelete, emitElementLock, emitElementUnlock } = useSocket();
+  const {
+    tool,
+    shapeType,
+    drawColor,
+    shapeColor,
+    stickyColor,
+    textColor,
+    selectedIds,
+    setTool,
+    setShapeType,
+    setDrawColor,
+    setShapeColor,
+    setStickyColor,
+    setTextColor,
+    deleteElement,
+    lockElement,
+    unlockElement,
+    updateElement,
+    getElement,
+    userId,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useCanvasStore();
+  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate } = useSocket();
 
   // Creative bonus feature toggles
   const [showHeatmap, setShowHeatmap] = useState(false);
@@ -54,6 +78,8 @@ export function Toolbar() {
   const selectedElement = selectedId ? getElement(selectedId) : null;
   const isLocked = selectedElement?.locked && selectedElement.lockedBy !== userId;
   const isEditing = selectedElement?.locked && selectedElement.lockedBy === userId;
+
+  const colorSwatches = ['#1f2937', '#ef4444', '#22c55e', '#06b6d4', '#8b5cf6', '#f97316', '#0f172a'];
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -105,6 +131,22 @@ export function Toolbar() {
         emitElementLock(selectedId);
       }
     }
+  };
+
+  const handleColorSelect = (color: string) => {
+    if (selectedElement) {
+      updateElement(selectedElement.id, { color });
+      const updated = useCanvasStore.getState().getElement(selectedElement.id);
+      if (updated) {
+        emitElementUpdate(updated);
+      }
+      return;
+    }
+
+    if (tool === 'draw') setDrawColor(color);
+    if (tool === 'shape') setShapeColor(color);
+    if (tool === 'sticky') setStickyColor(color);
+    if (tool === 'text') setTextColor(color);
   };
 
   return (
@@ -168,6 +210,29 @@ export function Toolbar() {
               {s.icon}
             </Button>
           ))}
+        </div>
+      )}
+
+      {(tool === 'draw' || tool === 'shape' || tool === 'sticky' || tool === 'text' || selectedElement) && (
+        <div className="bg-white rounded-lg shadow-lg border p-2 flex flex-col gap-2">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            {selectedElement ? 'Element Color' : 'Tool Color'}
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {colorSwatches.map((color) => (
+              <button
+                key={color}
+                onClick={() => handleColorSelect(color)}
+                className={cn(
+                  'h-6 w-6 rounded-full border border-gray-200 hover:scale-105 transition-transform',
+                  (selectedElement?.color || (tool === 'draw' ? drawColor : tool === 'shape' ? shapeColor : tool === 'sticky' ? stickyColor : textColor)) === color &&
+                    'ring-2 ring-gray-800'
+                )}
+                style={{ backgroundColor: color }}
+                title={color}
+              />
+            ))}
+          </div>
         </div>
       )}
 

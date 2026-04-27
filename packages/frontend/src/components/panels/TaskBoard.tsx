@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
+import { useSocket } from '@/contexts/socket-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +29,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { Task } from '@/types/canvas';
 import { SummaryExport } from './SummaryExport';
-import { Plus, Check, Circle, Clock, AlertCircle, FileDown } from 'lucide-react';
+import { Plus, Check, Circle, Clock, AlertCircle } from 'lucide-react';
 
 const priorityColors = {
   low: 'bg-green-100 text-green-800',
@@ -43,8 +44,13 @@ const statusIcons = {
 };
 
 export function TaskBoard() {
-  const { tasks, addTask, updateTask, deleteTask } = useCanvasStore();
+  const { tasks, updateTask, deleteTask } = useCanvasStore();
+  const { emitTaskCreate, emitTaskUpdate, emitTaskDelete } = useSocket();
   const [isOpen, setIsOpen] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const seenTaskIds = useRef<Set<string>>(new Set());
+  const didInit = useRef(false);
   const [newTask, setNewTask] = useState<{ title: string; description: string; priority: Task['priority'] }>({
     title: '',
     description: '',
@@ -53,24 +59,46 @@ export function TaskBoard() {
 
   const handleAddTask = () => {
     if (!newTask.title.trim()) return;
-    addTask({
-      ...newTask,
-      status: 'pending',
+    emitTaskCreate({
+      title: newTask.title.trim(),
+      description: newTask.description.trim() || undefined,
+      priority: newTask.priority,
     });
     setNewTask({ title: '', description: '', priority: 'medium' });
     setIsOpen(false);
   };
 
   const handleStatusChange = (taskId: string, status: Task['status']) => {
+    emitTaskUpdate(taskId, status);
     updateTask(taskId, { status });
   };
 
   const handleDeleteTask = (taskId: string) => {
+    emitTaskDelete(taskId);
     deleteTask(taskId);
   };
 
+  useEffect(() => {
+    if (!didInit.current) {
+      tasks.forEach((task) => seenTaskIds.current.add(task.id));
+      didInit.current = true;
+      return;
+    }
+    const unseen = tasks.filter((task) => !seenTaskIds.current.has(task.id));
+    if (unseen.length > 0 && !isSheetOpen) {
+      setUnreadCount((count) => count + unseen.length);
+    }
+    unseen.forEach((task) => seenTaskIds.current.add(task.id));
+  }, [tasks, isSheetOpen]);
+
+  useEffect(() => {
+    if (isSheetOpen) {
+      setUnreadCount(0);
+    }
+  }, [isSheetOpen]);
+
   return (
-    <Sheet>
+    <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <AlertCircle className="size-4" />
@@ -79,6 +107,11 @@ export function TaskBoard() {
             <Badge variant="secondary" className="ml-1">
               {tasks.length}
             </Badge>
+          )}
+          {unreadCount > 0 && (
+            <span className="ml-1 rounded-full bg-red-500 text-white text-xs px-1.5 py-0.5">
+              {unreadCount}
+            </span>
           )}
         </Button>
       </SheetTrigger>

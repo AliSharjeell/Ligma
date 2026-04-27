@@ -49,6 +49,10 @@ export interface CanvasState {
   selectedIds: Set<string>;
   tool: Tool;
   shapeType: ShapeType;
+  drawColor: string;
+  shapeColor: string;
+  stickyColor: string;
+  textColor: string;
   users: Map<string, User>;
   tasks: Task[];
   eventLog: CanvasEvent[];
