@@ -19,10 +19,12 @@ export function InfiniteCanvas() {
   const [isPanning, setIsPanning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [isDrawingShape, setIsDrawingShape] = useState(false);
   const [selectionBox, setSelectionBox] = useState<{ start: Position; end: Position } | null>(null);
+  const [shapeStart, setShapeStart] = useState<Position | null>(null);
+  const [shapePreview, setShapePreview] = useState<{ start: Position; end: Position } | null>(null);
   const [dragStart, setDragStart] = useState<Position | null>(null);
   const [drawPoints, setDrawPoints] = useState<Position[]>([]);
-  const [shapePreview, setShapePreview] = useState<{ start: Position; end: Position } | null>(null);
   const [showTimeTravel, setShowTimeTravel] = useState(false);
   const [isErasing, setIsErasing] = useState(false);
 
@@ -98,10 +100,10 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Shape tool - start drawing
+    // Shape tool - start drawing rectangle
     if (tool === 'shape') {
-      setIsDragging(true);
-      setDragStart({ x, y });
+      setIsDrawingShape(true);
+      setShapeStart({ x, y });
       setShapePreview({ start: { x, y }, end: { x, y } });
       return;
     }
@@ -155,8 +157,8 @@ export function InfiniteCanvas() {
     }
 
     // Shape tool - update preview
-    if (isDragging && tool === 'shape' && dragStart) {
-      setShapePreview({ start: dragStart, end: { x, y } });
+    if (isDrawingShape && tool === 'shape' && shapeStart) {
+      setShapePreview({ start: shapeStart, end: { x, y } });
       return;
     }
 
@@ -174,7 +176,7 @@ export function InfiniteCanvas() {
     if (isSelecting && selectionBox) {
       setSelectionBox({ ...selectionBox, end: { x, y } });
     }
-  }, [isPanning, isDragging, isErasing, isSelecting, dragStart, viewportPosition, tool, emitCursorMove, setViewportPosition, elements, deleteElement, emitElementDelete, selectionBox]);
+  }, [isPanning, isDragging, isErasing, isSelecting, isDrawingShape, dragStart, shapeStart, viewportPosition, tool, emitCursorMove, setViewportPosition, elements, deleteElement, emitElementDelete, selectionBox]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -198,7 +200,7 @@ export function InfiniteCanvas() {
     }
 
     // Create shape on mouse up (paint style)
-    if (isDragging && tool === 'shape' && shapePreview) {
+    if (isDrawingShape && tool === 'shape' && shapePreview) {
       const width = Math.abs(shapePreview.end.x - shapePreview.start.x);
       const height = Math.abs(shapePreview.end.y - shapePreview.start.y);
       if (width > 5 && height > 5) {
@@ -219,6 +221,7 @@ export function InfiniteCanvas() {
         setSelectedId(element.id);
       }
       setShapePreview(null);
+      setShapeStart(null);
     }
 
     // Select elements in selection box
@@ -242,8 +245,9 @@ export function InfiniteCanvas() {
     setIsDragging(false);
     setIsErasing(false);
     setIsSelecting(false);
+    setIsDrawingShape(false);
     setSelectionBox(null);
-  }, [isPanning, isDragging, isSelecting, tool, drawPoints, userId, addElement, emitElementCreate, selectionBox, elements, setSelectedId, shapePreview, shapeType]);
+  }, [isPanning, isDragging, isSelecting, isDrawingShape, tool, drawPoints, userId, addElement, emitElementCreate, selectionBox, elements, setSelectedId, shapePreview, shapeType]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
