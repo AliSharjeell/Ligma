@@ -2,6 +2,36 @@
 
 A hackathon project for building a real-time collaborative canvas workspace with AI-powered features, CRDT-based conflict resolution, and event-sourced architecture.
 
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Run both frontend and backend
+npm run dev
+
+# Or run separately:
+npm run dev:frontend  # Frontend: http://localhost:3000
+npm run dev:backend   # Backend: http://localhost:3001
+```
+
+**Open http://localhost:3000 in your browser to use the app!**
+
+## Deploy on Render
+
+1. Push to GitHub
+2. Connect to Render.com
+3. Create Web Service for backend:
+   - Build command: `npm run build`
+   - Start command: `npm start`
+   - Port: 3001
+4. Create Web Service for frontend:
+   - Build command: `npm run build`
+   - Start command: `npm start`
+   - Port: 3000
+5. Set environment variable: `NEXT_PUBLIC_WS_URL` = your backend URL
+
 ## Table of Contents
 
 - [Architecture](#architecture)
