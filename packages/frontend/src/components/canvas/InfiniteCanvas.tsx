@@ -12,15 +12,19 @@ import { PresenceHeatmap, usePresenceHeatmap } from './PresenceHeatmap';
 import { PresenceZones, usePresenceZones } from './PresenceZones';
 import { TimeTravel } from './TimeTravel';
 import { cn } from '@/lib/utils';
-import type { Position } from '@/types/canvas';
+import type { Position, CanvasElement } from '@/types/canvas';
 
 export function InfiniteCanvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionBox, setSelectionBox] = useState<{ start: Position; end: Position } | null>(null);
   const [dragStart, setDragStart] = useState<Position | null>(null);
   const [drawPoints, setDrawPoints] = useState<Position[]>([]);
+  const [shapePreview, setShapePreview] = useState<{ start: Position; end: Position } | null>(null);
   const [showTimeTravel, setShowTimeTravel] = useState(false);
+  const [isErasing, setIsErasing] = useState(false);
 
   // Creative bonus feature toggles
   const { isEnabled: heatmapEnabled, toggle: toggleHeatmap } = usePresenceHeatmap();
@@ -40,6 +44,8 @@ export function InfiniteCanvas() {
     addElement,
     updateElement,
     deleteElement,
+    undo,
+    redo,
   } = useCanvasStore();
 
   const { emitCursorMove, emitElementCreate, emitElementUpdate, emitElementDelete } = useSocket();
@@ -52,24 +58,55 @@ export function InfiniteCanvas() {
   }, [viewportZoom, setViewportZoom]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 1 || (e.button === 0 && tool === 'pan')) {
-      setIsPanning(true);
-      setDragStart({ x: e.clientX - viewportPosition.x, y: e.clientY - viewportPosition.y });
-      return;
-    }
-
-    if (tool === 'draw') {
-      setIsDragging(true);
-      setDrawPoints([{ x: e.clientX, y: e.clientY }]);
-      return;
-    }
-
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     if (!canvasRect) return;
 
     const x = (e.clientX - canvasRect.left - viewportPosition.x) / viewportZoom;
     const y = (e.clientY - canvasRect.top - viewportPosition.y) / viewportZoom;
 
+    // Pan tool or middle mouse button
+    if (e.button === 1 || (e.button === 0 && tool === 'pan')) {
+      setIsPanning(true);
+      setDragStart({ x: e.clientX - viewportPosition.x, y: e.clientY - viewportPosition.y });
+      return;
+    }
+
+    // Eraser tool
+    if (tool === 'eraser') {
+      setIsErasing(true);
+      // Find element under cursor and delete
+      elements.forEach((element) => {
+        if (isPointInElement(x, y, element)) {
+          emitElementDelete(element.id);
+          deleteElement(element.id);
+        }
+      });
+      return;
+    }
+
+    // Select tool - start selection box
+    if (tool === 'select') {
+      setIsSelecting(true);
+      setSelectionBox({ start: { x, y }, end: { x, y } });
+      return;
+    }
+
+    // Draw tool
+    if (tool === 'draw') {
+      setIsDragging(true);
+      setDrawPoints([{ x: x, y: y }]);
+      return;
+    }
+
+    // Shape tool - start drawing
+    if (tool === 'shape') {
+      setIsDragging(true);
+      setDragStart({ x, y });
+      setShapePreview({ start: { x, y }, end: { x, y } });
+      return;
+    }
+
+    // Create elements on click
     if (tool === 'sticky') {
       const element = addElement({
         type: 'sticky',
@@ -77,19 +114,6 @@ export function InfiniteCanvas() {
         size: { width: 200, height: 150 },
         content: '',
         color: '#fef08a',
-        locked: false,
-        createdBy: userId,
-      });
-      emitElementCreate(element);
-      setSelectedId(element.id);
-    } else if (tool === 'shape') {
-      const element = addElement({
-        type: 'shape',
-        position: { x: x - 50, y: y - 50 },
-        size: { width: 100, height: 100 },
-        content: '',
-        shapeType,
-        color: '#e2e8f0',
         locked: false,
         createdBy: userId,
       });
@@ -107,7 +131,7 @@ export function InfiniteCanvas() {
       emitElementCreate(element);
       setSelectedId(element.id);
     }
-  }, [tool, viewportPosition, viewportZoom, userId, addElement, setSelectedId, shapeType, emitElementCreate]);
+  }, [tool, viewportPosition, viewportZoom, userId, addElement, setSelectedId, shapeType, emitElementCreate, elements, deleteElement, emitElementDelete]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -129,7 +153,28 @@ export function InfiniteCanvas() {
     if (isDragging && tool === 'draw') {
       setDrawPoints((prev) => [...prev, { x: x, y: y }]);
     }
-  }, [isPanning, isDragging, dragStart, viewportPosition, tool, emitCursorMove, setViewportPosition]);
+
+    // Shape tool - update preview
+    if (isDragging && tool === 'shape' && dragStart) {
+      setShapePreview({ start: dragStart, end: { x, y } });
+      return;
+    }
+
+    // Eraser tool - delete elements under cursor
+    if (isErasing && tool === 'eraser') {
+      elements.forEach((element) => {
+        if (isPointInElement(x, y, element)) {
+          emitElementDelete(element.id);
+          deleteElement(element.id);
+        }
+      });
+    }
+
+    // Selection box
+    if (isSelecting && selectionBox) {
+      setSelectionBox({ ...selectionBox, end: { x, y } });
+    }
+  }, [isPanning, isDragging, isErasing, isSelecting, dragStart, viewportPosition, tool, emitCursorMove, setViewportPosition, elements, deleteElement, emitElementDelete, selectionBox]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -152,8 +197,53 @@ export function InfiniteCanvas() {
       setDrawPoints([]);
     }
 
+    // Create shape on mouse up (paint style)
+    if (isDragging && tool === 'shape' && shapePreview) {
+      const width = Math.abs(shapePreview.end.x - shapePreview.start.x);
+      const height = Math.abs(shapePreview.end.y - shapePreview.start.y);
+      if (width > 5 && height > 5) {
+        const element = addElement({
+          type: 'shape',
+          position: {
+            x: Math.min(shapePreview.start.x, shapePreview.end.x),
+            y: Math.min(shapePreview.start.y, shapePreview.end.y),
+          },
+          size: { width, height },
+          content: '',
+          shapeType,
+          color: '#e2e8f0',
+          locked: false,
+          createdBy: userId,
+        });
+        emitElementCreate(element);
+        setSelectedId(element.id);
+      }
+      setShapePreview(null);
+    }
+
+    // Select elements in selection box
+    if (isSelecting && selectionBox) {
+      const box = {
+        left: Math.min(selectionBox.start.x, selectionBox.end.x),
+        right: Math.max(selectionBox.start.x, selectionBox.end.x),
+        top: Math.min(selectionBox.start.y, selectionBox.end.y),
+        bottom: Math.max(selectionBox.start.y, selectionBox.end.y),
+      };
+
+      let firstId: string | null = null;
+      elements.forEach((element) => {
+        if (isElementInBox(element, box)) {
+          if (!firstId) firstId = element.id;
+        }
+      });
+      if (firstId) setSelectedId(firstId);
+    }
+
     setIsDragging(false);
-  }, [isPanning, isDragging, tool, drawPoints, userId, addElement, emitElementCreate]);
+    setIsErasing(false);
+    setIsSelecting(false);
+    setSelectionBox(null);
+  }, [isPanning, isDragging, isSelecting, tool, drawPoints, userId, addElement, emitElementCreate, selectionBox, elements, setSelectedId]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
@@ -178,8 +268,8 @@ export function InfiniteCanvas() {
       ref={canvasRef}
       data-canvas="true"
       className={cn(
-        'w-full h-full overflow-hidden bg-slate-50 relative',
-        isPanning ? 'cursor-grabbing' : tool === 'pan' ? 'cursor-grab' : 'cursor-crosshair'
+        'w-full h-full overflow-hidden bg-slate-50 relative select-none',
+        isPanning ? 'cursor-grabbing' : tool === 'pan' ? 'cursor-grab' : tool === 'eraser' ? 'cursor-cell' : tool === 'select' ? 'cursor-default' : 'cursor-crosshair'
       )}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
@@ -245,6 +335,32 @@ export function InfiniteCanvas() {
             })()}
           </svg>
         )}
+
+        {/* Shape preview while dragging */}
+        {shapePreview && (
+          <div
+            className="absolute border-2 border-blue-500 bg-blue-500/20 pointer-events-none"
+            style={{
+              left: Math.min(shapePreview.start.x, shapePreview.end.x),
+              top: Math.min(shapePreview.start.y, shapePreview.end.y),
+              width: Math.abs(shapePreview.end.x - shapePreview.start.x),
+              height: Math.abs(shapePreview.end.y - shapePreview.start.y),
+            }}
+          />
+        )}
+
+        {/* Selection box */}
+        {isSelecting && selectionBox && (
+          <div
+            className="absolute border-2 border-blue-500 border-dashed bg-blue-500/10 pointer-events-none"
+            style={{
+              left: Math.min(selectionBox.start.x, selectionBox.end.x),
+              top: Math.min(selectionBox.start.y, selectionBox.end.y),
+              width: Math.abs(selectionBox.end.x - selectionBox.start.x),
+              height: Math.abs(selectionBox.end.y - selectionBox.start.y),
+            }}
+          />
+        )}
       </div>
 
       <CursorPresence />
@@ -256,5 +372,27 @@ export function InfiniteCanvas() {
         <span className="text-muted-foreground">Zoom: {Math.round(viewportZoom * 100)}%</span>
       </div>
     </div>
+  );
+}
+
+// Helper function to check if point is in element
+function isPointInElement(x: number, y: number, element: CanvasElement): boolean {
+  const { position, size } = element;
+  return (
+    x >= position.x &&
+    x <= position.x + size.width &&
+    y >= position.y &&
+    y <= position.y + size.height
+  );
+}
+
+// Helper function to check if element is in selection box
+function isElementInBox(element: CanvasElement, box: { left: number; right: number; top: number; bottom: number }): boolean {
+  const { position, size } = element;
+  return (
+    position.x >= box.left &&
+    position.x + size.width <= box.right &&
+    position.y >= box.top &&
+    position.y + size.height <= box.bottom
   );
 }
