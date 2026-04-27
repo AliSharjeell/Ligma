@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { CanvasElement, Position, Tool, ShapeType, Task, CanvasEvent, User, CanvasState } from '@/types/canvas';
 
+interface HistoryEntry {
+  elements: Map<string, CanvasElement>;
+  timestamp: number;
+}
+
 interface CanvasStore extends CanvasState {
   setTool: (tool: Tool) => void;
   setShapeType: (shapeType: ShapeType) => void;
@@ -14,6 +19,11 @@ interface CanvasStore extends CanvasState {
   deleteElement: (id: string) => void;
   lockElement: (id: string) => boolean;
   unlockElement: (id: string) => void;
+
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 
   updateUserCursor: (userId: string, position: Position) => void;
   addUser: (user: User) => void;
@@ -40,6 +50,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   viewportZoom: 1,
   userId: uuidv4(),
   userName: `User ${Math.floor(Math.random() * 1000)}`,
+  history: [],
+  redoStack: [],
 
   setTool: (tool) => set({ tool }),
   setShapeType: (shapeType) => set({ shapeType }),
@@ -113,6 +125,45 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     });
     get().addEvent({ type: 'unlock', elementId: id });
   },
+
+  undo: () => {
+    const { elements } = get();
+    if (elements.size === 0) return;
+    const snapshot: HistoryEntry = {
+      elements: new Map(elements),
+      timestamp: Date.now(),
+    };
+    set((state) => {
+      if (state.history.length === 0) return state;
+      const newHistory = [...state.history];
+      const lastEntry = newHistory.pop();
+      if (lastEntry) {
+        return { elements: lastEntry.elements, history: newHistory };
+      }
+      return state;
+    });
+  },
+
+  redo: () => {
+    const { redoStack } = get();
+    if (redoStack.length === 0) return;
+    set((state) => {
+      if (state.redoStack.length === 0) return state;
+      const newRedoStack = [...state.redoStack];
+      const nextEntry = newRedoStack.pop();
+      if (nextEntry) {
+        return {
+          elements: nextEntry.elements,
+          redoStack: newRedoStack,
+        };
+      }
+      return state;
+    });
+  },
+
+  canUndo: () => get().elements.size > 0,
+
+  canRedo: () => get().redoStack.length > 0,
 
   updateUserCursor: (userId, position) => {
     set((state) => {
