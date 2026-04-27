@@ -1,6 +1,6 @@
 export type ElementType = 'sticky' | 'shape' | 'text' | 'drawing';
 export type ShapeType = 'rectangle' | 'circle';
-export type Tool = 'select' | 'sticky' | 'shape' | 'text' | 'draw' | 'pan';
+export type Tool = 'select' | 'sticky' | 'shape' | 'text' | 'draw' | 'pan' | 'eraser';
 
 export interface Position {
   x: number;
@@ -56,6 +56,8 @@ export interface CanvasState {
   viewportZoom: number;
   userId: string;
   userName: string;
+  history: { elements: Map<string, CanvasElement>; timestamp: number }[];
+  redoStack: { elements: Map<string, CanvasElement>; timestamp: number }[];
 }
 
 export interface CanvasEvent {
