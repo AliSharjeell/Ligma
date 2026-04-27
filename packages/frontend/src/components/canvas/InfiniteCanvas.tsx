@@ -213,7 +213,7 @@ export function InfiniteCanvas() {
           size: { width, height },
           content: '',
           shapeType,
-          color: '#e2e8f0',
+          color: '#374151',
           locked: false,
           createdBy: userId,
         });
@@ -340,17 +340,28 @@ export function InfiniteCanvas() {
           </svg>
         )}
 
-        {/* Shape preview while dragging */}
+        {/* Shape preview while dragging - actual rectangle outline */}
         {shapePreview && (
-          <div
-            className="absolute border-2 border-blue-500 bg-blue-500/20 pointer-events-none"
+          <svg
+            className="absolute pointer-events-none"
             style={{
               left: Math.min(shapePreview.start.x, shapePreview.end.x),
               top: Math.min(shapePreview.start.y, shapePreview.end.y),
               width: Math.abs(shapePreview.end.x - shapePreview.start.x),
               height: Math.abs(shapePreview.end.y - shapePreview.start.y),
             }}
-          />
+          >
+            <rect
+              x="1"
+              y="1"
+              width={Math.abs(shapePreview.end.x - shapePreview.start.x) - 2}
+              height={Math.abs(shapePreview.end.y - shapePreview.start.y) - 2}
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth="2"
+              strokeDasharray="5,5"
+            />
+          </svg>
         )}
 
         {/* Selection box */}

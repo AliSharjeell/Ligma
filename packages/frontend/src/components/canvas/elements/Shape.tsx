@@ -10,13 +10,13 @@ interface ShapeProps {
   element: CanvasElement;
 }
 
-const COLORS = [
-  '#e2e8f0', // gray
-  '#fca5a5', // red
-  '#a5f3fc', // cyan
-  '#bbf7d0', // green
-  '#ddd6fe', // purple
-  '#fed7aa', // orange
+const STROKE_COLORS = [
+  '#374151', // gray-700
+  '#ef4444', // red
+  '#06b6d4', // cyan
+  '#22c55e', // green
+  '#8b5cf6', // purple
+  '#f97316', // orange
 ];
 
 export function Shape({ element }: ShapeProps) {
@@ -26,6 +26,7 @@ export function Shape({ element }: ShapeProps) {
   const isSelected = selectedId === element.id;
   const isLocked = element.locked && element.lockedBy !== userId;
   const isEditing = element.locked && element.lockedBy === userId;
+  const strokeColor = element.color || STROKE_COLORS[0];
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -92,24 +93,45 @@ export function Shape({ element }: ShapeProps) {
   };
 
   const renderShape = () => {
-    const style = {
-      width: '100%',
-      height: '100%',
-      backgroundColor: element.color || COLORS[0],
-    };
+    const strokeWidth = isSelected ? 3 : 2;
 
     if (element.shapeType === 'circle') {
-      return <div className="w-full h-full rounded-full" style={style} />;
+      return (
+        <svg viewBox="0 0 100 100" className="w-full h-full">
+          <ellipse
+            cx="50"
+            cy="50"
+            rx="48"
+            ry="48"
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+          />
+        </svg>
+      );
     }
 
-    return <div className="w-full h-full rounded-md" style={style} />;
+    return (
+      <svg viewBox="0 0 100 100" className="w-full h-full">
+        <rect
+          x="2"
+          y="2"
+          width="96"
+          height="96"
+          rx="8"
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={strokeWidth}
+        />
+      </svg>
+    );
   };
 
   return (
     <div
       className={cn(
         'absolute select-none cursor-move',
-        isSelected && 'ring-2 ring-primary ring-offset-2',
+        isSelected && 'ring-2 ring-blue-500 ring-offset-1',
         isLocked && 'opacity-50 pointer-events-none',
         isEditing && 'ring-2 ring-yellow-400'
       )}
@@ -127,8 +149,8 @@ export function Shape({ element }: ShapeProps) {
       {renderShape()}
 
       {isSelected && !isLocked && (
-        <div className="absolute -bottom-8 left-0 flex gap-1">
-          {COLORS.map((color) => (
+        <div className="absolute -bottom-8 left-0 flex gap-1 bg-white rounded-lg shadow-lg p-1">
+          {STROKE_COLORS.map((color) => (
             <button
               key={color}
               onClick={(e) => {
@@ -136,8 +158,8 @@ export function Shape({ element }: ShapeProps) {
                 handleColorChange(color);
               }}
               className={cn(
-                'w-5 h-5 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-110',
-                element.color === color && 'ring-2 ring-gray-400'
+                'w-6 h-6 rounded-full border-2 transition-transform hover:scale-110',
+                element.color === color ? 'border-gray-800' : 'border-transparent'
               )}
               style={{ backgroundColor: color }}
             />
