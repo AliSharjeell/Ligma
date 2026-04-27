@@ -1,16 +1,16 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import type { Metadata } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'LIGMA - Real-time Collaborative Workspace',
-  description: 'Let\'s Integrate Groups, Manage Anything - A real-time collaborative workspace that bridges ideation and execution.',
+  title: "LIGMA - Collaborative Canvas",
+  description: "Real-time collaborative workspace for hackathons",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="en">
       <body className="antialiased">
