@@ -86,10 +86,24 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Select tool - start selection box
+    // Select tool - click to select element or start selection box
     if (tool === 'select') {
-      setIsSelecting(true);
-      setSelectionBox({ start: { x, y }, end: { x, y } });
+      // Check if clicking on an element
+      let clickedElement: CanvasElement | null = null;
+      elements.forEach((element) => {
+        if (isPointInElement(x, y, element)) {
+          clickedElement = element;
+        }
+      });
+
+      if (clickedElement) {
+        setSelectedId(clickedElement.id);
+        setIsDragging(true);
+        setDragStart({ x, y });
+      } else {
+        setIsSelecting(true);
+        setSelectionBox({ start: { x, y }, end: { x, y } });
+      }
       return;
     }
 
@@ -154,6 +168,23 @@ export function InfiniteCanvas() {
 
     if (isDragging && tool === 'draw') {
       setDrawPoints((prev) => [...prev, { x: x, y: y }]);
+    }
+
+    // Move selected element
+    if (isDragging && tool === 'select' && dragStart && selectedId) {
+      const dx = x - dragStart.x;
+      const dy = y - dragStart.y;
+      const element = elements.get(selectedId);
+      if (element) {
+        updateElement(selectedId, {
+          position: {
+            x: element.position.x + dx,
+            y: element.position.y + dy,
+          },
+        });
+        setDragStart({ x, y });
+      }
+      return;
     }
 
     // Shape tool - update preview
@@ -242,12 +273,21 @@ export function InfiniteCanvas() {
       if (firstId) setSelectedId(firstId);
     }
 
+    // Stop moving selected element and emit update
+    if (isDragging && tool === 'select' && selectedId) {
+      const element = elements.get(selectedId);
+      if (element) {
+        emitElementUpdate(element);
+      }
+    }
+
     setIsDragging(false);
     setIsErasing(false);
     setIsSelecting(false);
     setIsDrawingShape(false);
+    setDragStart(null);
     setSelectionBox(null);
-  }, [isPanning, isDragging, isSelecting, isDrawingShape, tool, drawPoints, userId, addElement, emitElementCreate, selectionBox, elements, setSelectedId, shapePreview, shapeType]);
+  }, [isPanning, isDragging, isSelecting, isDrawingShape, tool, drawPoints, userId, addElement, emitElementCreate, selectionBox, elements, setSelectedId, shapePreview, shapeType, selectedId, updateElement, emitElementUpdate, dragStart]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
