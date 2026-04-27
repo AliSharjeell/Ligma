@@ -176,6 +176,7 @@ export function InfiniteCanvas() {
   return (
     <div
       ref={canvasRef}
+      data-canvas="true"
       className={cn(
         'w-full h-full overflow-hidden bg-slate-50 relative',
         isPanning ? 'cursor-grabbing' : tool === 'pan' ? 'cursor-grab' : 'cursor-crosshair'
@@ -212,8 +213,6 @@ export function InfiniteCanvas() {
             {(() => {
               const minX = Math.min(...drawPoints.map(p => p.x));
               const minY = Math.min(...drawPoints.map(p => p.y));
-              const maxX = Math.max(...drawPoints.map(p => p.x));
-              const maxY = Math.max(...drawPoints.map(p => p.y));
 
               const relativePoints = drawPoints.map(p => ({
                 x: p.x - minX,
@@ -249,6 +248,9 @@ export function InfiniteCanvas() {
       </div>
 
       <CursorPresence />
+      <PresenceHeatmap visible={heatmapEnabled} />
+      <PresenceZones visible={zonesEnabled} />
+      <TimeTravel visible={showTimeTravel} onClose={() => setShowTimeTravel(false)} />
 
       <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-3 py-2 text-sm">
         <span className="text-muted-foreground">Zoom: {Math.round(viewportZoom * 100)}%</span>
