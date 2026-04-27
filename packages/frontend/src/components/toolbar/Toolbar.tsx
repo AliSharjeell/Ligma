@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { Button } from '@/components/ui/button';
@@ -20,16 +20,20 @@ import {
   Activity,
   Map,
   History,
+  Eraser,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import type { Tool, ShapeType } from '@/types/canvas';
 
 const tools: { id: Tool; icon: React.ReactNode; label: string }[] = [
-  { id: 'select', icon: <MousePointer2 className="size-4" />, label: 'Select' },
-  { id: 'pan', icon: <Hand className="size-4" />, label: 'Pan' },
-  { id: 'sticky', icon: <StickyNote className="size-4" />, label: 'Sticky Note' },
-  { id: 'shape', icon: <RectangleHorizontal className="size-4" />, label: 'Shape' },
-  { id: 'text', icon: <Type className="size-4" />, label: 'Text' },
-  { id: 'draw', icon: <Pencil className="size-4" />, label: 'Draw' },
+  { id: 'select', icon: <MousePointer2 className="size-4" />, label: 'Select (V)' },
+  { id: 'pan', icon: <Hand className="size-4" />, label: 'Pan (H)' },
+  { id: 'sticky', icon: <StickyNote className="size-4" />, label: 'Sticky Note (S)' },
+  { id: 'shape', icon: <RectangleHorizontal className="size-4" />, label: 'Shape (R)' },
+  { id: 'text', icon: <Type className="size-4" />, label: 'Text (T)' },
+  { id: 'draw', icon: <Pencil className="size-4" />, label: 'Draw (D)' },
+  { id: 'eraser', icon: <Eraser className="size-4" />, label: 'Eraser (E)' },
 ];
 
 const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
@@ -38,7 +42,7 @@ const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
 ];
 
 export function Toolbar() {
-  const { tool, shapeType, selectedId, setTool, setShapeType, deleteElement, lockElement, unlockElement, getElement, userId } = useCanvasStore();
+  const { tool, shapeType, selectedId, setTool, setShapeType, deleteElement, lockElement, unlockElement, getElement, userId, undo, redo, canUndo, canRedo } = useCanvasStore();
   const { emitElementDelete, emitElementLock, emitElementUnlock } = useSocket();
 
   // Creative bonus feature toggles
@@ -49,6 +53,39 @@ export function Toolbar() {
   const selectedElement = selectedId ? getElement(selectedId) : null;
   const isLocked = selectedElement?.locked && selectedElement.lockedBy !== userId;
   const isEditing = selectedElement?.locked && selectedElement.lockedBy === userId;
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === 'v' || e.key === 'V') setTool('select');
+      if (e.key === 'h' || e.key === 'H') setTool('pan');
+      if (e.key === 's' || e.key === 'S') setTool('sticky');
+      if (e.key === 'r' || e.key === 'R') setTool('shape');
+      if (e.key === 't' || e.key === 'T') setTool('text');
+      if (e.key === 'd' || e.key === 'D') setTool('draw');
+      if (e.key === 'e' || e.key === 'E') setTool('eraser');
+
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' || e.key === 'Z') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            redo();
+          } else {
+            undo();
+          }
+        }
+        if (e.key === 'y' || e.key === 'Y') {
+          e.preventDefault();
+          redo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setTool, undo, redo]);
 
   const handleDelete = () => {
     if (selectedId) {
@@ -71,6 +108,30 @@ export function Toolbar() {
 
   return (
     <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+      {/* Undo/Redo */}
+      <div className="bg-white rounded-lg shadow-lg border p-1 flex flex-col gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={undo}
+          title="Undo (Ctrl+Z)"
+          className="h-9 w-9"
+          disabled={!canUndo()}
+        >
+          <Undo2 className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={redo}
+          title="Redo (Ctrl+Y)"
+          className="h-9 w-9"
+          disabled={!canRedo()}
+        >
+          <Redo2 className="size-4" />
+        </Button>
+      </div>
+
       <div className="bg-white rounded-lg shadow-lg border p-1 flex flex-col gap-1">
         {tools.map((t) => (
           <Button
