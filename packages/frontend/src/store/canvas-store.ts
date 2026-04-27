@@ -68,9 +68,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       updatedAt: Date.now(),
     };
     set((state) => {
+      // Save current state to history before making change
+      const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.set(element.id, element);
-      return { elements: newElements };
+      return { elements: newElements, history: newHistory, redoStack: [] };
     });
     get().addEvent({
       type: 'create',
@@ -84,19 +86,25 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     set((state) => {
       const element = state.elements.get(id);
       if (!element || element.locked) return state;
+      // Save to history before update
+      const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.set(id, { ...element, ...updates, updatedAt: Date.now() });
-      return { elements: newElements };
+      return { elements: newElements, history: newHistory, redoStack: [] };
     });
   },
 
   deleteElement: (id) => {
     set((state) => {
+      // Save current state to history before deleting
+      const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.delete(id);
       return {
         elements: newElements,
         selectedId: state.selectedId === id ? null : state.selectedId,
+        history: newHistory,
+        redoStack: [],
       };
     });
     get().addEvent({ type: 'delete', elementId: id });
@@ -127,18 +135,21 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   undo: () => {
-    const { elements } = get();
-    if (elements.size === 0) return;
-    const snapshot: HistoryEntry = {
-      elements: new Map(elements),
-      timestamp: Date.now(),
-    };
+    const { elements, history } = get();
+    if (history.length === 0) return;
+
     set((state) => {
-      if (state.history.length === 0) return state;
       const newHistory = [...state.history];
       const lastEntry = newHistory.pop();
+
       if (lastEntry) {
-        return { elements: lastEntry.elements, history: newHistory };
+        // Save current state to redo stack
+        const newRedoStack = [...state.redoStack, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
+        return {
+          elements: lastEntry.elements,
+          history: newHistory,
+          redoStack: newRedoStack,
+        };
       }
       return state;
     });
@@ -147,21 +158,25 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   redo: () => {
     const { redoStack } = get();
     if (redoStack.length === 0) return;
+
     set((state) => {
-      if (state.redoStack.length === 0) return state;
       const newRedoStack = [...state.redoStack];
       const nextEntry = newRedoStack.pop();
+
       if (nextEntry) {
+        // Save current state to history
+        const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
         return {
           elements: nextEntry.elements,
           redoStack: newRedoStack,
+          history: newHistory,
         };
       }
       return state;
     });
   },
 
-  canUndo: () => get().elements.size > 0,
+  canUndo: () => get().history.length > 0,
 
   canRedo: () => get().redoStack.length > 0,
 

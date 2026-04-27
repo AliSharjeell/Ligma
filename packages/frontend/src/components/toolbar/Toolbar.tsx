@@ -28,11 +28,11 @@ import type { Tool, ShapeType } from '@/types/canvas';
 
 const tools: { id: Tool; icon: React.ReactNode; label: string }[] = [
   { id: 'select', icon: <MousePointer2 className="size-4" />, label: 'Select (V)' },
+  { id: 'draw', icon: <Pencil className="size-4" />, label: 'Draw (D)' },
   { id: 'pan', icon: <Hand className="size-4" />, label: 'Pan (H)' },
   { id: 'sticky', icon: <StickyNote className="size-4" />, label: 'Sticky Note (S)' },
   { id: 'shape', icon: <RectangleHorizontal className="size-4" />, label: 'Shape (R)' },
   { id: 'text', icon: <Type className="size-4" />, label: 'Text (T)' },
-  { id: 'draw', icon: <Pencil className="size-4" />, label: 'Draw (D)' },
   { id: 'eraser', icon: <Eraser className="size-4" />, label: 'Eraser (E)' },
 ];
 
@@ -108,6 +108,24 @@ export function Toolbar() {
 
   return (
     <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+      <div className="bg-white rounded-lg shadow-lg border p-1 flex flex-col gap-1">
+        {tools.map((t) => (
+          <Button
+            key={t.id}
+            variant={tool === t.id ? 'default' : 'ghost'}
+            size="icon"
+            onClick={() => setTool(t.id)}
+            title={t.label}
+            className={cn(
+              'h-9 w-9',
+              tool === t.id && 'bg-primary text-primary-foreground'
+            )}
+          >
+            {t.icon}
+          </Button>
+        ))}
+      </div>
+
       {/* Undo/Redo */}
       <div className="bg-white rounded-lg shadow-lg border p-1 flex flex-col gap-1">
         <Button
@@ -130,24 +148,6 @@ export function Toolbar() {
         >
           <Redo2 className="size-4" />
         </Button>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-lg border p-1 flex flex-col gap-1">
-        {tools.map((t) => (
-          <Button
-            key={t.id}
-            variant={tool === t.id ? 'default' : 'ghost'}
-            size="icon"
-            onClick={() => setTool(t.id)}
-            title={t.label}
-            className={cn(
-              'h-9 w-9',
-              tool === t.id && 'bg-primary text-primary-foreground'
-            )}
-          >
-            {t.icon}
-          </Button>
-        ))}
       </div>
 
       {tool === 'shape' && (

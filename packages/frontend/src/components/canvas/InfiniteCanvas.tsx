@@ -243,7 +243,7 @@ export function InfiniteCanvas() {
     setIsErasing(false);
     setIsSelecting(false);
     setSelectionBox(null);
-  }, [isPanning, isDragging, isSelecting, tool, drawPoints, userId, addElement, emitElementCreate, selectionBox, elements, setSelectedId]);
+  }, [isPanning, isDragging, isSelecting, tool, drawPoints, userId, addElement, emitElementCreate, selectionBox, elements, setSelectedId, shapePreview, shapeType]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
