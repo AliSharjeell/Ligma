@@ -127,7 +127,7 @@ export function InfiniteCanvas() {
     }
 
     if (isDragging && tool === 'draw') {
-      setDrawPoints((prev) => [...prev, { x: e.clientX, y: e.clientY }]);
+      setDrawPoints((prev) => [...prev, { x: x, y: y }]);
     }
   }, [isPanning, isDragging, dragStart, viewportPosition, tool, emitCursorMove, setViewportPosition]);
 
