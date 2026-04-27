@@ -42,7 +42,7 @@ const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
 ];
 
 export function Toolbar() {
-  const { tool, shapeType, selectedId, setTool, setShapeType, deleteElement, lockElement, unlockElement, getElement, userId, undo, redo, canUndo, canRedo } = useCanvasStore();
+  const { tool, shapeType, selectedIds, setTool, setShapeType, deleteElement, lockElement, unlockElement, getElement, userId, undo, redo, canUndo, canRedo } = useCanvasStore();
   const { emitElementDelete, emitElementLock, emitElementUnlock } = useSocket();
 
   // Creative bonus feature toggles
@@ -50,6 +50,7 @@ export function Toolbar() {
   const [showZones, setShowZones] = useState(false);
   const [showTimeTravel, setShowTimeTravel] = useState(false);
 
+  const selectedId = selectedIds.size === 1 ? Array.from(selectedIds)[0] : null;
   const selectedElement = selectedId ? getElement(selectedId) : null;
   const isLocked = selectedElement?.locked && selectedElement.lockedBy !== userId;
   const isEditing = selectedElement?.locked && selectedElement.lockedBy === userId;
