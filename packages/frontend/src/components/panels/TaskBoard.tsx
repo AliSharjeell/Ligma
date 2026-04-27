@@ -26,8 +26,9 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { Plus, Check, Circle, Clock, AlertCircle } from 'lucide-react';
 import type { Task } from '@/types/canvas';
+import { SummaryExport } from './SummaryExport';
+import { Plus, Check, Circle, Clock, AlertCircle, FileDown } from 'lucide-react';
 
 const priorityColors = {
   low: 'bg-green-100 text-green-800',
@@ -87,6 +88,9 @@ export function TaskBoard() {
           <SheetDescription>
             Tasks automatically extracted from canvas content
           </SheetDescription>
+          <div className="mt-2">
+            <SummaryExport />
+          </div>
         </SheetHeader>
 
         <div className="mt-6 space-y-4">
