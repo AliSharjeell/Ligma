@@ -417,8 +417,18 @@ export function InfiniteCanvas() {
   );
 }
 
-// Helper function to check if point is in element
+// Helper function to check if point is in element (including drawings)
 function isPointInElement(x: number, y: number, element: CanvasElement): boolean {
+  // For drawings, use bounding box
+  if (element.type === 'drawing' && element.points && element.points.length > 0) {
+    const minX = Math.min(...element.points.map(p => p.x));
+    const maxX = Math.max(...element.points.map(p => p.x));
+    const minY = Math.min(...element.points.map(p => p.y));
+    const maxY = Math.max(...element.points.map(p => p.y));
+    const padding = 10;
+    return x >= minX - padding && x <= maxX + padding && y >= minY - padding && y <= maxY + padding;
+  }
+
   const { position, size } = element;
   return (
     x >= position.x &&

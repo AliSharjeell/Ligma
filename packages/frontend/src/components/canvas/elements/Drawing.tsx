@@ -66,20 +66,49 @@ export function Drawing({ element }: DrawingProps) {
     e.stopPropagation();
     if (isLocked) return;
     setSelectedId(element.id);
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startPoints = element.points ? [...element.points] : [];
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const state = useCanvasStore.getState();
+      const dx = (moveEvent.clientX - startX) / state.viewportZoom;
+      const dy = (moveEvent.clientY - startY) / state.viewportZoom;
+
+      const newPoints = startPoints.map(p => ({
+        x: p.x + dx,
+        y: p.y + dy,
+      }));
+      updateElement(element.id, { points: newPoints });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      const updatedElement = useCanvasStore.getState().getElement(element.id);
+      if (updatedElement) {
+        emitElementUpdate(updatedElement);
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   return (
     <svg
       className={cn(
-        'absolute pointer-events-none',
-        isSelected && 'ring-2 ring-primary',
-        isLocked && 'opacity-50'
+        'absolute cursor-move',
+        isSelected && 'drop-shadow-[0_0_3px_rgba(59,130,246,1)]',
+        isLocked && 'opacity-50 pointer-events-none'
       )}
       style={{
         left: minX,
         top: minY,
         width: maxX - minX + 20,
         height: maxY - minY + 20,
+        overflow: 'visible',
       }}
       onMouseDown={handleMouseDown}
     >
