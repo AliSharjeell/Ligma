@@ -11,6 +11,11 @@ interface CanvasStore extends CanvasState {
   setTool: (tool: Tool) => void;
   setShapeType: (shapeType: ShapeType) => void;
   setSelectedId: (id: string | null) => void;
+  setSelectedIds: (ids: Set<string>) => void;
+  addToSelection: (id: string) => void;
+  removeFromSelection: (id: string) => void;
+  clearSelection: () => void;
+  toggleSelection: (id: string) => void;
   setViewportPosition: (position: Position) => void;
   setViewportZoom: (zoom: number) => void;
 
@@ -40,7 +45,7 @@ interface CanvasStore extends CanvasState {
 
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   elements: new Map(),
-  selectedId: null,
+  selectedIds: new Set(),
   tool: 'select',
   shapeType: 'rectangle',
   users: new Map(),
@@ -55,7 +60,28 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   setTool: (tool) => set({ tool }),
   setShapeType: (shapeType) => set({ shapeType }),
-  setSelectedId: (selectedId) => set({ selectedId }),
+  setSelectedId: (id) => set({ selectedIds: id ? new Set([id]) : new Set() }),
+  setSelectedIds: (ids) => set({ selectedIds: ids }),
+  addToSelection: (id) => set((state) => {
+    const newSet = new Set(state.selectedIds);
+    newSet.add(id);
+    return { selectedIds: newSet };
+  }),
+  removeFromSelection: (id) => set((state) => {
+    const newSet = new Set(state.selectedIds);
+    newSet.delete(id);
+    return { selectedIds: newSet };
+  }),
+  clearSelection: () => set({ selectedIds: new Set() }),
+  toggleSelection: (id) => set((state) => {
+    const newSet = new Set(state.selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    return { selectedIds: newSet };
+  }),
   setViewportPosition: (viewportPosition) => set({ viewportPosition }),
   setViewportZoom: (viewportZoom) => set({ viewportZoom }),
 
@@ -96,13 +122,14 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   deleteElement: (id) => {
     set((state) => {
-      // Save current state to history before deleting
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.delete(id);
+      const newSelectedIds = new Set(state.selectedIds);
+      newSelectedIds.delete(id);
       return {
         elements: newElements,
-        selectedId: state.selectedId === id ? null : state.selectedId,
+        selectedIds: newSelectedIds,
         history: newHistory,
         redoStack: [],
       };
