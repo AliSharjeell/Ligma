@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf /c/AppsNew/HackathonNew/packages/backend/.git)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'feat: add frontend with canvas workspace, task board, event log *)"
+    ]
+  }
+}
