@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,9 @@ import {
   Lock,
   Unlock,
   Trash2,
+  Activity,
+  Map,
+  History,
 } from 'lucide-react';
 import type { Tool, ShapeType } from '@/types/canvas';
 
@@ -37,6 +40,11 @@ const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
 export function Toolbar() {
   const { tool, shapeType, selectedId, setTool, setShapeType, deleteElement, lockElement, unlockElement, getElement, userId } = useCanvasStore();
   const { emitElementDelete, emitElementLock, emitElementUnlock } = useSocket();
+
+  // Creative bonus feature toggles
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showZones, setShowZones] = useState(false);
+  const [showTimeTravel, setShowTimeTravel] = useState(false);
 
   const selectedElement = selectedId ? getElement(selectedId) : null;
   const isLocked = selectedElement?.locked && selectedElement.lockedBy !== userId;
@@ -127,6 +135,46 @@ export function Toolbar() {
           </Button>
         </div>
       )}
+
+      {/* Creative Bonus Features */}
+      <div className="bg-white rounded-lg shadow-lg border p-1 flex flex-col gap-1">
+        <Button
+          variant={showHeatmap ? 'default' : 'ghost'}
+          size="icon"
+          onClick={() => setShowHeatmap(!showHeatmap)}
+          title="Toggle Heatmap"
+          className={cn(
+            'h-9 w-9',
+            showHeatmap && 'bg-primary text-primary-foreground'
+          )}
+        >
+          <Activity className="size-4" />
+        </Button>
+        <Button
+          variant={showZones ? 'default' : 'ghost'}
+          size="icon"
+          onClick={() => setShowZones(!showZones)}
+          title="Toggle Zones"
+          className={cn(
+            'h-9 w-9',
+            showZones && 'bg-primary text-primary-foreground'
+          )}
+        >
+          <Map className="size-4" />
+        </Button>
+        <Button
+          variant={showTimeTravel ? 'default' : 'ghost'}
+          size="icon"
+          onClick={() => setShowTimeTravel(!showTimeTravel)}
+          title="Toggle Time Travel"
+          className={cn(
+            'h-9 w-9',
+            showTimeTravel && 'bg-primary text-primary-foreground'
+          )}
+        >
+          <History className="size-4" />
+        </Button>
+      </div>
     </div>
   );
 }
