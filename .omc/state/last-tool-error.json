@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /c/AppsNew/HackathonNew/packages/frontend && npx shadcn@latest init --defaults --force\",\"timeout\":180000,\"description\":\"Initialize shadcn/ui with defaults\"}",
+  "error": "Exit code 1\n- Preflight checks.\n✔ Preflight checks.\n- Verifying framework.\n✔ Verifying framework. Found Next.js.\n- Validating Tailwind CSS.\n✖ Validating Tailwind CSS.\n- Validating import alias.\n✔ Validating import alias.\n\nNo Tailwind CSS configuration found at C:\\AppsNew\\HackathonNew\\packages\\frontend.\nIt is likely you do not have Tailwind CSS installed or have an invalid configuration.\nInstall Tailwind CSS then try again.\nVisit https://tailwindcss.com/docs/guides/nextjs to get started.",
+  "timestamp": "2026-04-27T17:26:26.234Z",
+  "retry_count": 1
+}
