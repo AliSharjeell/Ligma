@@ -18,10 +18,10 @@ export function InfiniteCanvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [isSelecting, setIsSelecting] = useState(false);
   const [isDrawingShape, setIsDrawingShape] = useState(false);
-  const [selectionBox, setSelectionBox] = useState<{ start: Position; end: Position } | null>(null);
-  const [shapeStart, setShapeStart] = useState<Position | null>(null);
+  const [isBoxSelecting, setIsBoxSelecting] = useState(false);
+  const [boxStart, setBoxStart] = useState<Position | null>(null);
+  const [boxEnd, setBoxEnd] = useState<Position | null>(null);
   const [shapePreview, setShapePreview] = useState<{ start: Position; end: Position } | null>(null);
   const [dragStart, setDragStart] = useState<Position | null>(null);
   const [drawPoints, setDrawPoints] = useState<Position[]>([]);
@@ -86,7 +86,7 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Select tool - click to select element, dragging handled by elements themselves
+    // Select tool - click to select element OR start box selection
     if (tool === 'select') {
       // Check if clicking on an element
       let clickedElement: CanvasElement | null = null;
@@ -98,8 +98,13 @@ export function InfiniteCanvas() {
 
       if (clickedElement) {
         setSelectedId(clickedElement.id);
+        setIsDragging(true);
+        setDragStart({ x, y });
       } else {
-        setSelectedId(null);
+        // Start box selection on empty area
+        setIsBoxSelecting(true);
+        setBoxStart({ x, y });
+        setBoxEnd({ x, y });
       }
       return;
     }
@@ -183,11 +188,11 @@ export function InfiniteCanvas() {
       });
     }
 
-    // Selection box
-    if (isSelecting && selectionBox) {
-      setSelectionBox({ ...selectionBox, end: { x, y } });
+    // Box selection update
+    if (isBoxSelecting && boxStart) {
+      setBoxEnd({ x, y });
     }
-  }, [isPanning, isDragging, isErasing, isSelecting, isDrawingShape, dragStart, shapeStart, viewportPosition, tool, emitCursorMove, setViewportPosition, elements, deleteElement, emitElementDelete, selectionBox]);
+  }, [isPanning, isDragging, isErasing, isBoxSelecting, boxStart, viewportPosition, tool, emitCursorMove, setViewportPosition, elements, deleteElement, emitElementDelete]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -235,13 +240,13 @@ export function InfiniteCanvas() {
       setShapeStart(null);
     }
 
-    // Select elements in selection box
-    if (isSelecting && selectionBox) {
+    // Select elements in box selection
+    if (isBoxSelecting && boxStart && boxEnd) {
       const box = {
-        left: Math.min(selectionBox.start.x, selectionBox.end.x),
-        right: Math.max(selectionBox.start.x, selectionBox.end.x),
-        top: Math.min(selectionBox.start.y, selectionBox.end.y),
-        bottom: Math.max(selectionBox.start.y, selectionBox.end.y),
+        left: Math.min(boxStart.x, boxEnd.x),
+        right: Math.max(boxStart.x, boxEnd.x),
+        top: Math.min(boxStart.y, boxEnd.y),
+        bottom: Math.max(boxStart.y, boxEnd.y),
       };
 
       let firstId: string | null = null;
@@ -256,8 +261,11 @@ export function InfiniteCanvas() {
     setIsDragging(false);
     setIsErasing(false);
     setIsDrawingShape(false);
+    setIsBoxSelecting(false);
+    setBoxStart(null);
+    setBoxEnd(null);
     setDragStart(null);
-  }, [isPanning, isDragging, isDrawingShape, tool, drawPoints, userId, addElement, emitElementCreate, elements, setSelectedId, shapePreview, shapeType, selectedId, updateElement, emitElementUpdate]);
+  }, [isPanning, isDragging, isDrawingShape, tool, drawPoints, userId, addElement, emitElementCreate, boxStart, boxEnd, elements, setSelectedId, shapePreview, shapeType, selectedId, updateElement, emitElementUpdate]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
@@ -383,15 +391,15 @@ export function InfiniteCanvas() {
           </svg>
         )}
 
-        {/* Selection box */}
-        {isSelecting && selectionBox && (
+        {/* Box selection while dragging */}
+        {isBoxSelecting && boxStart && boxEnd && (
           <div
             className="absolute border-2 border-blue-500 border-dashed bg-blue-500/10 pointer-events-none"
             style={{
-              left: Math.min(selectionBox.start.x, selectionBox.end.x),
-              top: Math.min(selectionBox.start.y, selectionBox.end.y),
-              width: Math.abs(selectionBox.end.x - selectionBox.start.x),
-              height: Math.abs(selectionBox.end.y - selectionBox.start.y),
+              left: Math.min(boxStart.x, boxEnd.x),
+              top: Math.min(boxStart.y, boxEnd.y),
+              width: Math.abs(boxEnd.x - boxStart.x),
+              height: Math.abs(boxEnd.y - boxStart.y),
             }}
           />
         )}
