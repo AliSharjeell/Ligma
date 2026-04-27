@@ -46,7 +46,7 @@ export interface Task {
 
 export interface CanvasState {
   elements: Map<string, CanvasElement>;
-  selectedId: string | null;
+  selectedIds: Set<string>;
   tool: Tool;
   shapeType: ShapeType;
   users: Map<string, User>;
