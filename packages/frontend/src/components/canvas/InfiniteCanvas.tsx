@@ -199,19 +199,43 @@ export function InfiniteCanvas() {
           }
         })}
 
-        {isDragging && tool === 'draw' && drawPoints.length > 0 && (
-          <svg className="absolute inset-0 w-full h-full pointer-events-none">
-            <polyline
-              points={drawPoints.map((p) => {
-                const rect = canvasRef.current?.getBoundingClientRect();
-                return `${p.x} ${p.y}`;
-              }).join(' ')}
-              fill="none"
-              stroke="#1f2937"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+        {isDragging && tool === 'draw' && drawPoints.length > 1 && (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+            {(() => {
+              const minX = Math.min(...drawPoints.map(p => p.x));
+              const minY = Math.min(...drawPoints.map(p => p.y));
+              const maxX = Math.max(...drawPoints.map(p => p.x));
+              const maxY = Math.max(...drawPoints.map(p => p.y));
+
+              const relativePoints = drawPoints.map(p => ({
+                x: p.x - minX,
+                y: p.y - minY,
+              }));
+
+              let path = `M ${relativePoints[0].x} ${relativePoints[0].y}`;
+              for (let i = 1; i < relativePoints.length - 1; i++) {
+                const curr = relativePoints[i];
+                const next = relativePoints[i + 1];
+                const cp2x = curr.x + (next.x - curr.x) * 0.5;
+                const cp2y = curr.y + (next.y - curr.y) * 0.5;
+                path += ` Q ${curr.x} ${curr.y} ${cp2x} ${cp2y}`;
+              }
+              const last = relativePoints[relativePoints.length - 1];
+              path += ` L ${last.x} ${last.y}`;
+
+              return (
+                <g transform={`translate(${minX}, ${minY})`}>
+                  <path
+                    d={path}
+                    fill="none"
+                    stroke="#1f2937"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </g>
+              );
+            })()}
           </svg>
         )}
       </div>

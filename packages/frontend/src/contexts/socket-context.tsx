@@ -109,7 +109,24 @@ export function SocketProvider({ children, url = 'http://localhost:3001' }: Sock
   }, [url, userId, userName]);
 
   const emitElementCreate = useCallback((element: CanvasElement) => {
-    socket?.emit('create_node', element);
+    // For drawing elements, use create_node with nodeType='drawing'
+    if (element.type === 'drawing') {
+      socket?.emit('create_node', {
+        canvasId: 'default',
+        nodeType: 'drawing',
+        position: element.position,
+        content: '',
+        points: element.points,
+        color: element.color,
+      });
+    } else {
+      socket?.emit('create_node', {
+        canvasId: 'default',
+        nodeType: element.type,
+        position: element.position,
+        content: element.content,
+      });
+    }
   }, [socket]);
 
   const emitElementUpdate = useCallback((element: CanvasElement) => {
