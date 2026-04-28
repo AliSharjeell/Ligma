@@ -296,30 +296,20 @@ export function CommentsOverlay() {
     }
   };
 
-  // Show overlay when there are comments or in comment mode or creating a comment
-  const shouldShow = isCommentMode || pendingComment || comments.length > 0 || activeCommentId;
+  // Only show when there are comments or in comment mode
+  const shouldShow = comments.length > 0 || isCommentMode;
 
   if (!shouldShow) {
     return null;
   }
 
   return (
-    <div
-      className={cn(
-        'absolute inset-0 pointer-events-none z-40',
-        isCommentMode && 'pointer-events-auto cursor-crosshair'
-      )}
-      onClick={(e) => {
-        if (activeCommentId) return; // Don't intercept clicks when viewing a comment
-        handleOverlayClick(e);
-        handleCanvasClick(e);
-      }}
-    >
-      {/* Existing comment pins */}
+    <>
+      {/* Comment pins - always show if there are comments */}
       {comments.map((comment) => {
         const { screenX, screenY } = canvasToScreen(comment.canvasX, comment.canvasY);
         return (
-          <div key={comment.id} className="pointer-events-auto">
+          <div key={comment.id} className="pointer-events-auto absolute">
             <CommentPin
               comment={comment}
               screenX={screenX}
@@ -333,56 +323,6 @@ export function CommentsOverlay() {
           </div>
         );
       })}
-
-      {/* Pending comment popover */}
-      {pendingComment && (
-        <div
-          className="absolute z-50 bg-white rounded-lg border border-gray-200 shadow-xl pointer-events-auto"
-          style={{
-            left: canvasToScreen(pendingComment.x, pendingComment.y).screenX,
-            top: canvasToScreen(pendingComment.x, pendingComment.y).screenY,
-            transform: 'translate(-50%, -100%)',
-          }}
-        >
-          <div className="w-72 p-3">
-            <textarea
-              ref={inputRef}
-              value={newCommentText}
-              onChange={(e) => setNewCommentText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Add a comment..."
-              className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded resize-none outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-              rows={3}
-              autoFocus
-            />
-            <div className="flex justify-end gap-2 mt-2">
-              <button
-                onClick={() => {
-                  setPendingComment(null);
-                  setNewCommentText('');
-                  setIsCommentMode(false);
-                  setTool('select');
-                }}
-                className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateComment}
-                disabled={!newCommentText.trim()}
-                className={cn(
-                  'px-3 py-1 text-xs font-medium rounded transition-colors',
-                  newCommentText.trim()
-                    ? 'bg-blue-500 text-white hover:bg-blue-600'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                )}
-              >
-                Post
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }

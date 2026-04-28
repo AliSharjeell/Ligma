@@ -466,7 +466,7 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Handle comment mode - place a comment where clicked
+    // Handle comment mode - set pending comment
     if (isCommentMode && e.target === canvasRef.current) {
       clearSelection();
       const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -477,8 +477,12 @@ export function InfiniteCanvas() {
       const canvasX = screenX / viewportZoom - viewportPosition.x;
       const canvasY = screenY / viewportZoom - viewportPosition.y;
 
-      useCanvasStore.getState().addComment(canvasX, canvasY, '');
-      useCanvasStore.getState().setIsCommentMode(false);
+      // Trigger pending comment in CommentsOverlay via store state
+      useCanvasStore.setState({
+        pendingCommentX: canvasX,
+        pendingCommentY: canvasY,
+        isCommentMode: false
+      });
       return;
     }
 
@@ -656,6 +660,7 @@ export function InfiniteCanvas() {
       <PresenceHeatmap />
       <PresenceZones />
       <TimeTravel />
+      <CommentsOverlay />
 
       <div className="absolute bottom-4 left-4 flex gap-4 items-center bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600">
         <span>Zoom: {Math.round(viewportZoom * 100)}%</span>

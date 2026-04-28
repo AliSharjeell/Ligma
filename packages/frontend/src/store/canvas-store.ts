@@ -64,6 +64,8 @@ interface CanvasStore extends CanvasState {
   isCommentMode: boolean;
   activeCommentId: string | null;
   hoveredCommentId: string | null;
+  pendingCommentX: number | null;
+  pendingCommentY: number | null;
   setIsCommentMode: (enabled: boolean) => void;
   setActiveCommentId: (id: string | null) => void;
   setHoveredCommentId: (id: string | null) => void;
@@ -146,6 +148,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   isCommentMode: false,
   activeCommentId: null,
   hoveredCommentId: null,
+  pendingCommentX: null,
+  pendingCommentY: null,
 
   setUserRole: (userRole) => set({ userRole }),
   setUserName: (name) => {

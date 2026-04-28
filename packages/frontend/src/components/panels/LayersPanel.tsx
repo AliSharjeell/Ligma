@@ -6,7 +6,7 @@ import { useSocket } from '@/contexts/socket-context';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image } from 'lucide-react';
+import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image, MessageCircle } from 'lucide-react';
 import type { CanvasElement, ElementType } from '@/types/canvas';
 
 const LAYER_ICONS: Record<ElementType, React.ReactNode> = {
@@ -15,6 +15,7 @@ const LAYER_ICONS: Record<ElementType, React.ReactNode> = {
   sticky: <StickyNote className="size-3" />,
   text: <Type className="size-3" />,
   image: <Image className="size-3" />,
+  comment: <MessageCircle className="size-3" />,
 };
 
 export function LayersList() {
@@ -29,6 +30,7 @@ export function LayersList() {
     sticky: 0,
     text: 0,
     image: 0,
+    comment: 0,
   };
 
   const handleLayerClick = (elementId: string, e: React.MouseEvent) => {
