@@ -157,12 +157,19 @@ export function Toolbar() {
       }
     };
 
+    const handleRoleRequestCleared = (payload: { userId: string; denied?: boolean }) => {
+      // Remove the request from pending list when denied
+      setPendingRequests(prev => prev.filter(r => r.userId !== payload.userId));
+    };
+
     socket.on('role_request', handleRoleRequest);
     socket.on('role_changed', handleRoleChanged);
+    socket.on('role_request_cleared', handleRoleRequestCleared);
 
     return () => {
       socket.off('role_request', handleRoleRequest);
       socket.off('role_changed', handleRoleChanged);
+      socket.off('role_request_cleared', handleRoleRequestCleared);
     };
   }, [socket, userId]);
 

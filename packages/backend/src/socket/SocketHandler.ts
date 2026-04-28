@@ -517,6 +517,12 @@ export class SocketHandler {
       timestamp: Date.now()
     });
 
+    // Notify all Leads to clear this request from their UI
+    this.io.to(canvasId).emit('role_request_cleared', {
+      userId: targetUserId,
+      approved: true,
+    });
+
     // Confirm to the approver
     socket.emit('role_request_approved', { userId: targetUserId });
 
@@ -537,6 +543,9 @@ export class SocketHandler {
       return;
     }
 
+    // Get the target user for the notification
+    const targetUser = clientState.users.get(targetUserId);
+
     // Remove from pending requests
     clientState.roleRequests.delete(targetUserId);
 
@@ -546,7 +555,13 @@ export class SocketHandler {
       targetSocket.emit('role_request_denied', {});
     }
 
-    console.log(`Lead ${requester.userName} denied role request for ${targetUserId}`);
+    // Notify all Leads that this request was denied (so they can clear it from their UI)
+    this.io.to(canvasId).emit('role_request_cleared', {
+      userId: targetUserId,
+      denied: true,
+    });
+
+    console.log(`Lead ${requester.userName} denied role request for ${targetUser?.userName || targetUserId}`);
   }
 
   private findSocketByUserId(userId: string, canvasId: string): Socket | undefined {

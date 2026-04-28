@@ -4,11 +4,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { cn } from '@/lib/utils';
-import type { CanvasElement, Position } from '@/types/canvas';
+import type { CanvasElement } from '@/types/canvas';
 
 interface StickyNoteProps {
   element: CanvasElement;
 }
+
+type HandlePosition = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
 
 const COLORS = [
   '#fef08a', // yellow
@@ -21,14 +23,16 @@ const COLORS = [
 
 export function StickyNote({ element }: StickyNoteProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const [localContent, setLocalContent] = useState(element.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { selectedIds, setSelectedId, setSelectedIds, updateElement, lockElement, unlockElement, userId, userRole } = useCanvasStore();
+  const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId, userRole } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
   const isLocked = element.locked && element.lockedBy !== userId;
+  const showSelection = isSelected || isHovered;
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -42,6 +46,86 @@ export function StickyNote({ element }: StickyNoteProps) {
       setLocalContent(element.content);
     }
   }, [element.content, isEditing]);
+
+  const startResize = (e: React.MouseEvent, position: HandlePosition) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (userRole === 'Viewer') {
+      alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
+      return;
+    }
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startPos = { ...element.position };
+    const startSize = { ...element.size };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const state = useCanvasStore.getState();
+      const dx = (moveEvent.clientX - startX) / state.viewportZoom;
+      const dy = (moveEvent.clientY - startY) / state.viewportZoom;
+
+      let newWidth = startSize.width;
+      let newHeight = startSize.height;
+      let newX = startPos.x;
+      let newY = startPos.y;
+
+      switch (position) {
+        case 'nw':
+          newWidth = Math.max(100, startSize.width - dx);
+          newHeight = Math.max(80, startSize.height - dy);
+          newX = startPos.x + startSize.width - newWidth;
+          newY = startPos.y + startSize.height - newHeight;
+          break;
+        case 'ne':
+          newWidth = Math.max(100, startSize.width + dx);
+          newHeight = Math.max(80, startSize.height - dy);
+          newY = startPos.y + startSize.height - newHeight;
+          break;
+        case 'sw':
+          newWidth = Math.max(100, startSize.width - dx);
+          newHeight = Math.max(80, startSize.height + dy);
+          newX = startPos.x + startSize.width - newWidth;
+          break;
+        case 'se':
+          newWidth = Math.max(100, startSize.width + dx);
+          newHeight = Math.max(80, startSize.height + dy);
+          break;
+        case 'n':
+          newHeight = Math.max(80, startSize.height - dy);
+          newY = startPos.y + startSize.height - newHeight;
+          break;
+        case 's':
+          newHeight = Math.max(80, startSize.height + dy);
+          break;
+        case 'e':
+          newWidth = Math.max(100, startSize.width + dx);
+          break;
+        case 'w':
+          newWidth = Math.max(100, startSize.width - dx);
+          newX = startPos.x + startSize.width - newWidth;
+          break;
+      }
+
+      updateElement(element.id, {
+        position: { x: newX, y: newY },
+        size: { width: newWidth, height: newHeight },
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      const updatedElement = useCanvasStore.getState().getElement(element.id);
+      if (updatedElement) {
+        emitElementUpdate(updatedElement);
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -113,10 +197,12 @@ export function StickyNote({ element }: StickyNoteProps) {
     }
   };
 
+  const handleSize = 8;
+
   return (
     <div
       className={cn(
-        'absolute select-none transition-shadow',
+        'absolute select-none transition-shadow outline-none',
         isSelected && 'ring-2 ring-primary',
         isLocked && 'opacity-50 pointer-events-none'
       )}
@@ -129,6 +215,8 @@ export function StickyNote({ element }: StickyNoteProps) {
       }}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {isEditing ? (
         <textarea
@@ -145,23 +233,77 @@ export function StickyNote({ element }: StickyNoteProps) {
         </div>
       )}
 
-      {isSelected && !isLocked && (
-        <div className="absolute -bottom-8 left-0 flex gap-1">
-          {COLORS.map((color) => (
-            <button
-              key={color}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleColorChange(color);
-              }}
-              className={cn(
-                'w-5 h-5 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-110',
-                element.color === color && 'ring-2 ring-gray-400'
-              )}
-              style={{ backgroundColor: color }}
-            />
-          ))}
-        </div>
+      {/* Selection outline with 8 handles */}
+      {showSelection && !isLocked && (
+        <>
+          {/* Selection border */}
+          <div
+            className="absolute inset-0 pointer-events-none border-2 border-blue-500 rounded-sm"
+            style={{ zIndex: 1 }}
+          />
+
+          {/* Corner handles */}
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{ left: -handleSize / 2, top: -handleSize / 2, width: handleSize, height: handleSize, cursor: 'nwse-resize' }}
+            onMouseDown={(e) => startResize(e, 'nw')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{ right: -handleSize / 2, top: -handleSize / 2, width: handleSize, height: handleSize, cursor: 'nesw-resize' }}
+            onMouseDown={(e) => startResize(e, 'ne')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{ left: -handleSize / 2, bottom: -handleSize / 2, width: handleSize, height: handleSize, cursor: 'nesw-resize' }}
+            onMouseDown={(e) => startResize(e, 'sw')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{ right: -handleSize / 2, bottom: -handleSize / 2, width: handleSize, height: handleSize, cursor: 'nwse-resize' }}
+            onMouseDown={(e) => startResize(e, 'se')}
+          />
+
+          {/* Edge handles */}
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{ left: element.size.width / 2 - handleSize / 2, top: -handleSize / 2, width: handleSize, height: handleSize, cursor: 'ns-resize' }}
+            onMouseDown={(e) => startResize(e, 'n')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{ left: element.size.width / 2 - handleSize / 2, bottom: -handleSize / 2, width: handleSize, height: handleSize, cursor: 'ns-resize' }}
+            onMouseDown={(e) => startResize(e, 's')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{ left: -handleSize / 2, top: element.size.height / 2 - handleSize / 2, width: handleSize, height: handleSize, cursor: 'ew-resize' }}
+            onMouseDown={(e) => startResize(e, 'w')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{ right: -handleSize / 2, top: element.size.height / 2 - handleSize / 2, width: handleSize, height: handleSize, cursor: 'ew-resize' }}
+            onMouseDown={(e) => startResize(e, 'e')}
+          />
+
+          {/* Color picker */}
+          <div className="absolute -bottom-8 left-0 flex gap-1 z-10">
+            {COLORS.map((color) => (
+              <button
+                key={color}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleColorChange(color);
+                }}
+                className={cn(
+                  'w-5 h-5 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-110',
+                  element.color === color && 'ring-2 ring-gray-400'
+                )}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {element.locked && element.lockedBy === userId && (

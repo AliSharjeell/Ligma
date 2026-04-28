@@ -18,7 +18,6 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
   const [isHovered, setIsHovered] = useState(false);
   const [localContent, setLocalContent] = useState(element.content);
   const [isResizing, setIsResizing] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
 
@@ -42,13 +41,12 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
   const showSelection = (isSelected || isHovered) && element.content && !isEditing && !isBeingEdited;
 
   // Measure actual text dimensions
-  const [textBounds, setTextBounds] = useState({ width: 0, height: 0 });
+  const [textBounds, setTextBounds] = useState({ width: element.size.width || 100, height: element.size.height || currentFontSize * 1.4 });
 
   useLayoutEffect(() => {
-    if (textRef.current) {
+    if (textRef.current && element.content) {
       const rect = textRef.current.getBoundingClientRect();
-      const parentRect = textRef.current.parentElement?.getBoundingClientRect();
-      if (parentRect) {
+      if (rect.width > 0 && rect.height > 0) {
         setTextBounds({
           width: rect.width,
           height: rect.height
@@ -76,40 +74,80 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     e.stopPropagation();
     e.preventDefault();
 
-    // Prevent Viewers from resizing
     if (userRole === 'Viewer') {
       alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
       return;
     }
 
+    const startX = e.clientX;
     const startY = e.clientY;
+    const startPos = { ...element.position };
+    const startSize = { ...element.size };
     const startFontSize = currentFontSize;
 
     setIsResizing(true);
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const dy = moveEvent.clientY - startY;
-      let newSize = startFontSize;
+      const state = useCanvasStore.getState();
+      const dx = (moveEvent.clientX - startX) / state.viewportZoom;
+      const dy = (moveEvent.clientY - startY) / state.viewportZoom;
+
+      let newWidth = startSize.width;
+      let newHeight = startSize.height;
+      let newX = startPos.x;
+      let newY = startPos.y;
+      let newFontSize = startFontSize;
 
       switch (position) {
         case 'nw':
-        case 'n':
+          newWidth = Math.max(50, startSize.width - dx);
+          newHeight = Math.max(20, startSize.height - dy);
+          newX = startPos.x + startSize.width - newWidth;
+          newY = startPos.y + startSize.height - newHeight;
+          newFontSize = Math.max(10, Math.min(120, startFontSize - dy));
+          break;
         case 'ne':
-          newSize = Math.max(10, startFontSize - dy);
+          newWidth = Math.max(50, startSize.width + dx);
+          newHeight = Math.max(20, startSize.height - dy);
+          newY = startPos.y + startSize.height - newHeight;
+          newFontSize = Math.max(10, Math.min(120, startFontSize - dy));
           break;
         case 'sw':
-        case 's':
+          newWidth = Math.max(50, startSize.width - dx);
+          newHeight = Math.max(20, startSize.height + dy);
+          newX = startPos.x + startSize.width - newWidth;
+          newFontSize = Math.max(10, Math.min(120, startFontSize + dy));
+          break;
         case 'se':
-          newSize = Math.max(10, startFontSize + dy);
+          newWidth = Math.max(50, startSize.width + dx);
+          newHeight = Math.max(20, startSize.height + dy);
+          newFontSize = Math.max(10, Math.min(120, startFontSize + dy));
+          break;
+        case 'n':
+          newHeight = Math.max(20, startSize.height - dy);
+          newY = startPos.y + startSize.height - newHeight;
+          newFontSize = Math.max(10, Math.min(120, startFontSize - dy));
+          break;
+        case 's':
+          newHeight = Math.max(20, startSize.height + dy);
+          newFontSize = Math.max(10, Math.min(120, startFontSize + dy));
+          break;
+        case 'e':
+          newWidth = Math.max(50, startSize.width + dx);
+          newFontSize = Math.max(10, Math.min(120, startFontSize + dx * 0.3));
           break;
         case 'w':
-        case 'e':
-          newSize = Math.max(10, startFontSize + dy * 0.3);
+          newWidth = Math.max(50, startSize.width - dx);
+          newX = startPos.x + startSize.width - newWidth;
+          newFontSize = Math.max(10, Math.min(120, startFontSize - dx * 0.3));
           break;
       }
 
-      const newTextStyle = { ...element.textStyle, fontSize: newSize };
-      updateElement(element.id, { textStyle: newTextStyle });
+      updateElement(element.id, {
+        position: { x: newX, y: newY },
+        size: { width: newWidth, height: newHeight },
+        textStyle: { ...element.textStyle, fontSize: newFontSize },
+      });
     };
 
     const handleMouseUp = () => {
@@ -124,7 +162,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [currentFontSize, element.textStyle, element.id, updateElement, emitElementUpdate, userRole]);
+  }, [currentFontSize, element.textStyle, element.id, element.position, element.size, updateElement, emitElementUpdate, userRole]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -135,8 +173,6 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     const startX = e.clientX;
     const startY = e.clientY;
     const startPos = { ...element.position };
-
-    setIsDragging(true);
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const state = useCanvasStore.getState();
@@ -150,7 +186,6 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      setIsDragging(false);
       const updatedElement = useCanvasStore.getState().getElement(element.id);
       if (updatedElement) {
         emitElementUpdate(updatedElement);
@@ -177,7 +212,6 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
   const handleBlur = () => {
     setIsEditing(false);
     if (!element.content && !localContent) {
-      // Delete empty text
       useCanvasStore.getState().deleteElement(element.id);
       return;
     }
@@ -209,113 +243,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     }
   };
 
-  // Excalidraw-style selection border
-  const SelectionBorder = () => {
-    if (!showSelection || skipSelectionBorder) return null;
-
-    const padding = 4;
-    const handleSize = 8;
-
-    return (
-      <>
-        {/* Selection outline - a simple box */}
-        <div
-          className="pointer-events-none absolute border-2 border-blue-500 rounded-sm"
-          style={{
-            left: -padding,
-            top: -padding,
-            width: textBounds.width + padding * 2,
-            height: textBounds.height + padding * 2,
-            zIndex: 0,
-          }}
-        />
-
-        {/* Corner handles */}
-        <div
-          className="absolute bg-white border-2 border-blue-500 rounded-sm cursor-nwse-resize z-50"
-          style={{
-            left: -padding - handleSize / 2,
-            top: -padding - handleSize / 2,
-            width: handleSize,
-            height: handleSize,
-          }}
-          onMouseDown={(e) => startResize(e, 'nw')}
-        />
-        <div
-          className="absolute bg-white border-2 border-blue-500 rounded-sm cursor-nesw-resize z-50"
-          style={{
-            right: -padding - handleSize / 2,
-            top: -padding - handleSize / 2,
-            width: handleSize,
-            height: handleSize,
-          }}
-          onMouseDown={(e) => startResize(e, 'ne')}
-        />
-        <div
-          className="absolute bg-white border-2 border-blue-500 rounded-sm cursor-nesw-resize z-50"
-          style={{
-            left: -padding - handleSize / 2,
-            bottom: -padding - handleSize / 2,
-            width: handleSize,
-            height: handleSize,
-          }}
-          onMouseDown={(e) => startResize(e, 'sw')}
-        />
-        <div
-          className="absolute bg-white border-2 border-blue-500 rounded-sm cursor-nwse-resize z-50"
-          style={{
-            right: -padding - handleSize / 2,
-            bottom: -padding - handleSize / 2,
-            width: handleSize,
-            height: handleSize,
-          }}
-          onMouseDown={(e) => startResize(e, 'se')}
-        />
-
-        {/* Edge handles */}
-        <div
-          className="absolute bg-white border-2 border-blue-500 rounded-sm cursor-ns-resize z-50"
-          style={{
-            left: textBounds.width / 2 - handleSize / 2,
-            top: -padding - handleSize / 2,
-            width: handleSize,
-            height: handleSize,
-          }}
-          onMouseDown={(e) => startResize(e, 'n')}
-        />
-        <div
-          className="absolute bg-white border-2 border-blue-500 rounded-sm cursor-ns-resize z-50"
-          style={{
-            left: textBounds.width / 2 - handleSize / 2,
-            bottom: -padding - handleSize / 2,
-            width: handleSize,
-            height: handleSize,
-          }}
-          onMouseDown={(e) => startResize(e, 's')}
-        />
-        <div
-          className="absolute bg-white border-2 border-blue-500 rounded-sm cursor-ew-resize z-50"
-          style={{
-            left: -padding - handleSize / 2,
-            top: textBounds.height / 2 - handleSize / 2,
-            width: handleSize,
-            height: handleSize,
-          }}
-          onMouseDown={(e) => startResize(e, 'w')}
-        />
-        <div
-          className="absolute bg-white border-2 border-blue-500 rounded-sm cursor-ew-resize z-50"
-          style={{
-            right: -padding - handleSize / 2,
-            top: textBounds.height / 2 - handleSize / 2,
-            width: handleSize,
-            height: handleSize,
-          }}
-          onMouseDown={(e) => startResize(e, 'e')}
-        />
-      </>
-    );
-  };
+  const handleSize = 8;
 
   return (
     <div
@@ -334,7 +262,114 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <SelectionBorder />
+      {/* Selection outline with 8 handles */}
+      {showSelection && !skipSelectionBorder && (
+        <>
+          {/* Selection border */}
+          <div
+            className="absolute border-2 border-blue-500 rounded-sm pointer-events-none"
+            style={{
+              left: -4,
+              top: -4,
+              width: textBounds.width + 8,
+              height: textBounds.height + 8,
+              zIndex: 1,
+            }}
+          />
+
+          {/* Corner handles */}
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{
+              left: -4 - handleSize / 2,
+              top: -4 - handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+              cursor: 'nwse-resize',
+            }}
+            onMouseDown={(e) => startResize(e, 'nw')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{
+              right: -4 - handleSize / 2,
+              top: -4 - handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+              cursor: 'nesw-resize',
+            }}
+            onMouseDown={(e) => startResize(e, 'ne')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{
+              left: -4 - handleSize / 2,
+              bottom: -4 - handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+              cursor: 'nesw-resize',
+            }}
+            onMouseDown={(e) => startResize(e, 'sw')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{
+              right: -4 - handleSize / 2,
+              bottom: -4 - handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+              cursor: 'nwse-resize',
+            }}
+            onMouseDown={(e) => startResize(e, 'se')}
+          />
+
+          {/* Edge handles */}
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{
+              left: textBounds.width / 2 - handleSize / 2,
+              top: -4 - handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+              cursor: 'ns-resize',
+            }}
+            onMouseDown={(e) => startResize(e, 'n')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{
+              left: textBounds.width / 2 - handleSize / 2,
+              bottom: -4 - handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+              cursor: 'ns-resize',
+            }}
+            onMouseDown={(e) => startResize(e, 's')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{
+              left: -4 - handleSize / 2,
+              top: textBounds.height / 2 - handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+              cursor: 'ew-resize',
+            }}
+            onMouseDown={(e) => startResize(e, 'w')}
+          />
+          <div
+            className="absolute bg-white border-2 border-blue-500 rounded-sm z-50"
+            style={{
+              right: -4 - handleSize / 2,
+              top: textBounds.height / 2 - handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+              cursor: 'ew-resize',
+            }}
+            onMouseDown={(e) => startResize(e, 'e')}
+          />
+        </>
+      )}
 
       {isEditing || isBeingEdited ? (
         <input

@@ -306,22 +306,37 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
 
     queue.forEach((event, index) => {
       setTimeout(() => {
-        switch (event.type) {
-          case 'create':
+        switch (event.eventType) {
+          case 'create_node':
             socketInstance.emit('create_node', event.payload);
             break;
-          case 'update':
+          case 'update_node':
             socketInstance.emit('update_node', event.payload);
             break;
-          case 'delete':
+          case 'delete_node':
             socketInstance.emit('delete_node', event.payload);
             break;
-          case 'lock':
+          case 'lock_node':
             socketInstance.emit('lock_node', event.payload);
             break;
-          case 'unlock':
+          case 'unlock_node':
             socketInstance.emit('unlock_node', event.payload);
             break;
+          // Role-related events
+          case 'role_request':
+            socketInstance.emit('request_role', event.payload);
+            break;
+          case 'approve_role_request':
+            socketInstance.emit('approve_role_request', event.payload);
+            break;
+          case 'deny_role_request':
+            socketInstance.emit('deny_role_request', event.payload);
+            break;
+          case 'transfer_ownership':
+            socketInstance.emit('transfer_ownership', event.payload);
+            break;
+          default:
+            console.log('Unknown event type:', event.eventType);
         }
       }, index * 50); // Small delay between events
     });
@@ -335,19 +350,27 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     }, queue.length * 50 + 100);
   }, []);
 
-  // Listen for online/offline events
+  // Listen for online/offline events - update status immediately
   useEffect(() => {
     const handleOnline = () => {
       console.log('Browser online');
+      // Don't set to connected here - wait for socket to actually connect
     };
 
     const handleOffline = () => {
       console.log('Browser offline');
+      // Immediately set to disconnected so user sees the indicator
       setConnectionStatus('disconnected');
+      setConnected(false);
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    // Check initial state
+    if (!navigator.onLine) {
+      setConnectionStatus('disconnected');
+    }
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -356,9 +379,15 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
   }, []);
 
   useEffect(() => {
+    // Immediately set connecting status when attempting connection
+    setConnectionStatus('connecting');
+
     const newSocket = io(url, {
       query: { userId, userName },
       transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000, // Faster reconnection
+      timeout: 5000, // Faster timeout
     });
 
     newSocket.on('connect', () => {
@@ -641,20 +670,41 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
   }, [socket, canvasId]);
 
   const emitRoleRequest = useCallback((requestedRole: 'Contributor') => {
-    socket?.emit('request_role', { canvasId, requestedRole });
-  }, [socket, canvasId]);
+    const payload = { canvasId, requestedRole };
+    if (connected && socket) {
+      socket.emit('request_role', payload);
+    } else {
+      // Queue for later if offline
+      addToQueue({ type: 'create', eventType: 'role_request', canvasId, payload });
+    }
+  }, [socket, canvasId, connected, addToQueue]);
 
   const emitApproveRoleRequest = useCallback((targetUserId: string) => {
-    socket?.emit('approve_role_request', { canvasId, targetUserId });
-  }, [socket, canvasId]);
+    const payload = { canvasId, targetUserId };
+    if (connected && socket) {
+      socket.emit('approve_role_request', payload);
+    } else {
+      addToQueue({ type: 'create', eventType: 'approve_role_request', canvasId, payload });
+    }
+  }, [socket, canvasId, connected, addToQueue]);
 
   const emitDenyRoleRequest = useCallback((targetUserId: string) => {
-    socket?.emit('deny_role_request', { canvasId, targetUserId });
-  }, [socket, canvasId]);
+    const payload = { canvasId, targetUserId };
+    if (connected && socket) {
+      socket.emit('deny_role_request', payload);
+    } else {
+      addToQueue({ type: 'create', eventType: 'deny_role_request', canvasId, payload });
+    }
+  }, [socket, canvasId, connected, addToQueue]);
 
   const emitTransferOwnership = useCallback((targetUserId: string) => {
-    socket?.emit('transfer_ownership', { canvasId, targetUserId });
-  }, [socket, canvasId]);
+    const payload = { canvasId, targetUserId };
+    if (connected && socket) {
+      socket.emit('transfer_ownership', payload);
+    } else {
+      addToQueue({ type: 'create', eventType: 'transfer_ownership', canvasId, payload });
+    }
+  }, [socket, canvasId, connected, addToQueue]);
 
   return (
     <SocketContext.Provider
