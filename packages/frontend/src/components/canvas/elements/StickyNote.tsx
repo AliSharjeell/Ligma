@@ -201,7 +201,7 @@ export function StickyNote({ element }: StickyNoteProps) {
         'absolute select-none transition-shadow outline-none',
         isSelected && 'ring-2 ring-primary',
         isLocked && 'opacity-50 pointer-events-none',
-        tool !== 'select' && tool !== 'sticky' && 'pointer-events-none'
+        !isLocked && tool !== 'select' && tool !== 'sticky' && 'pointer-events-none'
       )}
       style={{
         left: element.position.x,

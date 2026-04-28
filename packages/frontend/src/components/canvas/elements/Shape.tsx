@@ -276,14 +276,16 @@ export function Shape({ element }: ShapeProps) {
 
   const handleSize = 8;
 
+  const isLockedByOther = element.locked && element.lockedBy !== userId;
+
   return (
     <div
       className={cn(
         'absolute select-none group outline-none',
         isSelected ? 'cursor-move' : 'cursor-move',
-        isLocked && 'opacity-50 pointer-events-none',
+        isLockedByOther && 'opacity-50 pointer-events-none',
         isEditing && 'ring-2 ring-yellow-400',
-        tool !== 'select' && 'pointer-events-none'
+        !isLockedByOther && tool !== 'select' && 'pointer-events-none'
       )}
       style={{
         left: element.position.x,
