@@ -273,7 +273,7 @@ export function Toolbar() {
 
   return (
     <>
-      {/* Top Left Menu Button */}
+      {/* Top Left Layers Button */}
       <div className="absolute top-4 left-4 z-20">
         <Button
           variant="ghost"
@@ -283,9 +283,9 @@ export function Toolbar() {
             "h-10 w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
             isLeftPanelOpen && "bg-slate-50 ring-2 ring-primary/10"
           )}
-          title="Properties"
+          title="Layers"
         >
-          <Menu className="size-5 text-slate-600" />
+          <Layers className="size-5 text-slate-600" />
         </Button>
       </div>
 
@@ -546,9 +546,9 @@ export function Toolbar() {
         </Button>
       </div>
 
-      {/* Left Sidebar - Properties */}
+      {/* Left Sidebar - Layers */}
       <div className={cn(
-        "absolute bottom-52 left-4 z-20 flex flex-col transition-all duration-300",
+        "absolute top-1/2 -translate-y-1/2 left-4 z-20 flex flex-col transition-all duration-300",
         isLeftPanelOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"
       )}>
         <div className="bg-white rounded-xl shadow-excalidraw border border-slate-200 p-4 w-72 h-full flex flex-col gap-4 overflow-hidden">
@@ -557,144 +557,16 @@ export function Toolbar() {
               <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
                 <span className="text-white font-bold text-sm">L</span>
               </div>
-              <h3 className="text-sm font-semibold text-slate-700">Properties</h3>
+              <h3 className="text-sm font-semibold text-slate-700">Layers</h3>
             </div>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsLeftPanelOpen(false)}>
-              <ChevronLeft className="size-4" />
+              <ChevronRight className="size-4" />
             </Button>
           </div>
 
           <ScrollArea className="flex-1 -mx-4 px-4">
             <div className="flex flex-col gap-5 pb-4">
-              {/* Shape Selector */}
-              {tool === 'shape' && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] uppercase font-bold text-slate-400">Shape</label>
-                  <div className="flex gap-1">
-                    {shapes.map((s) => (
-                      <Button
-                        key={s.id}
-                        variant={shapeType === s.id ? 'default' : 'outline'}
-                        size="icon"
-                        onClick={() => setShapeType(s.id)}
-                        className="h-8 w-8 rounded-lg"
-                      >
-                        {s.icon}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Color Swatches */}
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] uppercase font-bold text-slate-400">Color</label>
-                <div className="grid grid-cols-7 gap-1.5">
-                  {colorSwatches.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => {
-                        if (selectedElement) {
-                          updateElement(selectedElement.id, { color });
-                          const updated = useCanvasStore.getState().getElement(selectedElement.id);
-                          if (updated) emitElementUpdate(updated);
-                        } else {
-                          if (tool === 'draw') setDrawColor(color);
-                          if (tool === 'shape') setShapeColor(color);
-                          if (tool === 'sticky') setStickyColor(color);
-                          if (tool === 'text') setTextColor(color);
-                        }
-                      }}
-                      className={cn(
-                        'h-6 w-6 rounded-full border border-slate-200 transition-all hover:scale-110',
-                        (selectedElement?.color || (tool === 'draw' ? drawColor : tool === 'shape' ? shapeColor : tool === 'sticky' ? stickyColor : textColor)) === color &&
-                        'ring-2 ring-slate-400 ring-offset-2'
-                      )}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Text Settings */}
-              {(tool === 'text' || selectedElement?.type === 'text') && (
-                <div className="flex flex-col gap-3">
-                  <Separator />
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase font-bold text-slate-400">Typography</label>
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500">Size</span>
-                        <input
-                          type="number"
-                          value={activeTextStyle.fontSize}
-                          onChange={(e) => handleTextStyleChange({ fontSize: Number(e.target.value) })}
-                          className="w-16 h-7 px-2 rounded-lg border border-slate-200 text-xs focus:outline-primary"
-                        />
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant={activeTextStyle.fontWeight === 'bold' ? 'default' : 'outline'}
-                          size="sm"
-                          className="flex-1 h-8 text-xs rounded-lg"
-                          onClick={() => handleTextStyleChange({ fontWeight: activeTextStyle.fontWeight === 'bold' ? 'normal' : 'bold' })}
-                        >
-                          B
-                        </Button>
-                        {['left', 'center', 'right'].map((align) => (
-                          <Button
-                            key={align}
-                            variant={activeTextStyle.textAlign === align ? 'default' : 'outline'}
-                            size="sm"
-                            className="flex-1 h-8 text-xs rounded-lg capitalize"
-                            onClick={() => handleTextStyleChange({ textAlign: align as any })}
-                          >
-                            {align[0]}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Element Actions */}
-              {selectedElement && (
-                <div className="flex flex-col gap-3">
-                  <Separator />
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase font-bold text-slate-400">Actions</label>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 h-9 gap-2 rounded-lg text-xs"
-                        onClick={() => {
-                          if (isLockedByMe || !selectedElement.locked) {
-                            if (selectedElement.locked) unlockElement(selectedId!); else lockElement(selectedId!);
-                            if (selectedElement.locked) emitElementUnlock(selectedId!); else emitElementLock(selectedId!);
-                          }
-                        }}
-                      >
-                        {selectedElement.locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
-                        {selectedElement.locked ? 'Locked' : 'Lock'}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="flex-1 h-9 gap-2 rounded-lg text-xs"
-                        onClick={() => {
-                          emitElementDelete(selectedId!);
-                          deleteElement(selectedId!);
-                        }}
-                      >
-                        <Trash2 className="size-3" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <LayersPanel />
             </div>
           </ScrollArea>
         </div>
