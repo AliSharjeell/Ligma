@@ -8,7 +8,7 @@ import { PresenceHeatmap } from '@/components/canvas/PresenceHeatmap';
 import { PresenceZones } from '@/components/canvas/PresenceZones';
 import { TimeTravel } from '@/components/canvas/TimeTravel';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
+const WS_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
   const [roomId, setRoomId] = useState<string>('default');

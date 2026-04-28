@@ -205,7 +205,7 @@ packages/
 ### WebSocket Connection
 
 ```javascript
-const socket = io('http://localhost:3001', {
+const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
   auth: { roomId: 'canvas-id', userId: 'user-id' }
 });
 ```
