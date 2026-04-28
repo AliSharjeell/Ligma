@@ -42,7 +42,7 @@ import {
 import type { CanvasElement, Tool, ShapeType } from '@/types/canvas';
 import { TaskBoard } from '@/components/panels/TaskBoard';
 import { EventLog } from '@/components/panels/EventLog';
-import { LayersPanel } from '@/components/panels/LayersPanel';
+import { LayersList } from '@/components/panels/LayersPanel';
 import {
   Dialog,
   DialogContent,
@@ -553,12 +553,7 @@ export function Toolbar() {
       )}>
         <div className="bg-white rounded-xl shadow-excalidraw border border-slate-200 p-4 w-72 h-full flex flex-col gap-4 overflow-hidden">
           <div className="flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
-                <span className="text-white font-bold text-sm">L</span>
-              </div>
-              <h3 className="text-sm font-semibold text-slate-700">Layers</h3>
-            </div>
+            <h3 className="text-sm font-semibold text-slate-700">Layers</h3>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsLeftPanelOpen(false)}>
               <ChevronRight className="size-4" />
             </Button>
@@ -566,7 +561,7 @@ export function Toolbar() {
 
           <ScrollArea className="flex-1 -mx-4 px-4">
             <div className="flex flex-col gap-5 pb-4">
-              <LayersPanel />
+              <LayersList />
             </div>
           </ScrollArea>
         </div>
@@ -733,7 +728,6 @@ export function Toolbar() {
                 <div className="grid grid-cols-1 gap-2">
                   <TaskBoard />
                   <EventLog />
-                  <LayersPanel />
                 </div>
               </div>
 
