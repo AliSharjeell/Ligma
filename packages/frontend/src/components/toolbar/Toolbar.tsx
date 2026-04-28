@@ -30,7 +30,6 @@ import {
   ChevronRight,
   Wifi,
   WifiOff,
-  Users,
   LogOut,
   PlusCircle,
 } from 'lucide-react';
@@ -114,7 +113,7 @@ export function Toolbar() {
     canRedo,
     users,
   } = useCanvasStore();
-  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate } = useSocket();
+  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate, emitElementLock: emitLock } = useSocket();
 
   // Room Management Logic
   const currentRoom = (typeof window !== 'undefined' && window.location.pathname.split('/').pop()) || 'default';
@@ -188,18 +187,24 @@ export function Toolbar() {
 
   return (
     <>
-      {/* Top Floating Toolbar */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white rounded-xl shadow-excalidraw border border-slate-200 p-1.5 px-3">
+      {/* Top Left Menu Button */}
+      <div className="absolute top-4 left-4 z-20">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
-          className={cn("h-9 w-9 rounded-lg", isLeftPanelOpen && "bg-slate-100")}
+          className={cn(
+            "h-10 w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
+            isLeftPanelOpen && "bg-slate-50 ring-2 ring-primary/10"
+          )}
           title="Properties"
         >
-          <Menu className="size-4" />
+          <Menu className="size-5 text-slate-600" />
         </Button>
-        <div className="w-px h-6 bg-slate-200 mx-1" />
+      </div>
+
+      {/* Top Floating Toolbar - COMPACT */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-white rounded-xl shadow-excalidraw border border-slate-200 p-1 px-1.5">
         {tools.map((t) => (
           <Button
             key={t.id}
@@ -208,28 +213,34 @@ export function Toolbar() {
             onClick={() => setTool(t.id)}
             title={t.label}
             className={cn(
-              'h-9 w-9 rounded-lg transition-all',
-              tool === t.id ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-slate-100'
+              'h-8 w-8 rounded-lg transition-all',
+              tool === t.id ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-slate-100 text-slate-600'
             )}
           >
             {t.icon}
           </Button>
         ))}
-        <div className="w-px h-6 bg-slate-200 mx-1" />
+      </div>
+
+      {/* Top Right Settings Button */}
+      <div className="absolute top-4 right-4 z-20">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
-          className={cn("h-9 w-9 rounded-lg", isRightPanelOpen && "bg-slate-100")}
+          className={cn(
+            "h-10 w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
+            isRightPanelOpen && "bg-slate-50 ring-2 ring-primary/10"
+          )}
           title="Workspace & Settings"
         >
-          <Settings className="size-4" />
+          <Settings className="size-5 text-slate-600" />
         </Button>
       </div>
 
       {/* Left Sidebar - Properties */}
       <div className={cn(
-        "absolute top-20 left-4 bottom-4 z-20 flex flex-col transition-all duration-300",
+        "absolute top-16 left-4 bottom-4 z-20 flex flex-col transition-all duration-300",
         isLeftPanelOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"
       )}>
         <div className="bg-white rounded-xl shadow-excalidraw border border-slate-200 p-4 w-72 h-full flex flex-col gap-4 overflow-hidden">
@@ -383,7 +394,7 @@ export function Toolbar() {
 
       {/* Right Sidebar - Workspace & Connection */}
       <div className={cn(
-        "absolute top-20 right-4 bottom-4 z-20 flex flex-col transition-all duration-300",
+        "absolute top-16 right-4 bottom-4 z-20 flex flex-col transition-all duration-300",
         isRightPanelOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"
       )}>
         <div className="bg-white rounded-xl shadow-excalidraw border border-slate-200 p-4 w-80 h-full flex flex-col gap-4 overflow-hidden">

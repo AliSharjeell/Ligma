@@ -93,12 +93,22 @@ export function InfiniteCanvas() {
     }
   }, [isDrawingShape, shapePreview, shapeType, shapeColor, isDragging, tool, drawPoints, drawColor]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.min(Math.max(viewportZoom * delta, 0.1), 5);
-    setViewportZoom(newZoom);
-  }, [viewportZoom, setViewportZoom]);
+  // Use native listener for wheel to ensure we can preventDefault (React synthetic events are often passive)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const state = useCanvasStore.getState();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.min(Math.max(state.viewportZoom * delta, 0.1), 5);
+      state.setViewportZoom(newZoom);
+    };
+
+    canvas.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleNativeWheel);
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -338,7 +348,6 @@ export function InfiniteCanvas() {
         'w-full h-full overflow-hidden bg-white relative select-none',
         isPanning ? 'cursor-grabbing' : (tool === 'pan' || tool === 'select') ? 'cursor-grab' : tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'
       )}
-      onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
