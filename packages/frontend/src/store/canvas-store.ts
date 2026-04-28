@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { CanvasElement, Position, Tool, ShapeType, Task, CanvasEvent, User, CanvasState } from '@/types/canvas';
+import type { CanvasElement, Position, Tool, ShapeType, Task, CanvasEvent, User, CanvasState, Comment } from '@/types/canvas';
 
 interface HistoryEntry {
   elements: Map<string, CanvasElement>;
@@ -58,6 +58,22 @@ interface CanvasStore extends CanvasState {
   setEventLog: (events: CanvasEvent[]) => void;
   setElements: (elements: CanvasElement[]) => void;
   setUsers: (users: User[]) => void;
+
+  // Comments
+  comments: Comment[];
+  isCommentMode: boolean;
+  activeCommentId: string | null;
+  hoveredCommentId: string | null;
+  setIsCommentMode: (enabled: boolean) => void;
+  setActiveCommentId: (id: string | null) => void;
+  setHoveredCommentId: (id: string | null) => void;
+  addComment: (x: number, y: number, content: string) => void;
+  addReply: (commentId: string, content: string) => void;
+  resolveComment: (commentId: string) => void;
+  deleteComment: (commentId: string) => void;
+  markRepliesAsRead: (commentId: string) => void;
+  saveComments: (roomId?: string) => void;
+  loadComments: (roomId?: string) => void;
 
   getElement: (id: string) => CanvasElement | undefined;
   resetCanvas: () => void;
@@ -126,6 +142,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   userName: getInitialUserName(),
   history: [],
   redoStack: [],
+  comments: [],
+  isCommentMode: false,
+  activeCommentId: null,
+  hoveredCommentId: null,
 
   setUserRole: (userRole) => set({ userRole }),
   setUserName: (name) => {
@@ -391,6 +411,101 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const newUsers = new Map<string, User>();
     users.forEach((u) => newUsers.set(u.id, u));
     set({ users: newUsers });
+  },
+
+  setIsCommentMode: (enabled) => set({ isCommentMode: enabled }),
+  setActiveCommentId: (id) => set({ activeCommentId: id }),
+  setHoveredCommentId: (id) => set({ hoveredCommentId: id }),
+
+  addComment: (x, y, content) => {
+    const { userId, userName, users } = get();
+    const user = users.get(userId);
+    const comment: Comment = {
+      id: uuidv4(),
+      canvasX: x,
+      canvasY: y,
+      authorId: userId,
+      authorName: userName,
+      authorColor: user?.color || '#6366f1',
+      content,
+      timestamp: Date.now(),
+      resolved: false,
+      replies: [],
+      unreadCount: 0,
+    };
+    set((state) => ({ comments: [...state.comments, comment] }));
+    get().saveComments();
+  },
+
+  addReply: (commentId, content) => {
+    const { userId, userName, users } = get();
+    const user = users.get(userId);
+    set((state) => ({
+      comments: state.comments.map((c) => {
+        if (c.id !== commentId) return c;
+        const reply = {
+          id: uuidv4(),
+          authorId: userId,
+          authorName: userName,
+          content,
+          timestamp: Date.now(),
+          isRead: false,
+        };
+        return {
+          ...c,
+          replies: [...c.replies, reply],
+          unreadCount: c.unreadCount + 1,
+        };
+      }),
+    }));
+    get().saveComments();
+  },
+
+  resolveComment: (commentId) => {
+    set((state) => ({
+      comments: state.comments.map((c) =>
+        c.id === commentId ? { ...c, resolved: !c.resolved } : c
+      ),
+    }));
+    get().saveComments();
+  },
+
+  deleteComment: (commentId) => {
+    set((state) => ({
+      comments: state.comments.filter((c) => c.id !== commentId),
+      activeCommentId: state.activeCommentId === commentId ? null : state.activeCommentId,
+    }));
+    get().saveComments();
+  },
+
+  markRepliesAsRead: (commentId) => {
+    set((state) => ({
+      comments: state.comments.map((c) => {
+        if (c.id !== commentId) return c;
+        return {
+          ...c,
+          unreadCount: 0,
+          replies: c.replies.map((r) => ({ ...r, isRead: true })),
+        };
+      }),
+    }));
+  },
+
+  saveComments: (roomId) => {
+    if (typeof window !== 'undefined') {
+      const key = `ligma-comments-${roomId || 'default'}`;
+      localStorage.setItem(key, JSON.stringify(get().comments));
+    }
+  },
+
+  loadComments: (roomId) => {
+    if (typeof window !== 'undefined') {
+      const key = `ligma-comments-${roomId || 'default'}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        set({ comments: JSON.parse(saved) });
+      }
+    }
   },
 
   getElement: (id) => get().elements.get(id),
