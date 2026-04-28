@@ -1,7 +1,7 @@
 {
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\AppsNew\\\\HackathonNew\\\\packages\\\\frontend\\\\src\\\\lib\\\\socket.ts\"}",
-  "error": "File does not exist. Note: your current working directory is C:\\AppsNew\\HackathonNew.",
-  "timestamp": "2026-04-27T18:07:45.728Z",
-  "retry_count": 3
+  "tool_name": "WebFetch",
+  "tool_input_preview": "{\"url\":\"https://claudemem.dev\",\"prompt\":\"What is ClaudeMem? What does it do? Is it related to Claude Code or Anthropic?\"}",
+  "error": "ECONNREFUSED",
+  "timestamp": "2026-04-28T11:56:09.630Z",
+  "retry_count": 1
 }

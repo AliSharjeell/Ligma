@@ -1,0 +1,110 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1777376458388,
+  "projectRoot": "D:\\Fresh Start\\AI ML Projects\\Ligma",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+      "dev:frontend": "npm run dev --workspace=packages/frontend",
+      "dev:backend": "npm run dev --workspace=packages/backend",
+      "build": "npm run build --workspace=packages/frontend && npm run build --workspace=packages/backend"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [
+      "packages/*"
+    ],
+    "mainDirectories": [],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "packages": {
+      "path": "packages",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1777376458261,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "packages\\backend\\src\\socket\\SocketHandler.ts",
+      "accessCount": 21,
+      "lastAccessed": 1777377999180,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 2,
+      "lastAccessed": 1777376858539,
+      "type": "directory"
+    },
+    {
+      "path": "C:\\Users\\HP\\.claude\\plugins\\cache\\omc\\oh-my-claudecode\\4.13.5\\skills\\omc-setup\\phases\\01-install-claude-md.md",
+      "accessCount": 1,
+      "lastAccessed": 1777376523183,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\HP\\.claude\\plugins\\cache\\omc\\oh-my-claudecode\\4.13.5\\skills\\omc-setup\\phases\\02-configure.md",
+      "accessCount": 1,
+      "lastAccessed": 1777376570790,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\HP\\.claude\\settings.json",
+      "accessCount": 1,
+      "lastAccessed": 1777376665511,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1777376846286,
+      "type": "file"
+    },
+    {
+      "path": "packages\\frontend\\package.json",
+      "accessCount": 1,
+      "lastAccessed": 1777376865921,
+      "type": "file"
+    },
+    {
+      "path": "packages\\backend\\package.json",
+      "accessCount": 1,
+      "lastAccessed": 1777376866026,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

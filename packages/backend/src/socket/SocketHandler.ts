@@ -193,6 +193,10 @@ export class SocketHandler {
     const { canvasId, userId, userName } = data;
 
     socket.join(canvasId);
+    // Debug: log room membership after join
+    const room = this.io.sockets.adapter.rooms.get(canvasId);
+    console.log(`[DEBUG] User ${userName} joined room ${canvasId}, sockets in room:`, room?.size || 0);
+
     const clientState = this.getOrCreateClientState(canvasId);
 
     // If first user, they are Lead. Otherwise, they are Viewer by default.
@@ -220,6 +224,23 @@ export class SocketHandler {
     if (historicalEvents.length > 0 && this.eventStore.getEvents(canvasId).length === 0) {
       historicalEvents.forEach(e => this.eventStore.append(e));
       console.log(`Replayed ${historicalEvents.length} events for canvas ${canvasId}`);
+    }
+
+    // SYNC: Send historical canvas events to the new user so they can render the canvas
+    const nodeEvents = historicalEvents.filter(e =>
+      e.type === 'NodeCreated' || e.type === 'NodeUpdated' || e.type === 'NodeDeleted'
+    );
+    if (nodeEvents.length > 0) {
+      nodeEvents.forEach(event => {
+        if (event.type === 'NodeCreated') {
+          socket.emit('node_created', event);
+        } else if (event.type === 'NodeUpdated') {
+          socket.emit('node_updated', event);
+        } else if (event.type === 'NodeDeleted') {
+          socket.emit('node_deleted', event);
+        }
+      });
+      console.log(`Synced ${nodeEvents.length} node events to new user ${userName}`);
     }
 
     const joinEvent: UserJoinedEvent = {
@@ -345,6 +366,9 @@ export class SocketHandler {
     this.eventBus.publish(event);
     await this.persistence.saveEvent(event);
 
+    // Debug: log room membership
+    const room = this.io.sockets.adapter.rooms.get(canvasId);
+    console.log(`[DEBUG] Emitting node_created to room ${canvasId}, sockets in room:`, room?.size || 0);
     this.io.to(canvasId).emit('node_created', event);
     socket.emit('node_created_ack', { nodeId, eventId: event.id });
 
@@ -372,7 +396,7 @@ export class SocketHandler {
     }
   }
 
-  private handleUpdateNode(socket: Socket, data: { canvasId: string; nodeId: string; changes: any; vectorClock: Record<string, number> }): void {
+  private async handleUpdateNode(socket: Socket, data: { canvasId: string; nodeId: string; changes: any; vectorClock: Record<string, number> }): Promise<void> {
     const { canvasId, nodeId, changes, vectorClock } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
 
@@ -444,7 +468,7 @@ export class SocketHandler {
     }
   }
 
-  private handleDeleteNode(socket: Socket, data: { canvasId: string; nodeId: string }): void {
+  private async handleDeleteNode(socket: Socket, data: { canvasId: string; nodeId: string }): Promise<void> {
     const { canvasId, nodeId } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
     
@@ -488,7 +512,7 @@ export class SocketHandler {
     });
   }
 
-  private handleLockNode(socket: Socket, data: { canvasId: string; nodeId: string; durationMs?: number }): void {
+  private async handleLockNode(socket: Socket, data: { canvasId: string; nodeId: string; durationMs?: number }): Promise<void> {
     const { canvasId, nodeId, durationMs } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
 
@@ -532,7 +556,7 @@ export class SocketHandler {
     });
   }
 
-  private handleUnlockNode(socket: Socket, data: { canvasId: string; nodeId: string }): void {
+  private async handleUnlockNode(socket: Socket, data: { canvasId: string; nodeId: string }): Promise<void> {
     const { canvasId, nodeId } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
 
