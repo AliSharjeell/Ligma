@@ -24,7 +24,7 @@ export function StickyNote({ element }: StickyNoteProps) {
   const [localContent, setLocalContent] = useState(element.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { selectedIds, setSelectedId, setSelectedIds, updateElement, lockElement, unlockElement, userId } = useCanvasStore();
+  const { selectedIds, setSelectedId, setSelectedIds, updateElement, lockElement, unlockElement, userId, userRole } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
@@ -80,6 +80,10 @@ export function StickyNote({ element }: StickyNoteProps) {
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
+    if (userRole === 'Viewer') {
+      alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
+      return;
+    }
     setSelectedId(element.id);
     setIsEditing(true);
     lockElement(element.id);

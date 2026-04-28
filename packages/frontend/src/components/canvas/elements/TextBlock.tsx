@@ -17,7 +17,7 @@ export function TextBlock({ element }: TextBlockProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId } = useCanvasStore();
+  const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId, userRole } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
@@ -94,6 +94,10 @@ export function TextBlock({ element }: TextBlockProps) {
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
+    if (userRole === 'Viewer') {
+      alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
+      return;
+    }
     setSelectedId(element.id);
     setIsEditing(true);
     lockElement(element.id);

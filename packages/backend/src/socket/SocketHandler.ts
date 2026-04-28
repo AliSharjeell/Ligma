@@ -37,6 +37,8 @@ interface ConnectedUser {
 interface ClientState {
   users: Map<string, ConnectedUser>;
   cursors: Map<string, { x: number; y: number; userId: string; userName: string }>;
+  roleRequests: Map<string, { userId: string; userName: string; requestedAt: number }>;
+  ownerId: string | null; // C: Room owner - can never be demoted, transfers on disconnect
 }
 
 interface ActivityEvent {
@@ -98,7 +100,9 @@ export class SocketHandler {
     if (!this.clientStates.has(canvasId)) {
       this.clientStates.set(canvasId, {
         users: new Map(),
-        cursors: new Map()
+        cursors: new Map(),
+        roleRequests: new Map(),
+        ownerId: null
       });
     }
     return this.clientStates.get(canvasId)!;
@@ -130,6 +134,24 @@ export class SocketHandler {
 
     socket.on('change_role', (data: { canvasId: string; targetUserId: string; newRole: 'Lead' | 'Contributor' | 'Viewer' }) => {
       this.handleChangeRole(socket, data);
+    });
+
+    // Role request handlers (B: Self-request Contributor)
+    socket.on('request_role', (data: { canvasId: string; requestedRole: 'Contributor' }) => {
+      this.handleRoleRequest(socket, data);
+    });
+
+    socket.on('approve_role_request', (data: { canvasId: string; targetUserId: string }) => {
+      this.handleApproveRoleRequest(socket, data);
+    });
+
+    socket.on('deny_role_request', (data: { canvasId: string; targetUserId: string }) => {
+      this.handleDenyRoleRequest(socket, data);
+    });
+
+    // C: Ownership transfer
+    socket.on('transfer_ownership', (data: { canvasId: string; targetUserId: string }) => {
+      this.handleTransferOwnership(socket, data);
     });
 
     socket.on('create_node', (data: { canvasId: string; nodeId?: string; nodeType: string; position: { x: number; y: number }; content: string; size?: { width: number; height: number }; color?: string; shapeType?: 'rectangle' | 'circle'; points?: { x: number; y: number }[]; style?: Record<string, unknown> }) => {
@@ -217,7 +239,33 @@ export class SocketHandler {
     };
     clientState.users.set(userId, user);
 
-    this.rbac.registerUser(userId, userName, assignedRole, canvasId);
+    // D: Check DB for existing roles first
+    const existingRoles = await this.persistence.getRoomRoles(canvasId);
+    const existingOwner = await this.persistence.getRoomOwner(canvasId);
+
+    // D: Restore role from DB if exists, otherwise assign based on first user
+    let finalRole: 'Lead' | 'Contributor' | 'Viewer' = assignedRole;
+    if (existingRoles.length > 0) {
+      const userRole = existingRoles.find(r => r.userId === userId);
+      if (userRole) {
+        finalRole = userRole.role as 'Lead' | 'Contributor' | 'Viewer';
+        user.role = finalRole;
+        console.log(`Restored role ${finalRole} for ${userName} from DB`);
+      }
+    }
+
+    // C: Set owner if first user or if no owner exists
+    if (clientState.users.size === 1 || !existingOwner) {
+      clientState.ownerId = userId;
+      finalRole = 'Lead';
+      user.role = 'Lead';
+      console.log(`User ${userName} is now the room owner`);
+    }
+
+    this.rbac.registerUser(userId, userName, finalRole, canvasId);
+
+    // D: Persist role to DB
+    await this.persistence.saveRoomRole(canvasId, userId, finalRole, clientState.ownerId === userId);
 
     // PERSISTENCE: Load all historical events for this room and catch up the in-memory store
     const historicalEvents = await this.persistence.getEvents(canvasId);
@@ -304,8 +352,15 @@ export class SocketHandler {
   private handleChangeRole(socket: Socket, data: { canvasId: string; targetUserId: string; newRole: 'Lead' | 'Contributor' | 'Viewer' }): void {
     const { canvasId, targetUserId, newRole } = data;
     const requesterId = this.getUserIdFromSocket(socket.id, canvasId);
+    const clientState = this.clientStates.get(canvasId);
 
-    if (!requesterId) return;
+    if (!requesterId || !clientState) return;
+
+    // C: Cannot demote the room owner
+    if (clientState.ownerId === targetUserId && newRole !== 'Lead') {
+      socket.emit('error', { message: 'Cannot demote the room owner' });
+      return;
+    }
 
     const success = this.rbac.changeRole(requesterId, canvasId, targetUserId, newRole);
     if (!success) {
@@ -313,11 +368,13 @@ export class SocketHandler {
       return;
     }
 
-    const clientState = this.clientStates.get(canvasId);
-    const targetUser = clientState?.users.get(targetUserId);
+    const targetUser = clientState.users.get(targetUserId);
     if (targetUser) {
       targetUser.role = newRole;
     }
+
+    // D: Persist role change to DB
+    this.persistence.saveRoomRole(canvasId, targetUserId, newRole, clientState.ownerId === targetUserId);
 
     this.io.to(canvasId).emit('role_changed', {
       userId: targetUserId,
@@ -326,6 +383,172 @@ export class SocketHandler {
     });
 
     console.log(`Role of user ${targetUserId} changed to ${newRole} by ${requesterId}`);
+  }
+
+  // C: Transfer ownership
+  private handleTransferOwnership(socket: Socket, data: { canvasId: string; targetUserId: string }): void {
+    const { canvasId, targetUserId } = data;
+    const requesterId = this.getUserIdFromSocket(socket.id, canvasId);
+    const clientState = this.clientStates.get(canvasId);
+
+    if (!requesterId || !clientState) return;
+
+    // Only owner can transfer ownership
+    if (clientState.ownerId !== requesterId) {
+      socket.emit('error', { message: 'Only the owner can transfer ownership' });
+      return;
+    }
+
+    const oldOwner = clientState.users.get(requesterId);
+    const newOwner = clientState.users.get(targetUserId);
+
+    if (!newOwner) {
+      socket.emit('error', { message: 'User not found' });
+      return;
+    }
+
+    // Transfer ownership
+    clientState.ownerId = targetUserId;
+    oldOwner!.role = 'Contributor';
+    newOwner.role = 'Lead';
+
+    this.rbac.assignCanvasRole(requesterId, canvasId, 'Contributor');
+    this.rbac.assignCanvasRole(targetUserId, canvasId, 'Lead');
+
+    // D: Persist ownership transfer to DB
+    this.persistence.saveRoomRole(canvasId, requesterId, 'Contributor', false);
+    this.persistence.saveRoomRole(canvasId, targetUserId, 'Lead', true);
+
+    // Notify everyone
+    this.io.to(canvasId).emit('role_changed', {
+      userId: requesterId,
+      newRole: 'Contributor',
+      timestamp: Date.now()
+    });
+    this.io.to(canvasId).emit('role_changed', {
+      userId: targetUserId,
+      newRole: 'Lead',
+      timestamp: Date.now()
+    });
+    this.io.to(canvasId).emit('ownership_transferred', {
+      oldOwnerId: requesterId,
+      newOwnerId: targetUserId,
+      timestamp: Date.now()
+    });
+
+    console.log(`Ownership transferred from ${oldOwner?.userName} to ${newOwner.userName}`);
+  }
+
+  // B: Self-request Contributor system
+  private handleRoleRequest(socket: Socket, data: { canvasId: string; requestedRole: 'Contributor' }): void {
+    const { canvasId, requestedRole } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+    const clientState = this.clientStates.get(canvasId);
+    const user = clientState?.users.get(userId);
+
+    if (!userId || !clientState || !user) return;
+
+    // Only Viewers can request Contributor
+    if (user.role !== 'Viewer') {
+      socket.emit('error', { message: 'Only Viewers can request a role change' });
+      return;
+    }
+
+    // Add to role requests
+    clientState.roleRequests.set(userId, {
+      userId,
+      userName: user.userName,
+      requestedAt: Date.now()
+    });
+
+    // Notify all Leads about the request
+    this.io.to(canvasId).emit('role_request', {
+      userId,
+      userName: user.userName,
+      requestedRole,
+      timestamp: Date.now()
+    });
+
+    console.log(`User ${user.userName} requested ${requestedRole} role`);
+  }
+
+  private handleApproveRoleRequest(socket: Socket, data: { canvasId: string; targetUserId: string }): void {
+    const { canvasId, targetUserId } = data;
+    const requesterId = this.getUserIdFromSocket(socket.id, canvasId);
+    const clientState = this.clientStates.get(canvasId);
+
+    if (!requesterId || !clientState) return;
+
+    // Only Leads can approve
+    const requester = clientState.users.get(requesterId);
+    if (!requester || requester.role !== 'Lead') {
+      socket.emit('error', { message: 'Only Leads can approve role requests' });
+      return;
+    }
+
+    // Remove from pending requests
+    clientState.roleRequests.delete(targetUserId);
+
+    // Update role to Contributor
+    const targetUser = clientState.users.get(targetUserId);
+    if (targetUser) {
+      targetUser.role = 'Contributor';
+      this.rbac.assignCanvasRole(targetUserId, canvasId, 'Contributor');
+    }
+
+    // D: Persist role change to DB
+    this.persistence.saveRoomRole(canvasId, targetUserId, 'Contributor', false);
+
+    // Notify everyone
+    this.io.to(canvasId).emit('role_changed', {
+      userId: targetUserId,
+      newRole: 'Contributor',
+      timestamp: Date.now()
+    });
+
+    // Confirm to the approver
+    socket.emit('role_request_approved', { userId: targetUserId });
+
+    console.log(`Lead ${requester.userName} approved Contributor role for ${targetUser?.userName}`);
+  }
+
+  private handleDenyRoleRequest(socket: Socket, data: { canvasId: string; targetUserId: string }): void {
+    const { canvasId, targetUserId } = data;
+    const requesterId = this.getUserIdFromSocket(socket.id, canvasId);
+    const clientState = this.clientStates.get(canvasId);
+
+    if (!requesterId || !clientState) return;
+
+    // Only Leads can deny
+    const requester = clientState.users.get(requesterId);
+    if (!requester || requester.role !== 'Lead') {
+      socket.emit('error', { message: 'Only Leads can deny role requests' });
+      return;
+    }
+
+    // Remove from pending requests
+    clientState.roleRequests.delete(targetUserId);
+
+    // Notify the requester they were denied
+    const targetSocket = this.findSocketByUserId(targetUserId, canvasId);
+    if (targetSocket) {
+      targetSocket.emit('role_request_denied', {});
+    }
+
+    console.log(`Lead ${requester.userName} denied role request for ${targetUserId}`);
+  }
+
+  private findSocketByUserId(userId: string, canvasId: string): Socket | undefined {
+    const sockets = this.io.sockets.adapter.rooms.get(canvasId);
+    if (!sockets) return undefined;
+
+    for (const socketId of sockets) {
+      const socket = this.io.sockets.sockets.get(socketId);
+      if (socket && socket.data.userId === userId) {
+        return socket;
+      }
+    }
+    return undefined;
   }
 
   private async handleCreateNode(socket: Socket, data: { canvasId: string; nodeId?: string; nodeType: string; position: { x: number; y: number }; content: string; size?: { width: number; height: number }; color?: string; shapeType?: 'rectangle' | 'circle'; points?: { x: number; y: number }[]; style?: Record<string, unknown> }): Promise<void> {
@@ -720,6 +943,9 @@ export class SocketHandler {
     for (const [canvasId, clientState] of this.clientStates.entries()) {
       for (const [userId, user] of clientState.users.entries()) {
         if (user.socketId === socket.id) {
+          const wasOwner = clientState.ownerId === userId;
+          const disconnectedUserName = user.userName;
+
           const leaveEvent: UserLeftEvent = {
             id: uuidv4(),
             type: 'UserLeft',
@@ -735,7 +961,59 @@ export class SocketHandler {
           clientState.users.delete(userId);
           clientState.cursors.delete(socket.id);
 
-          console.log(`User ${user.userName} disconnected from canvas ${canvasId}`);
+          // D: Remove user from DB roles (but keep if owner to preserve on reconnect)
+          if (!wasOwner) {
+            this.persistence.removeRoomUser(canvasId, userId);
+          }
+
+          // C: Transfer ownership if owner disconnects
+          if (wasOwner) {
+            // Find the most senior Contributor to become new Lead
+            let newOwner: ConnectedUser | null = null;
+            for (const [, u] of clientState.users.entries()) {
+              if (u.role === 'Contributor') {
+                if (!newOwner) {
+                  newOwner = u;
+                }
+              }
+            }
+
+            // If no Contributor, promote the first Viewer
+            if (!newOwner && clientState.users.size > 0) {
+              const firstUser = clientState.users.values().next().value;
+              if (firstUser) {
+                newOwner = firstUser;
+              }
+            }
+
+            if (newOwner) {
+              clientState.ownerId = newOwner.userId;
+              newOwner.role = 'Lead';
+              this.rbac.assignCanvasRole(newOwner.userId, canvasId, 'Lead');
+
+              // D: Persist ownership transfer to DB
+              this.persistence.saveRoomRole(canvasId, userId, 'Contributor', false);
+              this.persistence.saveRoomRole(canvasId, newOwner.userId, 'Lead', true);
+
+              this.io.to(canvasId).emit('role_changed', {
+                userId: newOwner.userId,
+                newRole: 'Lead',
+                timestamp: Date.now()
+              });
+              this.io.to(canvasId).emit('ownership_transferred', {
+                oldOwnerId: userId,
+                newOwnerId: newOwner.userId,
+                timestamp: Date.now()
+              });
+
+              console.log(`Ownership transferred from ${disconnectedUserName} to ${newOwner.userName}`);
+            } else {
+              clientState.ownerId = null;
+              console.log(`Owner ${disconnectedUserName} left, no users to transfer ownership to`);
+            }
+          }
+
+          console.log(`User ${disconnectedUserName} disconnected from canvas ${canvasId}`);
           break;
         }
       }

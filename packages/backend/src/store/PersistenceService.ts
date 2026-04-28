@@ -45,6 +45,17 @@ export class PersistenceService {
           timestamp INTEGER
         )
       `);
+
+      // D: Table for Room Roles (persists across server restarts)
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS room_roles (
+          canvasId TEXT,
+          userId TEXT,
+          role TEXT,
+          isOwner INTEGER DEFAULT 0,
+          PRIMARY KEY (canvasId, userId)
+        )
+      `);
     });
   }
 
@@ -116,6 +127,63 @@ export class PersistenceService {
         (err, rows) => {
           if (err) reject(err);
           else resolve(rows);
+        }
+      );
+    });
+  }
+
+  // D: Room role persistence
+  async saveRoomRole(canvasId: string, userId: string, role: string, isOwner: boolean = false): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT OR REPLACE INTO room_roles (canvasId, userId, role, isOwner) VALUES (?, ?, ?, ?)`,
+        [canvasId, userId, role, isOwner ? 1 : 0],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+  }
+
+  async getRoomRoles(canvasId: string): Promise<{ userId: string; role: string; isOwner: boolean }[]> {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT userId, role, isOwner FROM room_roles WHERE canvasId = ?`,
+        [canvasId],
+        (err, rows: any[]) => {
+          if (err) reject(err);
+          else resolve(rows.map(row => ({
+            userId: row.userId,
+            role: row.role,
+            isOwner: row.isOwner === 1
+          })));
+        }
+      );
+    });
+  }
+
+  async getRoomOwner(canvasId: string): Promise<string | null> {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        `SELECT userId FROM room_roles WHERE canvasId = ? AND isOwner = 1`,
+        [canvasId],
+        (err, row: any) => {
+          if (err) reject(err);
+          else resolve(row?.userId || null);
+        }
+      );
+    });
+  }
+
+  async removeRoomUser(canvasId: string, userId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `DELETE FROM room_roles WHERE canvasId = ? AND userId = ?`,
+        [canvasId, userId],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
         }
       );
     });

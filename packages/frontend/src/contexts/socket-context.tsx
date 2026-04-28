@@ -118,6 +118,12 @@ interface SocketContextType {
   emitTaskUpdate: (taskId: string, status: 'pending' | 'in-progress' | 'completed') => void;
   emitTaskDelete: (taskId: string) => void;
   emitChangeRole: (targetUserId: string, newRole: 'Lead' | 'Contributor' | 'Viewer') => void;
+  // B: Role request system
+  emitRoleRequest: (requestedRole: 'Contributor') => void;
+  emitApproveRoleRequest: (targetUserId: string) => void;
+  emitDenyRoleRequest: (targetUserId: string) => void;
+  // C: Ownership transfer
+  emitTransferOwnership: (targetUserId: string) => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -133,6 +139,10 @@ const SocketContext = createContext<SocketContextType>({
   emitTaskUpdate: () => {},
   emitTaskDelete: () => {},
   emitChangeRole: () => {},
+  emitRoleRequest: () => {},
+  emitApproveRoleRequest: () => {},
+  emitDenyRoleRequest: () => {},
+  emitTransferOwnership: () => {},
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -287,7 +297,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
       if (payload.userId === userId) {
         setUserRole(payload.newRole);
       }
-      
+
       // Update the user in the users map
       const existingUsers = useCanvasStore.getState().users;
       const user = existingUsers.get(payload.userId);
@@ -295,6 +305,32 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
         addUser({ ...user, role: payload.newRole });
       }
       console.log('Role changed for user:', payload.userId, 'to', payload.newRole);
+    });
+
+    // B: Role request handlers
+    newSocket.on('role_request', (payload: { userId: string; userName: string; requestedRole: string }) => {
+      // Lead receives this when a Viewer requests Contributor
+      console.log('Role request from:', payload.userName, 'for', payload.requestedRole);
+    });
+
+    newSocket.on('role_request_approved', (payload: { userId: string }) => {
+      if (payload.userId === userId) {
+        setUserRole('Contributor');
+        alert('Your Contributor request was approved! You can now edit.');
+      }
+    });
+
+    newSocket.on('role_request_denied', () => {
+      alert('Your Contributor request was denied by the Lead.');
+    });
+
+    // C: Ownership transfer
+    newSocket.on('ownership_transferred', (payload: { oldOwnerId: string; newOwnerId: string }) => {
+      if (payload.newOwnerId === userId) {
+        setUserRole('Lead');
+        alert('You are now the Lead of this room!');
+      }
+      console.log('Ownership transferred from', payload.oldOwnerId, 'to', payload.newOwnerId);
     });
 
     newSocket.on('node_created', (event: NodeCreatedEvent) => {
@@ -365,6 +401,11 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     });
 
     setSocket(newSocket);
+
+    // Expose socket on window for cross-component access
+    if (typeof window !== 'undefined') {
+      (window as any).__socket = newSocket;
+    }
 
     return () => {
       newSocket.disconnect();
@@ -448,6 +489,24 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     socket?.emit('change_role', { canvasId, targetUserId, newRole });
   }, [socket, canvasId]);
 
+  // B: Role request system
+  const emitRoleRequest = useCallback((requestedRole: 'Contributor') => {
+    socket?.emit('request_role', { canvasId, requestedRole });
+  }, [socket, canvasId]);
+
+  const emitApproveRoleRequest = useCallback((targetUserId: string) => {
+    socket?.emit('approve_role_request', { canvasId, targetUserId });
+  }, [socket, canvasId]);
+
+  const emitDenyRoleRequest = useCallback((targetUserId: string) => {
+    socket?.emit('deny_role_request', { canvasId, targetUserId });
+  }, [socket, canvasId]);
+
+  // C: Ownership transfer
+  const emitTransferOwnership = useCallback((targetUserId: string) => {
+    socket?.emit('transfer_ownership', { canvasId, targetUserId });
+  }, [socket, canvasId]);
+
   return (
     <SocketContext.Provider
       value={{
@@ -463,6 +522,10 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
         emitTaskUpdate,
         emitTaskDelete,
         emitChangeRole,
+        emitRoleRequest,
+        emitApproveRoleRequest,
+        emitDenyRoleRequest,
+        emitTransferOwnership,
       }}
     >
       {children}

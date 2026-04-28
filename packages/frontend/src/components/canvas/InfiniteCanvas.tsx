@@ -47,6 +47,7 @@ export function InfiniteCanvas() {
     viewportPosition,
     viewportZoom,
     userId,
+    userRole,
     setSelectedId,
     setSelectedIds,
     clearSelection,
@@ -206,6 +207,12 @@ export function InfiniteCanvas() {
 
   const handleMouseUp = useCallback(() => {
     if (isDragging && tool === 'draw' && drawPoints.length > 1) {
+      if (userRole === 'Viewer') {
+        alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
+        setDrawPoints([]);
+        setIsDragging(false);
+        return;
+      }
       const element = addElement({
         type: 'drawing',
         position: { x: 0, y: 0 },
@@ -221,6 +228,13 @@ export function InfiniteCanvas() {
     }
 
     if (isDrawingShape && tool === 'shape' && shapePreview) {
+      if (userRole === 'Viewer') {
+        alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
+        setShapePreview(null);
+        setShapeStart(null);
+        setIsDrawingShape(false);
+        return;
+      }
       const width = Math.abs(shapePreview.end.x - shapePreview.start.x);
       const height = Math.abs(shapePreview.end.y - shapePreview.start.y);
       if (width > 5 && height > 5) {
@@ -302,6 +316,10 @@ export function InfiniteCanvas() {
     }
 
     // If double clicked background, create text
+    if (userRole === 'Viewer') {
+      alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
+      return;
+    }
     const element = addElement({
       type: 'text',
       position: { x, y: y - 10 },
