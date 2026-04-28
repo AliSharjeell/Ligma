@@ -217,14 +217,14 @@ export function InfiniteCanvas() {
       return;
     }
 
+    // For all other tools, ignore elements underneath and work directly
     if (tool === 'eraser') {
       setIsErasing(true);
-      elements.forEach((element) => {
-        if (isPointInElement(x, y, element)) {
-          emitElementDelete(element.id);
-          deleteElement(element.id);
-        }
-      });
+      // Only delete if clicking on element
+      if (clickedElement) {
+        emitElementDelete(clickedElement.id);
+        deleteElement(clickedElement.id);
+      }
       return;
     }
 
