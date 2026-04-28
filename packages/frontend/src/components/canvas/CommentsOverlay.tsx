@@ -285,7 +285,17 @@ export function CommentsOverlay() {
     }
   }, [activeCommentId]);
 
-  if (!isCommentMode && !pendingComment && comments.length === 0) {
+  // Close popover when clicking outside
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      setActiveCommentId(null);
+    }
+  };
+
+  // Show overlay when there are comments or in comment mode or creating a comment
+  const shouldShow = isCommentMode || pendingComment || comments.length > 0 || activeCommentId;
+
+  if (!shouldShow) {
     return null;
   }
 
@@ -295,7 +305,10 @@ export function CommentsOverlay() {
         'absolute inset-0 pointer-events-none z-40',
         isCommentMode && 'pointer-events-auto cursor-crosshair'
       )}
-      onClick={handleCanvasClick}
+      onClick={(e) => {
+        handleOverlayClick(e);
+        handleCanvasClick(e);
+      }}
     >
       {/* Existing comment pins */}
       {comments.map((comment) => {
