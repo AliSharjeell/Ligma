@@ -293,6 +293,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       id: event.userId,
       name: event.userName,
       color: '#16a34a',
+      role: event.role,
     };
   }, []);
 
