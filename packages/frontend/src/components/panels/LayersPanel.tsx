@@ -6,22 +6,16 @@ import { useSocket } from '@/contexts/socket-context';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Layers, Trash2, Lock, Unlock } from 'lucide-react';
+import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image } from 'lucide-react';
 import type { CanvasElement, ElementType } from '@/types/canvas';
 
-const LAYER_LABELS: Record<ElementType, string> = {
-  drawing: 'Pen',
-  shape: 'Shape',
-  sticky: 'Sticky',
-  text: 'Text',
-  image: 'Image',
+const LAYER_ICONS: Record<ElementType, React.ReactNode> = {
+  drawing: <Pencil className="size-3" />,
+  shape: <Square className="size-3" />,
+  sticky: <StickyNote className="size-3" />,
+  text: <Type className="size-3" />,
+  image: <Image className="size-3" />,
 };
-
-function getLayerLabel(element: CanvasElement, counts: Record<ElementType, number>): string {
-  const base = LAYER_LABELS[element.type] || 'Layer';
-  counts[element.type] += 1;
-  return `${base} ${counts[element.type]}`;
-}
 
 export function LayersList() {
   const { elements, selectedIds, setSelectedId, setSelectedIds, deleteElement, lockElement, unlockElement } = useCanvasStore();
@@ -90,12 +84,9 @@ export function LayersList() {
               onClick={(e) => handleLayerClick(element.id, e)}
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div
-                  className="w-4 h-4 rounded shrink-0"
-                  style={{ backgroundColor: element.color || '#1f2937' }}
-                />
+                {LAYER_ICONS[element.type]}
                 <span className="text-xs text-muted-foreground capitalize shrink-0">
-                  {LAYER_LABELS[element.type] || element.type}
+                  {element.type}
                 </span>
               </div>
               <div className="flex items-center gap-1">
