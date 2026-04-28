@@ -76,6 +76,12 @@ export interface CanvasState {
   userName: string;
   history: { elements: Map<string, CanvasElement>; timestamp: number }[];
   redoStack: { elements: Map<string, CanvasElement>; timestamp: number }[];
+  comments: Comment[];
+  isCommentMode: boolean;
+  activeCommentId: string | null;
+  hoveredCommentId: string | null;
+  pendingCommentX: number | null;
+  pendingCommentY: number | null;
 }
 
 export interface CanvasEvent {
