@@ -32,6 +32,7 @@ import {
   WifiOff,
   LogOut,
   PlusCircle,
+  RefreshCw,
 } from 'lucide-react';
 import type { CanvasElement, Tool, ShapeType } from '@/types/canvas';
 import { TaskBoard } from '@/components/panels/TaskBoard';
@@ -75,7 +76,7 @@ export function Toolbar() {
   const [pendingRequests, setPendingRequests] = useState<{ userId: string; userName: string }[]>([]);
   const [hasRequested, setHasRequested] = useState(false);
   const router = useRouter();
-  const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership } = useSocket();
+  const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership, connectionStatus, pendingCount } = useSocket();
 
   const {
     tool,
@@ -345,7 +346,33 @@ export function Toolbar() {
       )}
 
       {/* Top Right Settings Button */}
-      <div className="absolute top-4 right-4 z-20">
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        {/* Connection Status Indicator */}
+        <div className="flex items-center gap-1.5 bg-white rounded-lg shadow-excalidraw border border-slate-200 px-2.5 py-1.5">
+          {connectionStatus === 'connected' && (
+            <>
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              {pendingCount > 0 ? (
+                <span className="text-xs text-amber-600 font-medium">{pendingCount} pending</span>
+              ) : (
+                <span className="text-xs text-green-600 font-medium">Synced</span>
+              )}
+            </>
+          )}
+          {connectionStatus === 'connecting' && (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 text-yellow-500 animate-spin" />
+              <span className="text-xs text-yellow-600 font-medium">Syncing...</span>
+            </>
+          )}
+          {connectionStatus === 'disconnected' && (
+            <>
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-xs text-red-600 font-medium">Offline</span>
+            </>
+          )}
+        </div>
+
         <Button
           variant="ghost"
           size="icon"

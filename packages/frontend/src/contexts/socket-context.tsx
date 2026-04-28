@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useCanvasStore } from '@/store/canvas-store';
 import type { CanvasElement, CanvasEvent, Position, ShapeType, Size, Task, User } from '@/types/canvas';
@@ -105,9 +105,25 @@ type UserDto = {
   role: 'Lead' | 'Contributor' | 'Viewer';
 };
 
+type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
+
+// Offline queue types
+interface QueuedEvent {
+  id: string;
+  timestamp: number;
+  type: 'create' | 'update' | 'delete' | 'lock' | 'unlock';
+  eventType: string;
+  canvasId: string;
+  payload: any;
+}
+
+const QUEUE_KEY = 'ligma-offline-queue';
+
 interface SocketContextType {
   socket: Socket | null;
   connected: boolean;
+  connectionStatus: ConnectionStatus;
+  pendingCount: number;
   emitElementCreate: (element: CanvasElement) => void;
   emitElementUpdate: (element: CanvasElement) => void;
   emitElementDelete: (elementId: string) => void;
@@ -118,17 +134,17 @@ interface SocketContextType {
   emitTaskUpdate: (taskId: string, status: 'pending' | 'in-progress' | 'completed') => void;
   emitTaskDelete: (taskId: string) => void;
   emitChangeRole: (targetUserId: string, newRole: 'Lead' | 'Contributor' | 'Viewer') => void;
-  // B: Role request system
   emitRoleRequest: (requestedRole: 'Contributor') => void;
   emitApproveRoleRequest: (targetUserId: string) => void;
   emitDenyRoleRequest: (targetUserId: string) => void;
-  // C: Ownership transfer
   emitTransferOwnership: (targetUserId: string) => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
   socket: null,
   connected: false,
+  connectionStatus: 'disconnected',
+  pendingCount: 0,
   emitElementCreate: () => {},
   emitElementUpdate: () => {},
   emitElementDelete: () => {},
@@ -153,9 +169,31 @@ interface SocketProviderProps {
   canvasId?: string;
 }
 
+// Load queue from localStorage
+function loadQueue(): QueuedEvent[] {
+  try {
+    const saved = localStorage.getItem(QUEUE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Save queue to localStorage
+function saveQueue(queue: QueuedEvent[]) {
+  try {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  } catch (e) {
+    console.error('Failed to save offline queue:', e);
+  }
+}
+
 export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', canvasId = 'default' }: SocketProviderProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
+  const [pendingCount, setPendingCount] = useState(0);
+  const queueRef = useRef<QueuedEvent[]>(loadQueue());
 
   const {
     userId,
@@ -179,6 +217,11 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     setUserRole,
     setUsers,
   } = useCanvasStore();
+
+  // Sync pending count with queue length
+  useEffect(() => {
+    setPendingCount(queueRef.current.length);
+  }, []);
 
   const toTask = useCallback((task: TaskDto): Task => {
     return {
@@ -253,6 +296,65 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     };
   }, []);
 
+  // Replay queued events
+  const replayQueue = useCallback((socketInstance: Socket) => {
+    const queue = queueRef.current;
+    if (queue.length === 0) return;
+
+    console.log(`Replaying ${queue.length} queued events...`);
+    setConnectionStatus('connecting');
+
+    queue.forEach((event, index) => {
+      setTimeout(() => {
+        switch (event.type) {
+          case 'create':
+            socketInstance.emit('create_node', event.payload);
+            break;
+          case 'update':
+            socketInstance.emit('update_node', event.payload);
+            break;
+          case 'delete':
+            socketInstance.emit('delete_node', event.payload);
+            break;
+          case 'lock':
+            socketInstance.emit('lock_node', event.payload);
+            break;
+          case 'unlock':
+            socketInstance.emit('unlock_node', event.payload);
+            break;
+        }
+      }, index * 50); // Small delay between events
+    });
+
+    // Clear queue after replay
+    setTimeout(() => {
+      queueRef.current = [];
+      saveQueue([]);
+      setPendingCount(0);
+      console.log('Offline queue replayed and cleared');
+    }, queue.length * 50 + 100);
+  }, []);
+
+  // Listen for online/offline events
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('Browser online');
+    };
+
+    const handleOffline = () => {
+      console.log('Browser offline');
+      setConnectionStatus('disconnected');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   useEffect(() => {
     const newSocket = io(url, {
       query: { userId, userName },
@@ -261,7 +363,14 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
 
     newSocket.on('connect', () => {
       setConnected(true);
+      setConnectionStatus('connected');
       console.log('Connected to WebSocket server');
+
+      // Replay offline queue on reconnect
+      if (queueRef.current.length > 0) {
+        replayQueue(newSocket);
+      }
+
       // Clear old state when joining a new canvas
       resetCanvas();
       newSocket.emit('join_canvas', {
@@ -273,7 +382,12 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
 
     newSocket.on('disconnect', () => {
       setConnected(false);
+      setConnectionStatus('disconnected');
       console.log('Disconnected from WebSocket server');
+    });
+
+    newSocket.on('connect_error', () => {
+      setConnectionStatus('disconnected');
     });
 
     newSocket.on('sync_response', (payload: { state: { nodes: any[] } }) => {
@@ -289,7 +403,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         id: u.userId,
         name: u.userName,
         role: u.role,
-        color: '#16a34a', // Default color
+        color: '#16a34a',
       }));
       setUsers(formattedUsers);
       setUserRole(payload.yourRole);
@@ -300,8 +414,6 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       if (payload.userId === userId) {
         setUserRole(payload.newRole);
       }
-
-      // Update the user in the users map
       const existingUsers = useCanvasStore.getState().users;
       const user = existingUsers.get(payload.userId);
       if (user) {
@@ -310,9 +422,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       console.log('Role changed for user:', payload.userId, 'to', payload.newRole);
     });
 
-    // B: Role request handlers
     newSocket.on('role_request', (payload: { userId: string; userName: string; requestedRole: string }) => {
-      // Lead receives this when a Viewer requests Contributor
       console.log('Role request from:', payload.userName, 'for', payload.requestedRole);
     });
 
@@ -327,7 +437,6 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       alert('Your Contributor request was denied by the Lead.');
     });
 
-    // C: Ownership transfer
     newSocket.on('ownership_transferred', (payload: { oldOwnerId: string; newOwnerId: string }) => {
       if (payload.newOwnerId === userId) {
         setUserRole('Lead');
@@ -405,7 +514,6 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
 
     setSocket(newSocket);
 
-    // Expose socket on window for cross-component access
     if (typeof window !== 'undefined') {
       (window as any).__socket = newSocket;
     }
@@ -413,12 +521,22 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     return () => {
       newSocket.disconnect();
     };
-  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement, setUsers, setUserRole, resetCanvas]);
+  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement, setUsers, setUserRole, resetCanvas, replayQueue]);
+
+  const addToQueue = useCallback((event: Omit<QueuedEvent, 'id' | 'timestamp'>) => {
+    const queuedEvent: QueuedEvent = {
+      ...event,
+      id: `offline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+    };
+    queueRef.current = [...queueRef.current, queuedEvent];
+    saveQueue(queueRef.current);
+    setPendingCount(queueRef.current.length);
+  }, []);
 
   const emitElementCreate = useCallback((element: CanvasElement) => {
-    // For drawing elements, use create_node with nodeType='drawing'
     if (element.type === 'drawing') {
-      socket?.emit('create_node', {
+      const payload = {
         canvasId,
         nodeId: element.id,
         nodeType: 'drawing',
@@ -427,9 +545,14 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         size: element.size,
         points: element.points,
         color: element.color,
-      });
+      };
+      if (connected) {
+        socket?.emit('create_node', payload);
+      } else {
+        addToQueue({ type: 'create', eventType: 'create_node', canvasId, payload });
+      }
     } else {
-      socket?.emit('create_node', {
+      const payload = {
         canvasId,
         nodeId: element.id,
         nodeType: element.type,
@@ -439,12 +562,17 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         color: element.color,
         shapeType: element.shapeType,
         style: element.textStyle,
-      });
+      };
+      if (connected) {
+        socket?.emit('create_node', payload);
+      } else {
+        addToQueue({ type: 'create', eventType: 'create_node', canvasId, payload });
+      }
     }
-  }, [socket, canvasId]);
+  }, [socket, canvasId, connected, addToQueue]);
 
   const emitElementUpdate = useCallback((element: CanvasElement) => {
-    socket?.emit('update_node', {
+    const payload = {
       canvasId,
       nodeId: element.id,
       changes: {
@@ -457,20 +585,40 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         style: element.textStyle,
       },
       vectorClock: {},
-    });
-  }, [socket, canvasId]);
+    };
+    if (connected) {
+      socket?.emit('update_node', payload);
+    } else {
+      addToQueue({ type: 'update', eventType: 'update_node', canvasId, payload });
+    }
+  }, [socket, canvasId, connected, addToQueue]);
 
   const emitElementDelete = useCallback((elementId: string) => {
-    socket?.emit('delete_node', { canvasId, nodeId: elementId });
-  }, [socket, canvasId]);
+    const payload = { canvasId, nodeId: elementId };
+    if (connected) {
+      socket?.emit('delete_node', payload);
+    } else {
+      addToQueue({ type: 'delete', eventType: 'delete_node', canvasId, payload });
+    }
+  }, [socket, canvasId, connected, addToQueue]);
 
   const emitElementLock = useCallback((elementId: string) => {
-    socket?.emit('lock_node', { canvasId, nodeId: elementId });
-  }, [socket, canvasId]);
+    const payload = { canvasId, nodeId: elementId };
+    if (connected) {
+      socket?.emit('lock_node', payload);
+    } else {
+      addToQueue({ type: 'lock', eventType: 'lock_node', canvasId, payload });
+    }
+  }, [socket, canvasId, connected, addToQueue]);
 
   const emitElementUnlock = useCallback((elementId: string) => {
-    socket?.emit('unlock_node', { canvasId, nodeId: elementId });
-  }, [socket, canvasId]);
+    const payload = { canvasId, nodeId: elementId };
+    if (connected) {
+      socket?.emit('unlock_node', payload);
+    } else {
+      addToQueue({ type: 'unlock', eventType: 'unlock_node', canvasId, payload });
+    }
+  }, [socket, canvasId, connected, addToQueue]);
 
   const emitCursorMove = useCallback((position: Position) => {
     socket?.emit('cursor_move', { canvasId, position });
@@ -492,7 +640,6 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     socket?.emit('change_role', { canvasId, targetUserId, newRole });
   }, [socket, canvasId]);
 
-  // B: Role request system
   const emitRoleRequest = useCallback((requestedRole: 'Contributor') => {
     socket?.emit('request_role', { canvasId, requestedRole });
   }, [socket, canvasId]);
@@ -505,7 +652,6 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     socket?.emit('deny_role_request', { canvasId, targetUserId });
   }, [socket, canvasId]);
 
-  // C: Ownership transfer
   const emitTransferOwnership = useCallback((targetUserId: string) => {
     socket?.emit('transfer_ownership', { canvasId, targetUserId });
   }, [socket, canvasId]);
@@ -515,6 +661,8 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       value={{
         socket,
         connected,
+        connectionStatus,
+        pendingCount,
         emitElementCreate,
         emitElementUpdate,
         emitElementDelete,
@@ -534,4 +682,4 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       {children}
     </SocketContext.Provider>
   );
-  }
+}
