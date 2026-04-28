@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TaskBoard } from '@/components/panels/TaskBoard';
 import { EventLog } from '@/components/panels/EventLog';
+import { LayersPanel } from '@/components/panels/LayersPanel';
 import { useSocket } from '@/contexts/socket-context';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -20,11 +21,12 @@ interface HeaderProps {
 export function Header({ className, currentRoom = 'default' }: HeaderProps) {
   const { connected } = useSocket();
   const router = useRouter();
-  const [roomInput, setRoomInput] = useState(currentRoom);
+  const normalizedRoom = currentRoom && currentRoom !== 'undefined' ? currentRoom : 'default';
+  const [roomInput, setRoomInput] = useState(normalizedRoom);
 
   useEffect(() => {
-    setRoomInput(currentRoom);
-  }, [currentRoom]);
+    setRoomInput(normalizedRoom);
+  }, [normalizedRoom]);
 
   const handleJoinRoom = () => {
     const trimmed = roomInput.trim();
@@ -53,7 +55,7 @@ export function Header({ className, currentRoom = 'default' }: HeaderProps) {
         <Dialog>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
-              Room: {currentRoom}
+              Room: {normalizedRoom}
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -103,6 +105,7 @@ export function Header({ className, currentRoom = 'default' }: HeaderProps) {
         <div className="flex items-center gap-2">
           <TaskBoard />
           <EventLog />
+          <LayersPanel />
         </div>
       </div>
     </header>

@@ -42,6 +42,10 @@ export function InfiniteCanvas() {
     shapeColor,
     stickyColor,
     textColor,
+    textFontSize,
+    textFontFamily,
+    textFontWeight,
+    textAlign,
     viewportPosition,
     viewportZoom,
     userId,
@@ -73,6 +77,8 @@ export function InfiniteCanvas() {
     const x = (e.clientX - canvasRect.left - viewportPosition.x) / viewportZoom;
     const y = (e.clientY - canvasRect.top - viewportPosition.y) / viewportZoom;
 
+    const lockedByMe = Array.from(elements.values()).find((element) => element.locked && element.lockedBy === userId);
+
     // Pan tool or middle mouse button
     if (e.button === 1 || (e.button === 0 && tool === 'pan')) {
       setIsPanning(true);
@@ -97,6 +103,10 @@ export function InfiniteCanvas() {
     if (tool === 'select') {
       const elementsArray = Array.from(elements.values());
       const clickedElement = elementsArray.find((element) => isPointInElement(x, y, element));
+
+      if (lockedByMe && (!clickedElement || clickedElement.id !== lockedByMe.id)) {
+        return;
+      }
 
       if (clickedElement) {
         if (e.shiftKey) {
@@ -150,13 +160,19 @@ export function InfiniteCanvas() {
         size: { width: 200, height: 40 },
         content: 'Double-click to edit',
         color: textColor,
+        textStyle: {
+          fontSize: textFontSize,
+          fontFamily: textFontFamily,
+          fontWeight: textFontWeight,
+          textAlign,
+        },
         locked: false,
         createdBy: userId,
       });
       emitElementCreate(element);
       setSelectedId(element.id);
     }
-  }, [tool, viewportPosition, viewportZoom, userId, addElement, setSelectedId, shapeType, emitElementCreate, elements, deleteElement, emitElementDelete, stickyColor, textColor]);
+  }, [tool, viewportPosition, viewportZoom, userId, addElement, setSelectedId, shapeType, emitElementCreate, elements, deleteElement, emitElementDelete, stickyColor, textColor, textFontSize, textFontFamily, textFontWeight, textAlign]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -226,14 +242,16 @@ export function InfiniteCanvas() {
     if (isDrawingShape && tool === 'shape' && shapePreview) {
       const width = Math.abs(shapePreview.end.x - shapePreview.start.x);
       const height = Math.abs(shapePreview.end.y - shapePreview.start.y);
-      if (width > 5 && height > 5) {
+      const finalWidth = width > 5 ? width : 140;
+      const finalHeight = height > 5 ? height : 100;
+      if (finalWidth > 0 && finalHeight > 0) {
         const element = addElement({
           type: 'shape',
           position: {
             x: Math.min(shapePreview.start.x, shapePreview.end.x),
             y: Math.min(shapePreview.start.y, shapePreview.end.y),
           },
-          size: { width, height },
+          size: { width: finalWidth, height: finalHeight },
           content: '',
           shapeType,
           color: shapeColor,
@@ -417,9 +435,9 @@ export function InfiniteCanvas() {
       </div>
 
       <CursorPresence />
-      <PresenceHeatmap visible={heatmapEnabled} />
+      <PresenceHeatmap />
       <PresenceZones visible={zonesEnabled} />
-      <TimeTravel visible={showTimeTravel} onClose={() => setShowTimeTravel(false)} />
+      <TimeTravel visible={showTimeTravel} />
 
       <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-3 py-2 text-sm">
         <span className="text-muted-foreground">Zoom: {Math.round(viewportZoom * 100)}%</span>

@@ -119,7 +119,7 @@ export class SocketHandler {
       this.handleJoinCanvas(socket, data);
     });
 
-    socket.on('create_node', (data: { canvasId: string; nodeId?: string; nodeType: string; position: { x: number; y: number }; content: string; size?: { width: number; height: number }; color?: string; shapeType?: 'rectangle' | 'circle'; points?: { x: number; y: number }[] }) => {
+    socket.on('create_node', (data: { canvasId: string; nodeId?: string; nodeType: string; position: { x: number; y: number }; content: string; size?: { width: number; height: number }; color?: string; shapeType?: 'rectangle' | 'circle'; points?: { x: number; y: number }[]; style?: Record<string, unknown> }) => {
       console.log(`Create node request for canvas ${data.canvasId}`);
       this.handleCreateNode(socket, data);
     });
@@ -220,8 +220,8 @@ export class SocketHandler {
     console.log(`User ${userName} joined canvas ${canvasId}`);
   }
 
-  private async handleCreateNode(socket: Socket, data: { canvasId: string; nodeId?: string; nodeType: string; position: { x: number; y: number }; content: string; size?: { width: number; height: number }; color?: string; shapeType?: 'rectangle' | 'circle'; points?: { x: number; y: number }[] }): Promise<void> {
-    const { canvasId, nodeId: clientNodeId, nodeType, position, content, size, color, shapeType, points } = data;
+  private async handleCreateNode(socket: Socket, data: { canvasId: string; nodeId?: string; nodeType: string; position: { x: number; y: number }; content: string; size?: { width: number; height: number }; color?: string; shapeType?: 'rectangle' | 'circle'; points?: { x: number; y: number }[]; style?: Record<string, unknown> }): Promise<void> {
+    const { canvasId, nodeId: clientNodeId, nodeType, position, content, size, color, shapeType, points, style } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
 
     if (!userId || !this.rbac.canPerformAction(userId, canvasId, 'canCreate')) {
@@ -249,7 +249,8 @@ export class SocketHandler {
         size,
         color,
         shapeType,
-        points
+        points,
+        style
       }
     };
 

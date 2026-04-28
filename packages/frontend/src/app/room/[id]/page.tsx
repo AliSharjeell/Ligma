@@ -9,9 +9,11 @@ import { TimeTravel } from '@/components/canvas/TimeTravel';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
 
-export default function RoomPage({ params }: { params: { id: string } }) {
-  const roomId = decodeURIComponent(params.id);
-
+export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const roomId = decodeURIComponent(id ?? 'default');
+  console.log('Joining room:', roomId);
+  
   return (
     <SocketProvider url={WS_URL} canvasId={roomId}>
       <main className="h-screen w-screen flex flex-col overflow-hidden">

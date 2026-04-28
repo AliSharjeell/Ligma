@@ -14,6 +14,10 @@ interface CanvasStore extends CanvasState {
   setShapeColor: (color: string) => void;
   setStickyColor: (color: string) => void;
   setTextColor: (color: string) => void;
+  setTextFontSize: (size: number) => void;
+  setTextFontFamily: (family: string) => void;
+  setTextFontWeight: (weight: 'normal' | 'bold' | number) => void;
+  setTextAlign: (align: 'left' | 'center' | 'right') => void;
   setSelectedId: (id: string | null) => void;
   setSelectedIds: (ids: Set<string>) => void;
   addToSelection: (id: string) => void;
@@ -59,6 +63,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   shapeColor: '#374151',
   stickyColor: '#fef08a',
   textColor: '#1f2937',
+  textFontSize: 18,
+  textFontFamily: 'Georgia, serif',
+  textFontWeight: 'normal',
+  textAlign: 'left',
   users: new Map(),
   tasks: [],
   eventLog: [],
@@ -75,6 +83,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setShapeColor: (color) => set({ shapeColor: color }),
   setStickyColor: (color) => set({ stickyColor: color }),
   setTextColor: (color) => set({ textColor: color }),
+  setTextFontSize: (size) => set({ textFontSize: size }),
+  setTextFontFamily: (family) => set({ textFontFamily: family }),
+  setTextFontWeight: (weight) => set({ textFontWeight: weight }),
+  setTextAlign: (align) => set({ textAlign: align }),
   setSelectedId: (id) => set({ selectedIds: id ? new Set([id]) : new Set() }),
   setSelectedIds: (ids) => set({ selectedIds: ids }),
   addToSelection: (id) => set((state) => {
@@ -132,7 +144,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   updateElement: (id, updates) => {
     set((state) => {
       const element = state.elements.get(id);
-      if (!element || element.locked) return state;
+      const { userId } = get();
+      if (!element) return state;
+      if (element.locked && element.lockedBy !== userId) return state;
       // Save to history before update
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);

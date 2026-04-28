@@ -20,6 +20,7 @@ type NodeCreatedEvent = {
     color?: string;
     shapeType?: ShapeType;
     points?: Position[];
+    style?: Record<string, unknown>;
   };
 };
 
@@ -187,6 +188,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
       color: event.metadata?.color || '#1f2937',
       shapeType: event.metadata?.shapeType,
       points: event.metadata?.points,
+      textStyle: event.metadata?.style as CanvasElement['textStyle'] | undefined,
       locked: false,
       createdBy: event.userId,
       createdAt: now,
@@ -231,7 +233,13 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     });
 
     newSocket.on('node_updated', (event: NodeUpdatedEvent) => {
-      updateElement(event.nodeId, event.changes);
+      const nextChanges: Partial<CanvasElement> = {
+        ...event.changes,
+      };
+      if (event.changes.style) {
+        nextChanges.textStyle = event.changes.style as CanvasElement['textStyle'];
+      }
+      updateElement(event.nodeId, nextChanges);
       console.log('Node updated:', event);
     });
 
@@ -315,6 +323,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
         size: element.size,
         color: element.color,
         shapeType: element.shapeType,
+        style: element.textStyle,
       });
     }
   }, [socket, canvasId]);
@@ -330,6 +339,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
         color: element.color,
         shapeType: element.shapeType,
         points: element.points,
+        style: element.textStyle,
       },
       vectorClock: {},
     });

@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { cn } from '@/lib/utils';
-
 interface HeatmapZone {
   x: number;
   y: number;
@@ -20,14 +19,13 @@ const getDensityColor = (count: number): string => {
   return `rgba(239, 68, 68, ${HEATMAP_OPACITY})`; // high - red
 };
 
-interface PresenceHeatmapProps {
-  visible: boolean;
-}
 
-export function PresenceHeatmap({ visible }: PresenceHeatmapProps) {
+export function PresenceHeatmap() {
   const { viewportPosition, viewportZoom } = useCanvasStore();
   const [zones, setZones] = useState<HeatmapZone[]>([]);
   const [viewportOffset, setViewportOffset] = useState({ x: 0, y: 0 });
+
+  const { isEnabled, toggle } = usePresenceHeatmap();
 
   // Track cursor movements and update heatmap
   useEffect(() => {
@@ -86,7 +84,7 @@ export function PresenceHeatmap({ visible }: PresenceHeatmapProps) {
     return { minX: startX, maxX: endX, minY: startY, maxY: endY };
   }, [viewportPosition]);
 
-  if (!visible) return null;
+  if (!isEnabled) return null;
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -134,5 +132,5 @@ export function PresenceHeatmap({ visible }: PresenceHeatmapProps) {
 
 export function usePresenceHeatmap() {
   const [isEnabled, setIsEnabled] = useState(false);
-  return { isEnabled, toggle: () => setIsEnabled(prev => !prev) };
+  return { isEnabled, toggle: (val: boolean) => setIsEnabled(val) };
 }

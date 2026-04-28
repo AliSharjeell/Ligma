@@ -54,10 +54,9 @@ class StateReconstructor {
 
 interface TimeTravelProps {
   visible: boolean;
-  onClose: () => void;
 }
 
-export function TimeTravel({ visible, onClose }: TimeTravelProps) {
+export function TimeTravel({ visible }: TimeTravelProps) {
   const { eventLog, elements } = useCanvasStore();
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -167,7 +166,9 @@ export function TimeTravel({ visible, onClose }: TimeTravelProps) {
     <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-2xl border p-4 w-[500px] z-20">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-sm">Time Travel Replay</h3>
-        <Button variant="ghost" size="sm" onClick={onClose}>×</Button>
+        <Button variant="ghost" size="sm" onClick={()=>{console.log('Closing TimeTravel')}}>
+          ×
+        </Button>
       </div>
 
       <div className="space-y-4">

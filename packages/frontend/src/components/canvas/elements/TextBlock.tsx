@@ -29,8 +29,18 @@ export function TextBlock({ element }: TextBlockProps) {
     }
   }, [isEditing]);
 
+  useEffect(() => {
+    if (!isEditing) {
+      setLocalContent(element.content);
+    }
+  }, [element.content, isEditing]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const lockedByMe = Array.from(useCanvasStore.getState().elements.values()).find(
+      (item) => item.locked && item.lockedBy === userId && item.id !== element.id
+    );
+    if (lockedByMe) return;
     if (isLocked || isEditing) return;
     setSelectedId(element.id);
 
@@ -63,6 +73,7 @@ export function TextBlock({ element }: TextBlockProps) {
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
+    setSelectedId(element.id);
     setIsEditing(true);
     lockElement(element.id);
     emitElementLock(element.id);
@@ -120,12 +131,25 @@ export function TextBlock({ element }: TextBlockProps) {
           onChange={(e) => setLocalContent(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="px-2 py-1 text-lg font-medium bg-transparent border-none outline-none w-full min-w-[100px]"
+          className="px-2 py-1 bg-transparent border-none outline-none w-full min-w-[100px]"
+          style={{
+            fontSize: element.textStyle?.fontSize || 18,
+            fontFamily: element.textStyle?.fontFamily || 'Georgia, serif',
+            fontWeight: element.textStyle?.fontWeight || 'normal',
+            textAlign: element.textStyle?.textAlign || 'left',
+            color: element.color || '#1f2937',
+          }}
         />
       ) : (
         <div
-          className="px-2 py-1 text-lg font-medium whitespace-nowrap"
-          style={{ color: element.color || '#1f2937' }}
+          className="px-2 py-1 whitespace-nowrap"
+          style={{
+            color: element.color || '#1f2937',
+            fontSize: element.textStyle?.fontSize || 18,
+            fontFamily: element.textStyle?.fontFamily || 'Georgia, serif',
+            fontWeight: element.textStyle?.fontWeight || 'normal',
+            textAlign: element.textStyle?.textAlign || 'left',
+          }}
         >
           {element.content || 'Double-click to edit'}
         </div>

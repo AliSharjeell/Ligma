@@ -30,6 +30,10 @@ export function Shape({ element }: ShapeProps) {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const lockedByMe = Array.from(useCanvasStore.getState().elements.values()).find(
+      (item) => item.locked && item.lockedBy === userId && item.id !== element.id
+    );
+    if (lockedByMe) return;
     if (isLocked) return;
     setSelectedId(element.id);
 

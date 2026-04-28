@@ -37,8 +37,18 @@ export function StickyNote({ element }: StickyNoteProps) {
     }
   }, [isEditing]);
 
+  useEffect(() => {
+    if (!isEditing) {
+      setLocalContent(element.content);
+    }
+  }, [element.content, isEditing]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const lockedByMe = Array.from(useCanvasStore.getState().elements.values()).find(
+      (item) => item.locked && item.lockedBy === userId && item.id !== element.id
+    );
+    if (lockedByMe) return;
     if (isLocked) return;
     setSelectedId(element.id);
 
@@ -70,6 +80,7 @@ export function StickyNote({ element }: StickyNoteProps) {
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
+    setSelectedId(element.id);
     setIsEditing(true);
     lockElement(element.id);
     emitElementLock(element.id);

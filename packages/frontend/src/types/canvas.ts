@@ -21,6 +21,12 @@ export interface CanvasElement {
   color?: string;
   shapeType?: ShapeType;
   points?: Position[];
+  textStyle?: {
+    fontSize?: number;
+    fontFamily?: string;
+    fontWeight?: 'normal' | 'bold' | number;
+    textAlign?: 'left' | 'center' | 'right';
+  };
   locked: boolean;
   lockedBy?: string;
   createdBy: string;
@@ -53,6 +59,10 @@ export interface CanvasState {
   shapeColor: string;
   stickyColor: string;
   textColor: string;
+  textFontSize: number;
+  textFontFamily: string;
+  textFontWeight: 'normal' | 'bold' | number;
+  textAlign: 'left' | 'center' | 'right';
   users: Map<string, User>;
   tasks: Task[];
   eventLog: CanvasEvent[];
