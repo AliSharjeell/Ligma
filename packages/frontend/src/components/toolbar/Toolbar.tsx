@@ -588,7 +588,7 @@ export function Toolbar() {
               {/* Online Users */}
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] uppercase font-bold text-slate-400">
-                  Online Users ({users.size + 1})
+                  Online Users ({users.size})
                 </label>
                 <div className="flex flex-col gap-2">
                    {/* Current User */}
@@ -612,8 +612,8 @@ export function Toolbar() {
                      </Button>
                    </div>
 
-                   {/* Other Users */}
-                   {Array.from(users.values()).map((user) => (
+                   {/* Other Users (exclude current user) */}
+                   {Array.from(users.values()).filter(u => u.id !== userId).map((user) => (
                      <div key={user.id} className="flex items-center justify-between bg-white pl-1 pr-3 py-1.5 rounded-xl border border-slate-100 shadow-sm">
                        <div className="flex items-center gap-2">
                          <div 

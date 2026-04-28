@@ -81,6 +81,31 @@
       ]
     }
   },
-  "hotPaths": [],
+  "hotPaths": [
+    {
+      "path": "src\\socket\\SocketHandler.ts",
+      "accessCount": 6,
+      "lastAccessed": 1777392280578,
+      "type": "file"
+    },
+    {
+      "path": "src\\store\\CanvasStore.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777391971376,
+      "type": "file"
+    },
+    {
+      "path": "src\\events\\EventStore.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777391985584,
+      "type": "file"
+    },
+    {
+      "path": "src\\events\\StateReconstructor.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777392020167,
+      "type": "file"
+    }
+  ],
   "userDirectives": []
 }

@@ -29,6 +29,7 @@ export function InfiniteCanvas() {
   const [dragStart, setDragStart] = useState<Position | null>(null);
   const [drawPoints, setDrawPoints] = useState<Position[]>([]);
   const [isErasing, setIsErasing] = useState(false);
+  const [enteringEditId, setEnteringEditId] = useState<string | null>(null);
   const suppressClickClearRef = useRef(false);
 
   const {
@@ -320,6 +321,7 @@ export function InfiniteCanvas() {
       alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
       return;
     }
+    setEnteringEditId(''); // Signal we're creating a text element (empty string = skip border)
     const element = addElement({
       type: 'text',
       position: { x, y: y - 10 },
@@ -337,16 +339,23 @@ export function InfiniteCanvas() {
     });
     emitElementCreate(element);
     setSelectedId(element.id);
-    
+    setEnteringEditId(element.id); // Signal we've entered edit mode
+
     setTimeout(() => {
       lockElement(element.id);
       emitElementLock(element.id);
+      setEnteringEditId(null); // Clear after transition
     }, 50);
   }, [viewportPosition, viewportZoom, elements, addElement, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, userId, emitElementCreate, setSelectedId, lockElement, emitElementLock]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't delete when typing in an input/textarea (like text editing)
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size > 0) {
+        const activeElement = document.activeElement;
+        const isEditingText = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
+        if (isEditingText) return;
+
         selectedIds.forEach((id) => {
           emitElementDelete(id);
           deleteElement(id);
@@ -385,7 +394,7 @@ export function InfiniteCanvas() {
             case 'shape':
               return <Shape key={element.id} element={element} />;
             case 'text':
-              return <TextBlock key={element.id} element={element} />;
+              return <TextBlock key={element.id} element={element} skipSelectionBorder={enteringEditId === element.id} />;
             case 'drawing':
               return <Drawing key={element.id} element={element} />;
             default:
