@@ -105,6 +105,7 @@ export function Toolbar() {
     selectedIds,
     setTool,
     setShapeType,
+    clearSelection,
     setDrawColor,
     setShapeColor,
     setStickyColor,
@@ -231,13 +232,13 @@ export function Toolbar() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      if (e.key === 'v' || e.key === 'V') setTool('select');
-      if (e.key === 'h' || e.key === 'H') setTool('pan');
-      if (e.key === 's' || e.key === 'S') setTool('sticky');
-      if (e.key === 'r' || e.key === 'R') setTool('shape');
-      if (e.key === 't' || e.key === 'T') setTool('text');
-      if (e.key === 'd' || e.key === 'D') setTool('draw');
-      if (e.key === 'e' || e.key === 'E') setTool('eraser');
+      if (e.key === 'v' || e.key === 'V') { setTool('select'); clearSelection(); }
+      if (e.key === 'h' || e.key === 'H') { setTool('pan'); clearSelection(); }
+      if (e.key === 's' || e.key === 'S') { setTool('sticky'); clearSelection(); }
+      if (e.key === 'r' || e.key === 'R') { setTool('shape'); clearSelection(); }
+      if (e.key === 't' || e.key === 'T') { setTool('text'); clearSelection(); }
+      if (e.key === 'd' || e.key === 'D') { setTool('draw'); clearSelection(); }
+      if (e.key === 'e' || e.key === 'E') { setTool('eraser'); clearSelection(); }
 
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
@@ -247,7 +248,7 @@ export function Toolbar() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setTool, undo, redo]);
+  }, [setTool, undo, redo, clearSelection]);
 
   const handleTextStyleChange = (updates: Partial<NonNullable<CanvasElement['textStyle']>>) => {
     if (selectedElement?.type === 'text') {

@@ -70,7 +70,7 @@ export function LayersList() {
   }
 
   return (
-    <ScrollArea className="h-[400px]">
+    <ScrollArea className="h-[500px]">
       <div className="space-y-1">
         {layers.map((element) => {
           const isSelected = selectedIds.has(element.id);
