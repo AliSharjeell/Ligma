@@ -9,7 +9,7 @@ export function WelcomeDialog() {
   const setUserName = useCanvasStore((s) => s.setUserName);
   const [name, setName] = useState('');
   const [roomCode, setRoomCode] = useState('');
-  const [showJoin, setShowJoin] = useState(false);
+  const [mode, setMode] = useState<'idle' | 'create' | 'join'>('idle');
   const [error, setError] = useState('');
 
   const handleCreate = () => {
@@ -33,6 +33,15 @@ export function WelcomeDialog() {
     }
     setUserName(name.trim());
     router.push(`/room/${encodeURIComponent(roomCode.trim())}`);
+  };
+
+  const handleModeChange = (newMode: 'create' | 'join') => {
+    if (!name.trim()) {
+      setError('Please enter your name first');
+      return;
+    }
+    setMode(newMode);
+    setError('');
   };
 
   return (
@@ -89,70 +98,78 @@ export function WelcomeDialog() {
                 placeholder="Enter your name"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    if (showJoin) handleJoin();
-                    else setShowJoin(true);
-                  }
+                  if (e.key === 'Enter' && mode === 'join') handleJoin();
+                  else if (e.key === 'Enter' && mode === 'idle') handleModeChange('create');
                 }}
               />
             </div>
 
-            {!showJoin ? (
-              <button
-                onClick={() => {
-                  if (!name.trim()) {
-                    setError('Please enter your name first');
-                    return;
-                  }
-                  setShowJoin(true);
-                }}
-                className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
-              >
-                Create New Room
-              </button>
-            ) : (
+            {/* Mode Selection Buttons */}
+            {mode === 'idle' && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleModeChange('create')}
+                  className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                >
+                  Create New Room
+                </button>
+                <button
+                  onClick={() => handleModeChange('join')}
+                  className="flex-1 px-4 py-3 bg-white text-indigo-600 border-2 border-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                >
+                  Join a Room
+                </button>
+              </div>
+            )}
+
+            {/* Room Code Input (shown when in create or join mode) */}
+            {mode !== 'idle' && (
               <>
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-gray-200" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500">or join existing room</span>
+                    <span className="px-2 bg-white text-gray-500">
+                      {mode === 'create' ? 'Create your room' : 'Enter room code'}
+                    </span>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Room Code
-                  </label>
-                  <input
-                    type="text"
-                    value={roomCode}
-                    onChange={(e) => {
-                      setRoomCode(e.target.value.toUpperCase());
-                      setError('');
-                    }}
-                    placeholder="Enter room code"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition mb-4"
-                    onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-                  />
-                </div>
+                {mode === 'join' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Room Code
+                    </label>
+                    <input
+                      type="text"
+                      value={roomCode}
+                      onChange={(e) => {
+                        setRoomCode(e.target.value.toUpperCase());
+                        setError('');
+                      }}
+                      placeholder="Enter room code"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                      onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                    />
+                  </div>
+                )}
 
                 <div className="flex gap-3">
                   <button
                     onClick={() => {
-                      setShowJoin(false);
+                      setMode('idle');
                       setRoomCode('');
                     }}
-                    className="flex-1 px-4 py-3 bg-white text-indigo-600 border-2 border-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                    className="px-4 py-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition"
                   >
-                    Create New Room
+                    Back
                   </button>
                   <button
-                    onClick={handleJoin}
+                    onClick={mode === 'create' ? handleCreate : handleJoin}
                     className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
                   >
-                    Join Room
+                    {mode === 'create' ? 'Create Room' : 'Join Room'}
                   </button>
                 </div>
               </>
