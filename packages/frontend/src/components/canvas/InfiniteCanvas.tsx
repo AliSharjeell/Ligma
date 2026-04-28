@@ -494,12 +494,41 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // If double clicked background, create text
+    // Text tool always creates new text, even on top of existing elements
+    if (tool === 'text' && userRole !== 'Viewer') {
+      setEnteringEditId('');
+      const element = addElement({
+        type: 'text',
+        position: { x, y: y - 10 },
+        size: { width: 10, height: 24 },
+        content: '',
+        color: textColor,
+        textStyle: {
+          fontSize: textFontSize,
+          fontFamily: textFontFamily,
+          fontWeight: textFontWeight,
+          textAlign,
+        },
+        locked: false,
+        createdBy: userId,
+      });
+      emitElementCreate(element);
+      setSelectedId(element.id);
+      setEnteringEditId(element.id);
+      setTimeout(() => {
+        lockElement(element.id);
+        emitElementLock(element.id);
+        setEnteringEditId(null);
+      }, 50);
+      return;
+    }
+    // Viewer mode check for background double click
     if (userRole === 'Viewer') {
       alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
       return;
     }
-    setEnteringEditId(''); // Signal we're creating a text element (empty string = skip border)
+    // Default: create text on double click (for select tool)
+    setEnteringEditId('');
     const element = addElement({
       type: 'text',
       position: { x, y: y - 10 },
@@ -517,12 +546,11 @@ export function InfiniteCanvas() {
     });
     emitElementCreate(element);
     setSelectedId(element.id);
-    setEnteringEditId(element.id); // Signal we've entered edit mode
-
+    setEnteringEditId(element.id);
     setTimeout(() => {
       lockElement(element.id);
       emitElementLock(element.id);
-      setEnteringEditId(null); // Clear after transition
+      setEnteringEditId(null);
     }, 50);
   }, [viewportPosition, viewportZoom, elements, addElement, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, userId, emitElementCreate, setSelectedId, lockElement, emitElementLock, tool]);
 
