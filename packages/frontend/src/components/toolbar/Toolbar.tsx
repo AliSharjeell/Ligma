@@ -290,7 +290,7 @@ export function Toolbar() {
       </div>
 
       {/* Bottom Center Toolbar - COMPACT */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-white rounded-xl shadow-excalidraw border border-slate-200 p-1 px-1.5">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-white rounded-full shadow-excalidraw border border-slate-200 p-1 px-1.5">
         {tools.map((t) => (
           <Button
             key={t.id}
@@ -305,7 +305,7 @@ export function Toolbar() {
             }}
             title={t.label}
             className={cn(
-              'h-8 w-8 rounded-lg transition-all',
+              'h-8 w-8 rounded-full transition-all',
               tool === t.id ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-slate-100 text-slate-600',
               userRole === 'Viewer' && ['draw', 'sticky', 'shape', 'text', 'eraser'].includes(t.id) && 'opacity-50'
             )}
@@ -317,7 +317,7 @@ export function Toolbar() {
 
       {/* Tool Options Bar - shows when draw or shape is selected */}
       {(tool === 'draw' || tool === 'shape') && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white rounded-xl shadow-excalidraw border border-slate-200 p-2">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white rounded-full shadow-excalidraw border border-slate-200 p-2">
           {/* Draw/Shape Color */}
           <div className="flex items-center gap-2">
             <div className="flex gap-1">
