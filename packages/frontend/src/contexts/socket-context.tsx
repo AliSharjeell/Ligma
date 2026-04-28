@@ -423,11 +423,15 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
 
     newSocket.on('sync_response', (payload: { state: { nodes: any[] } }) => {
       if (payload.state && payload.state.nodes) {
-        const elements = payload.state.nodes.map(nodeStateToCanvasElement);
-        setElements(elements);
-        // Save server state to localStorage for persistence
+        const serverElements = payload.state.nodes.map(nodeStateToCanvasElement);
+        // Only use server state if we have no local elements
+        const currentElements = useCanvasStore.getState().elements;
+        if (currentElements.size === 0) {
+          setElements(serverElements);
+        }
+        // Always persist whatever we have
         setTimeout(() => persistElements(canvasId), 100);
-        console.log('Synchronized canvas state:', elements.length, 'elements');
+        console.log('Sync response - server has', serverElements.length, 'elements, local has', currentElements.size);
       }
     });
 
