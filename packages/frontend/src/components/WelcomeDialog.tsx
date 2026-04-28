@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCanvasStore } from '@/store/canvas-store';
 
+const BRAND_COLOR = '#50B5FF';
+
 export function WelcomeDialog() {
   const router = useRouter();
   const setUserName = useCanvasStore((s) => s.setUserName);
@@ -59,7 +61,7 @@ export function WelcomeDialog() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="md:hidden text-center mb-8">
-            <h1 className="text-4xl font-bold text-indigo-600 mb-2">LIGMA</h1>
+            <h1 className="text-4xl font-bold mb-2" style={{ color: BRAND_COLOR }}>LIGMA</h1>
             <p className="text-gray-500">Real-time Collaborative Canvas</p>
           </div>
 
@@ -76,7 +78,8 @@ export function WelcomeDialog() {
                   setError('');
                 }}
                 placeholder="Enter your name"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 outline-none transition"
+                style={{ '--tw-ring-color': BRAND_COLOR, '--tw-ring-offset-color': '#fff', '--tw-border-color': BRAND_COLOR } as React.CSSProperties}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && mode === 'join') handleJoin();
                   else if (e.key === 'Enter' && mode === 'idle') handleModeChange('create');
@@ -89,13 +92,15 @@ export function WelcomeDialog() {
               <div className="space-y-3">
                 <button
                   onClick={() => handleModeChange('create')}
-                  className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                  className="w-full px-4 py-3 text-white rounded-lg transition hover:opacity-90"
+                  style={{ backgroundColor: BRAND_COLOR }}
                 >
                   Create New Room
                 </button>
                 <button
                   onClick={() => handleModeChange('join')}
-                  className="w-full px-4 py-3 bg-white text-indigo-600 border-2 border-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                  className="w-full px-4 py-3 rounded-lg transition hover:bg-blue-50"
+                  style={{ border: `2px solid ${BRAND_COLOR}`, color: BRAND_COLOR }}
                 >
                   Join a Room
                 </button>
@@ -129,7 +134,8 @@ export function WelcomeDialog() {
                         setError('');
                       }}
                       placeholder="Enter room code"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 outline-none transition"
+                      style={{ '--tw-ring-color': BRAND_COLOR, '--tw-ring-offset-color': '#fff', '--tw-border-color': BRAND_COLOR } as React.CSSProperties}
                       onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
                     />
                   </div>
@@ -147,7 +153,8 @@ export function WelcomeDialog() {
                   </button>
                   <button
                     onClick={mode === 'create' ? handleCreate : handleJoin}
-                    className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                    className="flex-1 px-4 py-3 text-white rounded-lg transition hover:opacity-90"
+                    style={{ backgroundColor: BRAND_COLOR }}
                   >
                     {mode === 'create' ? 'Create Room' : 'Join Room'}
                   </button>
