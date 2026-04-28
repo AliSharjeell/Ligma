@@ -193,14 +193,6 @@ export function StickyNote({ element }: StickyNoteProps) {
     }
   };
 
-  const handleColorChange = (color: string) => {
-    updateElement(element.id, { color });
-    const updatedElement = useCanvasStore.getState().getElement(element.id);
-    if (updatedElement) {
-      emitElementUpdate(updatedElement);
-    }
-  };
-
   const handleSize = 8;
 
   return (
@@ -290,24 +282,6 @@ export function StickyNote({ element }: StickyNoteProps) {
             style={{ right: -handleSize / 2, top: element.size.height / 2 - handleSize / 2, width: handleSize, height: handleSize, cursor: 'ew-resize' }}
             onMouseDown={(e) => startResize(e, 'e')}
           />
-
-          {/* Color picker */}
-          <div className="absolute -bottom-8 left-0 flex gap-1 z-10">
-            {COLORS.map((color) => (
-              <button
-                key={color}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleColorChange(color);
-                }}
-                className={cn(
-                  'w-5 h-5 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-110',
-                  element.color === color && 'ring-2 ring-gray-400'
-                )}
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
         </>
       )}
 
