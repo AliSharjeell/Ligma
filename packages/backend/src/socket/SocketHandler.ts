@@ -21,6 +21,8 @@ import {
 } from '../events/types';
 import { VectorClock } from '../crdt/VectorClock';
 import { v4 as uuidv4 } from 'uuid';
+import { PersistenceService } from '../store/PersistenceService';
+import { CanvasStore } from '../store/CanvasStore';
 
 interface ConnectedUser {
   socketId: string;
@@ -50,24 +52,28 @@ interface ActivityEvent {
 export class SocketHandler {
   private io: Server;
   private eventStore: EventStore;
+  private canvasStore: CanvasStore;
   private eventBus: EventBus;
   private stateReconstructor: StateReconstructor;
   private rbac: RBACService;
   private intentExtractor: IntentExtractor;
   private taskBoard: TaskBoard;
+  private persistence: PersistenceService;
   private clientStates: Map<string, ClientState> = new Map();
   private lastEventPerClient: Map<string, string> = new Map();
   private activityByCanvas: Map<string, ActivityEvent[]> = new Map();
   private activityLimit = 200;
 
-  constructor(io: Server, eventStore?: EventStore, rbac?: RBACService) {
+  constructor(io: Server, eventStore: EventStore, rbac: RBACService, canvasStore: CanvasStore) {
     this.io = io;
-    this.eventStore = eventStore || new EventStore();
+    this.eventStore = eventStore;
+    this.rbac = rbac;
+    this.canvasStore = canvasStore;
     this.eventBus = new EventBus();
     this.stateReconstructor = new StateReconstructor();
-    this.rbac = rbac || new RBACService();
     this.intentExtractor = new IntentExtractor();
     this.taskBoard = new TaskBoard();
+    this.persistence = new PersistenceService();
     this.setupEventHandlers();
   }
 
@@ -75,12 +81,15 @@ export class SocketHandler {
     this.eventBus.subscribe('NodeCreated', async (event) => {
       const intent = this.intentExtractor.analyze((event as NodeCreatedEvent).content);
       if (intent.type === 'action_item' && intent.suggestedTask) {
-        this.taskBoard.addTask({
+        const task = this.taskBoard.addTask({
           nodeId: (event as NodeCreatedEvent).nodeId,
           ...intent.suggestedTask,
           status: 'pending',
-          canvasId: event.canvasId
+          canvasId: event.canvasId,
+          priority: 'medium'
         });
+        await this.persistence.saveTask(task);
+        this.io.to(event.canvasId).emit('task_created', task);
       }
     });
   }
@@ -114,9 +123,13 @@ export class SocketHandler {
   handleConnection(socket: Socket): void {
     console.log(`Client connected: ${socket.id}`);
 
-    socket.on('join_canvas', (data: { canvasId: string; userId: string; userName: string; role: 'Lead' | 'Contributor' | 'Viewer' }) => {
+    socket.on('join_canvas', (data: { canvasId: string; userId: string; userName: string; role?: 'Lead' | 'Contributor' | 'Viewer' }) => {
       console.log(`Join canvas request from ${data.userName} for canvas ${data.canvasId}`);
       this.handleJoinCanvas(socket, data);
+    });
+
+    socket.on('change_role', (data: { canvasId: string; targetUserId: string; newRole: 'Lead' | 'Contributor' | 'Viewer' }) => {
+      this.handleChangeRole(socket, data);
     });
 
     socket.on('create_node', (data: { canvasId: string; nodeId?: string; nodeType: string; position: { x: number; y: number }; content: string; size?: { width: number; height: number }; color?: string; shapeType?: 'rectangle' | 'circle'; points?: { x: number; y: number }[]; style?: Record<string, unknown> }) => {
@@ -176,23 +189,38 @@ export class SocketHandler {
     });
   }
 
-  private handleJoinCanvas(socket: Socket, data: { canvasId: string; userId: string; userName: string; role: 'Lead' | 'Contributor' | 'Viewer' }): void {
-    const { canvasId, userId, userName, role } = data;
+  private async handleJoinCanvas(socket: Socket, data: { canvasId: string; userId: string; userName: string; role?: 'Lead' | 'Contributor' | 'Viewer' }): Promise<void> {
+    const { canvasId, userId, userName } = data;
 
     socket.join(canvasId);
     const clientState = this.getOrCreateClientState(canvasId);
+
+    // If first user, they are Lead. Otherwise, they are Viewer by default.
+    let assignedRole: 'Lead' | 'Contributor' | 'Viewer' = 'Viewer';
+    if (clientState.users.size === 0) {
+      assignedRole = 'Lead';
+    } else {
+      assignedRole = 'Viewer';
+    }
 
     const user: ConnectedUser = {
       socketId: socket.id,
       userId,
       userName,
       canvasId,
-      role,
+      role: assignedRole,
       vectorClock: new VectorClock()
     };
     clientState.users.set(userId, user);
 
-    this.rbac.registerUser(userId, userName, role, canvasId);
+    this.rbac.registerUser(userId, userName, assignedRole, canvasId);
+
+    // PERSISTENCE: Load all historical events for this room and catch up the in-memory store
+    const historicalEvents = await this.persistence.getEvents(canvasId);
+    if (historicalEvents.length > 0 && this.eventStore.getEvents(canvasId).length === 0) {
+      historicalEvents.forEach(e => this.eventStore.append(e));
+      console.log(`Replayed ${historicalEvents.length} events for canvas ${canvasId}`);
+    }
 
     const joinEvent: UserJoinedEvent = {
       id: uuidv4(),
@@ -200,24 +228,83 @@ export class SocketHandler {
       canvasId,
       userId,
       userName,
-      role,
+      role: assignedRole,
       timestamp: Date.now(),
       vectorClock: user.vectorClock.toJSON()
     };
 
+    // We don't necessarily persist JOIN events to the DB to keep it clean, 
+    // but we add them to the in-memory event store for the current session.
     this.eventStore.append(joinEvent);
     this.io.to(canvasId).emit('user_joined', joinEvent);
 
+    // Send the current list of users to the newcomer
+    const currentUsers = Array.from(clientState.users.values()).map(u => ({
+      userId: u.userId,
+      userName: u.userName,
+      role: u.role
+    }));
+    socket.emit('initial_users', { users: currentUsers, yourRole: assignedRole });
+
+    // Sync activity log from memory (session-based)
     const activityLog = this.getOrCreateActivityLog(canvasId);
     socket.emit('activity_sync', { events: activityLog });
 
+    // PERSISTENCE: Load tasks from DB
+    const historicalTasks = await this.persistence.getTasks(canvasId);
+    historicalTasks.forEach(t => {
+      if (!this.taskBoard.getTask(t.id)) {
+        this.taskBoard.addTask(t);
+      }
+    });
+    
     const tasks = this.taskBoard.getTasksByCanvas(canvasId);
     socket.emit('tasks_list', { tasks });
 
     const existingCursors = Array.from(clientState.cursors.values());
     socket.emit('existing_cursors', existingCursors);
 
-    console.log(`User ${userName} joined canvas ${canvasId}`);
+    // HYDRATION: Send the current state of the canvas to the newcomer
+    const state = this.canvasStore.getCanvas(canvasId);
+    if (state) {
+      socket.emit('sync_response', {
+        events: this.eventStore.getEvents(canvasId),
+        state: {
+          nodes: Array.from(state.nodes.values()),
+          vectorClock: state.vectorClock,
+          lastEventId: state.lastEventId
+        }
+      });
+    }
+
+    console.log(`User ${userName} joined canvas ${canvasId} as ${assignedRole}`);
+  }
+
+  private handleChangeRole(socket: Socket, data: { canvasId: string; targetUserId: string; newRole: 'Lead' | 'Contributor' | 'Viewer' }): void {
+    const { canvasId, targetUserId, newRole } = data;
+    const requesterId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!requesterId) return;
+
+    const success = this.rbac.changeRole(requesterId, canvasId, targetUserId, newRole);
+    if (!success) {
+      socket.emit('error', { message: 'Permission denied to change roles' });
+      return;
+    }
+
+    const clientState = this.clientStates.get(canvasId);
+    const targetUser = clientState?.users.get(targetUserId);
+    if (targetUser) {
+      targetUser.role = newRole;
+    }
+
+    this.io.to(canvasId).emit('role_changed', {
+      userId: targetUserId,
+      newRole,
+      timestamp: Date.now()
+    });
+
+    console.log(`Role of user ${targetUserId} changed to ${newRole} by ${requesterId}`);
   }
 
   private async handleCreateNode(socket: Socket, data: { canvasId: string; nodeId?: string; nodeType: string; position: { x: number; y: number }; content: string; size?: { width: number; height: number }; color?: string; shapeType?: 'rectangle' | 'circle'; points?: { x: number; y: number }[]; style?: Record<string, unknown> }): Promise<void> {
@@ -256,6 +343,7 @@ export class SocketHandler {
 
     this.eventStore.append(event);
     this.eventBus.publish(event);
+    await this.persistence.saveEvent(event);
 
     this.io.to(canvasId).emit('node_created', event);
     socket.emit('node_created_ack', { nodeId, eventId: event.id });
@@ -323,6 +411,7 @@ export class SocketHandler {
 
     this.eventStore.append(event);
     this.eventBus.publish(event);
+    await this.persistence.saveEvent(event);
 
     this.io.to(canvasId).emit('node_updated', event);
     socket.emit('node_updated_ack', { eventId: event.id });
@@ -380,6 +469,7 @@ export class SocketHandler {
 
     this.eventStore.append(event);
     this.eventBus.publish(event);
+    await this.persistence.saveEvent(event);
 
     console.log(`Node deleted: ${nodeId} by user ${userId} on canvas ${canvasId}`);
 
@@ -427,6 +517,7 @@ export class SocketHandler {
     };
 
     this.eventStore.append(event);
+    await this.persistence.saveEvent(event);
     this.io.to(canvasId).emit('node_locked', event);
 
     const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
@@ -468,6 +559,7 @@ export class SocketHandler {
     };
 
     this.eventStore.append(event);
+    await this.persistence.saveEvent(event);
     this.io.to(canvasId).emit('node_unlocked', event);
 
     const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
@@ -553,22 +645,21 @@ export class SocketHandler {
     socket.emit('tasks_list', { tasks });
   }
 
-  private handleUpdateTaskStatus(socket: Socket, data: { taskId: string; status: 'pending' | 'in_progress' | 'completed' }): void {
+  private async handleUpdateTaskStatus(socket: Socket, data: { taskId: string; status: 'pending' | 'in_progress' | 'completed' }): Promise<void> {
     const { taskId, status } = data;
     const task = this.taskBoard.getTask(taskId);
     const success = this.taskBoard.updateTaskStatus(taskId, status);
-    socket.emit('task_status_updated', { taskId, success });
-    if (success) {
-      const canvasId = task?.canvasId;
-      if (canvasId) {
-        this.io.to(canvasId).emit('task_updated', { taskId, status });
-      } else {
-        this.io.emit('task_updated', { taskId, status });
-      }
+    
+    if (success && task) {
+      await this.persistence.saveTask({ ...task, status });
+      const canvasId = task.canvasId;
+      this.io.to(canvasId).emit('task_updated', { taskId, status });
     }
+    
+    socket.emit('task_status_updated', { taskId, success });
   }
 
-  private handleCreateTask(socket: Socket, data: { canvasId: string; title: string; description?: string; priority: 'low' | 'medium' | 'high' }): void {
+  private async handleCreateTask(socket: Socket, data: { canvasId: string; title: string; description?: string; priority: 'low' | 'medium' | 'high' }): Promise<void> {
     const { canvasId, title, description, priority } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
     const userName = this.clientStates.get(canvasId)?.users.get(userId || '')?.userName || 'Unknown';
@@ -586,20 +677,18 @@ export class SocketHandler {
       priority
     });
 
+    await this.persistence.saveTask(task);
     this.io.to(canvasId).emit('task_created', task);
   }
 
-  private handleDeleteTask(socket: Socket, data: { taskId: string }): void {
+  private async handleDeleteTask(socket: Socket, data: { taskId: string }): Promise<void> {
     const { taskId } = data;
     const task = this.taskBoard.getTask(taskId);
     const success = this.taskBoard.deleteTask(taskId);
-    if (success) {
-      const canvasId = task?.canvasId;
-      if (canvasId) {
-        this.io.to(canvasId).emit('task_deleted', { taskId });
-      } else {
-        this.io.emit('task_deleted', { taskId });
-      }
+    if (success && task) {
+      await this.persistence.deleteTask(taskId);
+      const canvasId = task.canvasId;
+      this.io.to(canvasId).emit('task_deleted', { taskId });
     }
   }
 

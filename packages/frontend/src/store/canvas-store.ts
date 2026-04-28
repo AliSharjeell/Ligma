@@ -8,6 +8,9 @@ interface HistoryEntry {
 }
 
 interface CanvasStore extends CanvasState {
+  userRole: 'Lead' | 'Contributor' | 'Viewer';
+  setUserRole: (role: 'Lead' | 'Contributor' | 'Viewer') => void;
+  setUserName: (name: string) => void;
   setTool: (tool: Tool) => void;
   setShapeType: (shapeType: ShapeType) => void;
   setDrawColor: (color: string) => void;
@@ -54,16 +57,21 @@ interface CanvasStore extends CanvasState {
   addRemoteEvent: (event: CanvasEvent) => void;
   setEventLog: (events: CanvasEvent[]) => void;
   setElements: (elements: CanvasElement[]) => void;
+  setUsers: (users: User[]) => void;
 
   getElement: (id: string) => CanvasElement | undefined;
 }
 
+const getInitialUserName = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('ligma-username') || `User ${Math.floor(Math.random() * 1000)}`;
+  }
+  return 'User';
+};
+
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   elements: new Map(),
   selectedIds: new Set(),
-  // ... (rest of state stays same)
-  // I need to be careful with "rest of state stays same" placeholder. I will provide full implementation.
-  // Actually, I should just provide the added method and surrounding lines.
   tool: 'select',
   shapeType: 'rectangle',
   drawColor: '#1f2937',
@@ -78,15 +86,23 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   presenceZonesEnabled: false,
   timeTravelEnabled: false,
   users: new Map(),
+  userRole: 'Viewer',
   tasks: [],
   eventLog: [],
   viewportPosition: { x: 0, y: 0 },
   viewportZoom: 1,
   userId: uuidv4(),
-  userName: `User ${Math.floor(Math.random() * 1000)}`,
+  userName: getInitialUserName(),
   history: [],
   redoStack: [],
 
+  setUserRole: (userRole) => set({ userRole }),
+  setUserName: (name) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ligma-username', name);
+    }
+    set({ userName: name });
+  },
   setTool: (tool) => set({ tool }),
   setShapeType: (shapeType) => set({ shapeType }),
   setDrawColor: (color) => set({ drawColor: color }),
@@ -328,6 +344,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const newElements = new Map<string, CanvasElement>();
     elements.forEach((el) => newElements.set(el.id, el));
     set({ elements: newElements });
+  },
+
+  setUsers: (users) => {
+    const newUsers = new Map<string, User>();
+    users.forEach((u) => newUsers.set(u.id, u));
+    set({ users: newUsers });
   },
 
   getElement: (id) => get().elements.get(id),

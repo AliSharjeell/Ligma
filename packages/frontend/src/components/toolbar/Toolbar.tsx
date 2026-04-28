@@ -70,8 +70,10 @@ const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
 export function Toolbar() {
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [nameInput, setNameInput] = useState('');
   const router = useRouter();
-  const { connected } = useSocket();
+  const { connected, emitChangeRole } = useSocket();
 
   const {
     tool,
@@ -107,6 +109,9 @@ export function Toolbar() {
     updateElement,
     getElement,
     userId,
+    userName,
+    setUserName,
+    userRole,
     undo,
     redo,
     canUndo,
@@ -122,12 +127,29 @@ export function Toolbar() {
 
   useEffect(() => {
     setRoomInput(normalizedRoom);
+    
+    // Check if name is set, if not, open join modal
+    const storedName = localStorage.getItem('ligma-username');
+    if (!storedName) {
+      setIsJoinModalOpen(true);
+    } else {
+      setNameInput(storedName);
+    }
   }, [normalizedRoom]);
 
   const handleJoinRoom = () => {
     const trimmed = roomInput.trim();
     if (!trimmed) return;
     router.push(`/room/${encodeURIComponent(trimmed)}`);
+  };
+
+  const handleUpdateName = () => {
+    if (nameInput.trim()) {
+      setUserName(nameInput.trim());
+      setIsJoinModalOpen(false);
+      // Reload to reconnect with new name
+      window.location.reload();
+    }
   };
 
   const handleCreateRoom = () => {
@@ -475,22 +497,63 @@ export function Toolbar() {
                 <label className="text-[10px] uppercase font-bold text-slate-400">
                   Online Users ({users.size + 1})
                 </label>
-                <div className="flex flex-wrap gap-2">
-                   <div className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
-                     <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-[10px] text-white font-bold">
-                        ME
-                     </div>
-                     <span className="text-xs font-medium text-slate-700">You</span>
-                   </div>
-                   {Array.from(users.values()).map((user) => (
-                     <div key={user.id} className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
-                       <div 
-                         className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white font-bold"
-                         style={{ backgroundColor: user.color }}
-                        >
-                          {user.name[0].toUpperCase()}
+                <div className="flex flex-col gap-2">
+                   {/* Current User */}
+                   <div className="flex items-center justify-between bg-slate-50 pl-1 pr-3 py-1.5 rounded-xl border border-slate-100">
+                     <div className="flex items-center gap-2">
+                       <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs text-white font-bold">
+                          ME
                        </div>
-                       <span className="text-xs font-medium text-slate-700">{user.name}</span>
+                       <div className="flex flex-col">
+                         <span className="text-xs font-bold text-slate-700">{userName} (You)</span>
+                         <span className={cn(
+                           "text-[10px] font-medium",
+                           userRole === 'Lead' ? "text-amber-600" : userRole === 'Contributor' ? "text-blue-600" : "text-slate-500"
+                         )}>
+                           {userRole}
+                         </span>
+                       </div>
+                     </div>
+                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsJoinModalOpen(true)}>
+                       <Settings className="size-3" />
+                     </Button>
+                   </div>
+
+                   {/* Other Users */}
+                   {Array.from(users.values()).map((user) => (
+                     <div key={user.id} className="flex items-center justify-between bg-white pl-1 pr-3 py-1.5 rounded-xl border border-slate-100 shadow-sm">
+                       <div className="flex items-center gap-2">
+                         <div 
+                           className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-bold"
+                           style={{ backgroundColor: user.color }}
+                          >
+                            {user.name[0].toUpperCase()}
+                         </div>
+                         <div className="flex flex-col">
+                           <span className="text-xs font-medium text-slate-700">{user.name}</span>
+                           <span className={cn(
+                             "text-[10px] font-medium",
+                             user.role === 'Lead' ? "text-amber-600" : user.role === 'Contributor' ? "text-blue-600" : "text-slate-500"
+                           )}>
+                             {user.role}
+                           </span>
+                         </div>
+                       </div>
+
+                       {/* Lead Controls */}
+                       {userRole === 'Lead' && (
+                         <div className="flex gap-1">
+                           <Button 
+                             variant="ghost" 
+                             size="icon" 
+                             className="h-7 w-7" 
+                             title={user.role === 'Contributor' ? 'Demote to Viewer' : 'Promote to Contributor'}
+                             onClick={() => emitChangeRole(user.id, user.role === 'Contributor' ? 'Viewer' : 'Contributor')}
+                            >
+                             {user.role === 'Contributor' ? <ArrowRight className="size-3 rotate-90 text-slate-400" /> : <PlusCircle className="size-3 text-blue-500" />}
+                           </Button>
+                         </div>
+                       )}
                      </div>
                    ))}
                 </div>
@@ -547,6 +610,36 @@ export function Toolbar() {
           </ScrollArea>
         </div>
       </div>
+
+      {/* Join Modal - Identify User */}
+      <Dialog open={isJoinModalOpen} onOpenChange={setIsJoinModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Welcome to LIGMA</DialogTitle>
+            <DialogDescription>
+              Please enter your name to start collaborating.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                className="col-span-3"
+                placeholder="John Doe"
+                onKeyDown={(e) => e.key === 'Enter' && handleUpdateName()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleUpdateName}>Start Collaborating</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

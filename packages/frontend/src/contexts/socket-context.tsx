@@ -99,6 +99,12 @@ type TasksListPayload = {
   tasks: TaskDto[];
 };
 
+type UserDto = {
+  userId: string;
+  userName: string;
+  role: 'Lead' | 'Contributor' | 'Viewer';
+};
+
 interface SocketContextType {
   socket: Socket | null;
   connected: boolean;
@@ -111,6 +117,7 @@ interface SocketContextType {
   emitTaskCreate: (task: { title: string; description?: string; priority: 'low' | 'medium' | 'high' }) => void;
   emitTaskUpdate: (taskId: string, status: 'pending' | 'in-progress' | 'completed') => void;
   emitTaskDelete: (taskId: string) => void;
+  emitChangeRole: (targetUserId: string, newRole: 'Lead' | 'Contributor' | 'Viewer') => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -125,6 +132,7 @@ const SocketContext = createContext<SocketContextType>({
   emitTaskCreate: () => {},
   emitTaskUpdate: () => {},
   emitTaskDelete: () => {},
+  emitChangeRole: () => {},
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -157,6 +165,8 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     updateTask,
     deleteTask,
     setElements,
+    setUserRole,
+    setUsers,
   } = useCanvasStore();
 
   const toTask = useCallback((task: TaskDto): Task => {
@@ -245,10 +255,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
         canvasId,
         userId,
         userName,
-        role: 'Contributor',
       });
-      newSocket.emit('get_tasks', { canvasId });
-      newSocket.emit('request_sync', { canvasId });
     });
 
     newSocket.on('disconnect', () => {
@@ -262,6 +269,32 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
         setElements(elements);
         console.log('Synchronized canvas state:', elements.length, 'elements');
       }
+    });
+
+    newSocket.on('initial_users', (payload: { users: UserDto[], yourRole: 'Lead' | 'Contributor' | 'Viewer' }) => {
+      const formattedUsers: User[] = payload.users.map(u => ({
+        id: u.userId,
+        name: u.userName,
+        role: u.role,
+        color: '#16a34a', // Default color
+      }));
+      setUsers(formattedUsers);
+      setUserRole(payload.yourRole);
+      console.log('Initial users synced. Your role:', payload.yourRole);
+    });
+
+    newSocket.on('role_changed', (payload: { userId: string, newRole: 'Lead' | 'Contributor' | 'Viewer' }) => {
+      if (payload.userId === userId) {
+        setUserRole(payload.newRole);
+      }
+      
+      // Update the user in the users map
+      const existingUsers = useCanvasStore.getState().users;
+      const user = existingUsers.get(payload.userId);
+      if (user) {
+        addUser({ ...user, role: payload.newRole });
+      }
+      console.log('Role changed for user:', payload.userId, 'to', payload.newRole);
     });
 
     newSocket.on('node_created', (event: NodeCreatedEvent) => {
@@ -336,7 +369,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     return () => {
       newSocket.disconnect();
     };
-  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement]);
+  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement, setUsers, setUserRole]);
 
   const emitElementCreate = useCallback((element: CanvasElement) => {
     // For drawing elements, use create_node with nodeType='drawing'
@@ -411,6 +444,10 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     socket?.emit('delete_task', { taskId });
   }, [socket]);
 
+  const emitChangeRole = useCallback((targetUserId: string, newRole: 'Lead' | 'Contributor' | 'Viewer') => {
+    socket?.emit('change_role', { canvasId, targetUserId, newRole });
+  }, [socket, canvasId]);
+
   return (
     <SocketContext.Provider
       value={{
@@ -425,9 +462,10 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
         emitTaskCreate,
         emitTaskUpdate,
         emitTaskDelete,
+        emitChangeRole,
       }}
     >
       {children}
     </SocketContext.Provider>
   );
-}
+  }
