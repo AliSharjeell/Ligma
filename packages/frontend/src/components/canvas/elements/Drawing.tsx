@@ -51,6 +51,9 @@ export function Drawing({ element }: DrawingProps) {
   const maxX = Math.max(...element.points.map(p => p.x));
   const maxY = Math.max(...element.points.map(p => p.y));
 
+  const actualPosition = { x: minX, y: minY };
+  const actualSize = { width: maxX - minX, height: maxY - minY };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
@@ -69,7 +72,14 @@ export function Drawing({ element }: DrawingProps) {
         x: p.x + dx,
         y: p.y + dy,
       }));
-      updateElement(element.id, { points: newPoints });
+
+      const newMinX = Math.min(...newPoints.map(p => p.x));
+      const newMinY = Math.min(...newPoints.map(p => p.y));
+
+      updateElement(element.id, {
+        points: newPoints,
+        position: { x: newMinX, y: newMinY },
+      });
     };
 
     const handleMouseUp = () => {
@@ -93,10 +103,10 @@ export function Drawing({ element }: DrawingProps) {
         isLocked && 'opacity-50 pointer-events-none'
       )}
       style={{
-        left: minX,
-        top: minY,
-        width: maxX - minX,
-        height: maxY - minY,
+        left: actualPosition.x,
+        top: actualPosition.y,
+        width: actualSize.width,
+        height: actualSize.height,
       }}
       onMouseDown={handleMouseDown}
     >
