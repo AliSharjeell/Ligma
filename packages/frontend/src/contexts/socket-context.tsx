@@ -216,6 +216,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     resetCanvas,
     setUserRole,
     setUsers,
+    persistElements,
   } = useCanvasStore();
 
   // Sync pending count with queue length
@@ -424,6 +425,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       if (payload.state && payload.state.nodes) {
         const elements = payload.state.nodes.map(nodeStateToCanvasElement);
         setElements(elements);
+        persistElements(canvasId);
         console.log('Synchronized canvas state:', elements.length, 'elements');
       }
     });
@@ -552,7 +554,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     return () => {
       newSocket.disconnect();
     };
-  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement, setUsers, setUserRole, resetCanvas, replayQueue]);
+  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement, setUsers, setUserRole, resetCanvas, replayQueue, persistElements]);
 
   const addToQueue = useCallback((event: Omit<QueuedEvent, 'id' | 'timestamp'>) => {
     const queuedEvent: QueuedEvent = {

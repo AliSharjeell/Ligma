@@ -61,28 +61,29 @@ interface CanvasStore extends CanvasState {
 
   getElement: (id: string) => CanvasElement | undefined;
   resetCanvas: () => void;
-  persistElements: () => void;
-  loadElements: () => void;
+  persistElements: (roomId?: string) => void;
+  loadElements: (roomId?: string) => void;
 }
 
-const ELEMENTS_KEY = 'ligma-canvas-elements';
+const getElementsKey = (roomId?: string) => `ligma-canvas-${roomId || 'default'}`;
 
-const saveElementsToStorage = (elements: Map<string, CanvasElement>) => {
+const saveElementsToStorage = (elements: Map<string, CanvasElement>, roomId?: string) => {
   if (typeof window !== 'undefined') {
     try {
       const arr = Array.from(elements.values());
-      console.log('Saving', arr.length, 'elements to localStorage');
-      localStorage.setItem(ELEMENTS_KEY, JSON.stringify(arr));
+      console.log('Saving', arr.length, 'elements to localStorage for room:', roomId);
+      localStorage.setItem(getElementsKey(roomId), JSON.stringify(arr));
     } catch (e) {
       console.error('Failed to save elements:', e);
     }
   }
 };
 
-const loadElementsFromStorage = (): CanvasElement[] => {
+const loadElementsFromStorage = (roomId?: string): CanvasElement[] => {
   if (typeof window !== 'undefined') {
     try {
-      const saved = localStorage.getItem(ELEMENTS_KEY);
+      const saved = localStorage.getItem(getElementsKey(roomId));
+      console.log('Loading elements from localStorage for room:', roomId);
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
       console.error('Failed to load elements:', e);
@@ -387,12 +388,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   getElement: (id) => get().elements.get(id),
 
-  persistElements: () => {
-    saveElementsToStorage(get().elements);
+  persistElements: (roomId) => {
+    saveElementsToStorage(get().elements, roomId);
   },
 
-  loadElements: () => {
-    const saved = loadElementsFromStorage();
+  loadElements: (roomId) => {
+    const saved = loadElementsFromStorage(roomId);
     if (saved.length > 0) {
       const newElements = new Map<string, CanvasElement>();
       saved.forEach((el) => newElements.set(el.id, el));

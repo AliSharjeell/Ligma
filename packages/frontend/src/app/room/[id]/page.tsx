@@ -19,20 +19,17 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const loadElements = useCanvasStore((state) => state.loadElements);
 
   useEffect(() => {
-    loadElements();
-  }, [loadElements]);
-
-  useEffect(() => {
     params.then(p => {
       const id = decodeURIComponent(p.id ?? '');
       if (!id) {
         router.push('/');
       } else {
         setRoomId(id);
+        loadElements(id);
         setLoading(false);
       }
     });
-  }, [params, router]);
+  }, [params, router, loadElements]);
 
   if (loading) {
     return (
