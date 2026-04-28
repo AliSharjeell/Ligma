@@ -702,7 +702,7 @@ export function Toolbar() {
 
       {/* Right Sidebar - Workspace & Connection */}
       <div className={cn(
-        "absolute bottom-52 right-4 z-20 flex flex-col transition-all duration-300",
+        "absolute top-1/2 -translate-y-1/2 right-4 z-20 flex flex-col transition-all duration-300",
         isRightPanelOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"
       )}>
         <div className="bg-white rounded-xl shadow-excalidraw border border-slate-200 p-4 w-80 h-full flex flex-col gap-4 overflow-hidden">
