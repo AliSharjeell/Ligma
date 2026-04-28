@@ -1,0 +1,86 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1777389959228,
+  "projectRoot": "D:\\Fresh Start\\AI ML Projects\\Ligma\\packages\\backend",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "express",
+        "version": "4.18.2",
+        "category": "backend"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": null,
+    "devCommand": "npm run dev",
+    "scripts": {
+      "build": "tsc",
+      "start": "node dist/index.js",
+      "dev": "tsx src/index.ts",
+      "test": "jest"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "src"
+    ],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "data": {
+      "path": "data",
+      "purpose": "Data files",
+      "fileCount": 1,
+      "lastAccessed": 1777389959167,
+      "keyFiles": [
+        "ligma.db"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1777389959170,
+      "keyFiles": [
+        "index.ts"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

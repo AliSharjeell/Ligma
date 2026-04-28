@@ -75,7 +75,7 @@ export function Toolbar() {
   const [pendingRequests, setPendingRequests] = useState<{ userId: string; userName: string }[]>([]);
   const [hasRequested, setHasRequested] = useState(false);
   const router = useRouter();
-  const { connected, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership } = useSocket();
+  const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership } = useSocket();
 
   const {
     tool,
@@ -141,9 +141,6 @@ export function Toolbar() {
 
   // B: Listen for role request events
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const socket = (window as any).__socket;
     if (!socket) return;
 
     const handleRoleRequest = (payload: { userId: string; userName: string }) => {
@@ -166,7 +163,7 @@ export function Toolbar() {
       socket.off('role_request', handleRoleRequest);
       socket.off('role_changed', handleRoleChanged);
     };
-  }, [userId]);
+  }, [socket, userId]);
 
   const handleJoinRoom = () => {
     const trimmed = roomInput.trim();
