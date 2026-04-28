@@ -377,10 +377,14 @@ export function InfiniteCanvas() {
         setIsDragging(false);
         return;
       }
+      const minX = Math.min(...drawPoints.map(p => p.x));
+      const minY = Math.min(...drawPoints.map(p => p.y));
+      const maxX = Math.max(...drawPoints.map(p => p.x));
+      const maxY = Math.max(...drawPoints.map(p => p.y));
       const element = addElement({
         type: 'drawing',
-        position: { x: 0, y: 0 },
-        size: { width: 0, height: 0 },
+        position: { x: minX, y: minY },
+        size: { width: maxX - minX, height: maxY - minY },
         content: '',
         points: drawPoints,
         color: drawColor,
