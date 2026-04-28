@@ -264,7 +264,7 @@ export function Toolbar() {
   return (
     <>
       {/* Top Left Menu Button */}
-      <div className="absolute top-4 left-4 z-20">
+      <div className="absolute bottom-20 left-4 z-20">
         <Button
           variant="ghost"
           size="icon"
@@ -279,8 +279,8 @@ export function Toolbar() {
         </Button>
       </div>
 
-      {/* Top Floating Toolbar - COMPACT */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-white rounded-xl shadow-excalidraw border border-slate-200 p-1 px-1.5">
+      {/* Bottom Center Toolbar - COMPACT */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-white rounded-xl shadow-excalidraw border border-slate-200 p-1 px-1.5">
         {tools.map((t) => (
           <Button
             key={t.id}
@@ -307,7 +307,7 @@ export function Toolbar() {
 
       {/* Viewer Mode Indicator with Request Button */}
       {userRole === 'Viewer' && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 mt-14 z-20 flex items-center gap-3 bg-amber-50 text-amber-700 px-4 py-2 rounded-lg border border-amber-200 text-xs">
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-amber-50 text-amber-700 px-4 py-2 rounded-lg border border-amber-200 text-xs">
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -337,7 +337,7 @@ export function Toolbar() {
 
       {/* Lead: Pending Role Requests */}
       {userRole === 'Lead' && pendingRequests.length > 0 && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 mt-14 z-20 flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-lg border border-blue-200 text-xs">
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-lg border border-blue-200 text-xs">
           <span className="font-medium">{pendingRequests.length} request(s) pending:</span>
           {pendingRequests.map(req => (
             <div key={req.userId} className="flex items-center gap-1">
@@ -373,8 +373,8 @@ export function Toolbar() {
         </div>
       )}
 
-      {/* Top Right Settings Button */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+      {/* Bottom Right Settings Button */}
+      <div className="absolute bottom-20 right-4 z-20 flex items-center gap-2">
         {/* Connection Status Indicator */}
         <div className="flex items-center gap-1.5 bg-white rounded-lg shadow-excalidraw border border-slate-200 px-2.5 py-1.5">
           {connectionStatus === 'connected' && (
@@ -417,7 +417,7 @@ export function Toolbar() {
 
       {/* Left Sidebar - Properties */}
       <div className={cn(
-        "absolute top-16 left-4 bottom-4 z-20 flex flex-col transition-all duration-300",
+        "absolute bottom-52 left-4 z-20 flex flex-col transition-all duration-300",
         isLeftPanelOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"
       )}>
         <div className="bg-white rounded-xl shadow-excalidraw border border-slate-200 p-4 w-72 h-full flex flex-col gap-4 overflow-hidden">
@@ -571,7 +571,7 @@ export function Toolbar() {
 
       {/* Right Sidebar - Workspace & Connection */}
       <div className={cn(
-        "absolute top-16 right-4 bottom-4 z-20 flex flex-col transition-all duration-300",
+        "absolute bottom-52 right-4 z-20 flex flex-col transition-all duration-300",
         isRightPanelOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"
       )}>
         <div className="bg-white rounded-xl shadow-excalidraw border border-slate-200 p-4 w-80 h-full flex flex-col gap-4 overflow-hidden">
