@@ -50,6 +50,7 @@ export function InfiniteCanvas() {
     viewportZoom,
     userId,
     userRole,
+    isCommentMode,
     setSelectedId,
     setSelectedIds,
     clearSelection,
@@ -464,11 +465,28 @@ export function InfiniteCanvas() {
       suppressClickClearRef.current = false;
       return;
     }
+
+    // Handle comment mode - place a comment where clicked
+    if (isCommentMode && e.target === canvasRef.current) {
+      clearSelection();
+      const canvasRect = canvasRef.current?.getBoundingClientRect();
+      if (!canvasRect) return;
+
+      const screenX = e.clientX - canvasRect.left;
+      const screenY = e.clientY - canvasRect.top;
+      const canvasX = screenX / viewportZoom - viewportPosition.x;
+      const canvasY = screenY / viewportZoom - viewportPosition.y;
+
+      useCanvasStore.getState().addComment(canvasX, canvasY, '');
+      useCanvasStore.getState().setIsCommentMode(false);
+      return;
+    }
+
     // Only clear selection if clicking exactly on canvas and not dragging/panning
     if (e.target === canvasRef.current) {
       clearSelection();
     }
-  }, [clearSelection]);
+  }, [clearSelection, isCommentMode, viewportPosition, viewportZoom]);
 
   const handleCanvasDoubleClick = useCallback((e: React.MouseEvent) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -567,7 +585,7 @@ export function InfiniteCanvas() {
       ref={canvasRef}
       className={cn(
         'w-full h-full overflow-hidden bg-white relative select-none',
-        isPanning ? 'cursor-grabbing' : (tool === 'pan' || tool === 'select') ? 'cursor-grab' : tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'
+        isPanning ? 'cursor-grabbing' : (tool === 'pan' || tool === 'select') ? 'cursor-grab' : tool === 'eraser' ? 'cursor-cell' : tool === 'comment' ? 'cursor-crosshair' : 'cursor-crosshair'
       )}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -638,7 +656,6 @@ export function InfiniteCanvas() {
       <PresenceHeatmap />
       <PresenceZones />
       <TimeTravel />
-      <CommentsOverlay />
 
       <div className="absolute bottom-4 left-4 flex gap-4 items-center bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600">
         <span>Zoom: {Math.round(viewportZoom * 100)}%</span>
