@@ -31,7 +31,9 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
-  const isLocked = element.locked && element.lockedBy !== userId;
+  // Only faded when locked by ANOTHER user, not yourself
+  const isLockedByOther = element.locked && element.lockedBy !== userId;
+  const isLocked = element.locked;
   const isBeingEdited = element.locked && element.lockedBy === userId;
 
   const currentFontSize = element.textStyle?.fontSize || textFontSize || 20;
@@ -258,7 +260,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     <div
       className={cn(
         'absolute select-none outline-none',
-        isLocked && 'opacity-50 pointer-events-none',
+        isLockedByOther && 'opacity-50 pointer-events-none',
         !isLocked && tool !== 'select' && 'pointer-events-none',
         !isLocked && tool === 'draw' && 'cursor-crosshair',
         !isLocked && tool === 'select' && 'cursor-text'

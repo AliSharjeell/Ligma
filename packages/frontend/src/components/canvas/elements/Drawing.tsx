@@ -17,7 +17,9 @@ export function Drawing({ element }: DrawingProps) {
   const { emitElementUpdate } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
-  const isLocked = element.locked && element.lockedBy !== userId;
+  // Only faded when locked by ANOTHER user, not yourself
+  const isLockedByOther = element.locked && element.lockedBy !== userId;
+  const isLocked = element.locked;
 
   useEffect(() => {
     if (!svgRef.current || !element.points || element.points.length < 2) return;
@@ -104,7 +106,7 @@ export function Drawing({ element }: DrawingProps) {
       className={cn(
         'absolute cursor-move',
         isSelected && 'ring-1 ring-blue-400 ring-offset-4 rounded-sm',
-        isLocked && 'opacity-50 pointer-events-none',
+        isLockedByOther && 'opacity-50 pointer-events-none',
         !isLocked && tool !== 'select' && 'pointer-events-none'
       )}
       style={{

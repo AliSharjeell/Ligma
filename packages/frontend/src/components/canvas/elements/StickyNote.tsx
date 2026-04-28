@@ -31,7 +31,9 @@ export function StickyNote({ element }: StickyNoteProps) {
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
-  const isLocked = element.locked && element.lockedBy !== userId;
+  // Only faded when locked by ANOTHER user, not yourself
+  const isLockedByOther = element.locked && element.lockedBy !== userId;
+  const isLocked = element.locked;
   const showSelection = isSelected || isHovered;
 
   useEffect(() => {
@@ -204,7 +206,7 @@ export function StickyNote({ element }: StickyNoteProps) {
       className={cn(
         'absolute select-none transition-shadow outline-none',
         isSelected && 'ring-2 ring-primary',
-        isLocked && 'opacity-50 pointer-events-none',
+        isLockedByOther && 'opacity-50 pointer-events-none',
         !isLocked && tool !== 'select' && tool !== 'sticky' && 'pointer-events-none'
       )}
       style={{
