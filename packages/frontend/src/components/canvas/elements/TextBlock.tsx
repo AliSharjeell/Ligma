@@ -379,7 +379,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
           onChange={(e) => setLocalContent(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="px-0 py-0 bg-transparent border-none outline-none relative z-10 w-auto min-w-[1ch]"
+          className="px-1 py-0 bg-white bg-opacity-80 border-2 border-blue-400 rounded outline-none relative z-10 w-auto min-w-[1ch]"
           style={{
             fontSize: currentFontSize,
             fontFamily,
