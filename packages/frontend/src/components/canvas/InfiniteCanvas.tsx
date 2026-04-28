@@ -388,6 +388,7 @@ export function InfiniteCanvas() {
         createdBy: userId,
       });
       emitElementCreate(element);
+      setSelectedId(element.id);
       setDrawPoints([]);
     }
 
