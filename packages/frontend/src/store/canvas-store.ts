@@ -60,6 +60,7 @@ interface CanvasStore extends CanvasState {
   setUsers: (users: User[]) => void;
 
   getElement: (id: string) => CanvasElement | undefined;
+  resetCanvas: () => void;
 }
 
 const getInitialUserName = () => {
