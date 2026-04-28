@@ -264,7 +264,7 @@ export function Toolbar() {
   return (
     <>
       {/* Top Left Menu Button */}
-      <div className="absolute bottom-20 left-4 z-20">
+      <div className="absolute top-4 left-4 z-20">
         <Button
           variant="ghost"
           size="icon"
@@ -373,8 +373,8 @@ export function Toolbar() {
         </div>
       )}
 
-      {/* Bottom Right Settings Button */}
-      <div className="absolute bottom-20 right-4 z-20 flex items-center gap-2">
+      {/* Top Right Settings Button */}
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
         {/* Connection Status Indicator */}
         <div className="flex items-center gap-1.5 bg-white rounded-lg shadow-excalidraw border border-slate-200 px-2.5 py-1.5">
           {connectionStatus === 'connected' && (
