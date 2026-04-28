@@ -169,9 +169,10 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     e.stopPropagation();
     if (isLocked || isResizing) return;
     if (isEditing) return;
-    if (tool !== 'select') return;
-    if (tool === 'draw') return; // Let draw tool draw on top of text
-    setSelectedId(element.id);
+    if (tool === 'select') {
+      setSelectedId(element.id);
+    }
+    // For other tools, let the event propagate to canvas
 
     const startX = e.clientX;
     const startY = e.clientY;

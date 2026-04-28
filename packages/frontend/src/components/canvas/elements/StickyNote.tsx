@@ -134,8 +134,10 @@ export function StickyNote({ element }: StickyNoteProps) {
     );
     if (lockedByMe) return;
     if (isLocked) return;
-    if (tool !== 'select') return;
-    setSelectedId(element.id);
+    if (tool === 'select') {
+      setSelectedId(element.id);
+    }
+    // For other tools, let the event propagate to canvas
 
     const startX = e.clientX;
     const startY = e.clientY;

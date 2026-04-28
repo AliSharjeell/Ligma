@@ -203,8 +203,10 @@ export function Shape({ element }: ShapeProps) {
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
-    if (tool !== 'select') return;
-    setSelectedId(element.id);
+    if (tool === 'select') {
+      setSelectedId(element.id);
+    }
+    // For other tools, let the event propagate to canvas
 
     const startX = e.clientX;
     const startY = e.clientY;
