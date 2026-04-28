@@ -88,6 +88,29 @@ export interface CanvasEvent {
   details?: string;
 }
 
+export interface CommentReply {
+  id: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  timestamp: number;
+  isRead: boolean;
+}
+
+export interface Comment {
+  id: string;
+  canvasX: number;
+  canvasY: number;
+  authorId: string;
+  authorName: string;
+  authorColor: string;
+  content: string;
+  timestamp: number;
+  resolved: boolean;
+  replies: CommentReply[];
+  unreadCount: number;
+}
+
 export interface SocketEvents {
   create_node: CanvasElement;
   update_node: CanvasElement;
