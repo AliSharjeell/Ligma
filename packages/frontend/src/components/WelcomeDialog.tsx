@@ -91,7 +91,7 @@ export function WelcomeDialog() {
             {mode === 'idle' && (
               <div className="space-y-3">
                 <button
-                  onClick={() => handleModeChange('create')}
+                  onClick={handleCreate}
                   className="w-full px-4 py-3 text-white rounded-lg transition hover:opacity-90"
                   style={{ backgroundColor: BRAND_COLOR }}
                 >
@@ -107,39 +107,26 @@ export function WelcomeDialog() {
               </div>
             )}
 
-            {/* Room Code Input (shown when in create or join mode) */}
-            {mode !== 'idle' && (
+            {/* Join Room Form */}
+            {mode === 'join' && (
               <>
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200" />
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500">
-                      {mode === 'create' ? 'Create your room' : 'Enter room code'}
-                    </span>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Room Code
+                  </label>
+                  <input
+                    type="text"
+                    value={roomCode}
+                    onChange={(e) => {
+                      setRoomCode(e.target.value.toUpperCase());
+                      setError('');
+                    }}
+                    placeholder="Enter room code"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 outline-none transition"
+                    style={{ '--tw-ring-color': BRAND_COLOR, '--tw-ring-offset-color': '#fff', '--tw-border-color': BRAND_COLOR } as React.CSSProperties}
+                    onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                  />
                 </div>
-
-                {mode === 'join' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Room Code
-                    </label>
-                    <input
-                      type="text"
-                      value={roomCode}
-                      onChange={(e) => {
-                        setRoomCode(e.target.value.toUpperCase());
-                        setError('');
-                      }}
-                      placeholder="Enter room code"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 outline-none transition"
-                      style={{ '--tw-ring-color': BRAND_COLOR, '--tw-ring-offset-color': '#fff', '--tw-border-color': BRAND_COLOR } as React.CSSProperties}
-                      onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-                    />
-                  </div>
-                )}
 
                 <div className="flex gap-3">
                   <button
@@ -152,11 +139,11 @@ export function WelcomeDialog() {
                     Back
                   </button>
                   <button
-                    onClick={mode === 'create' ? handleCreate : handleJoin}
+                    onClick={handleJoin}
                     className="flex-1 px-4 py-3 text-white rounded-lg transition hover:opacity-90"
                     style={{ backgroundColor: BRAND_COLOR }}
                   >
-                    {mode === 'create' ? 'Create Room' : 'Join Room'}
+                    Join Room
                   </button>
                 </div>
               </>
