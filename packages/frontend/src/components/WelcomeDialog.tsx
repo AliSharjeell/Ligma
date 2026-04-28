@@ -47,11 +47,10 @@ export function WelcomeDialog() {
   return (
     <div className="min-h-screen flex">
       {/* Left side - Branding */}
-      <div className="hidden md:flex md:w-1/2 bg-cover bg-center flex-col justify-center items-center p-12 text-white relative" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=1920&q=80)' }}>
-        <div className="absolute inset-0 bg-black/40"></div>
-        <div className="relative max-w-md text-center z-10">
+      <div className="hidden md:flex md:w-1/2 bg-cover bg-center flex-col justify-center items-center p-12 text-white relative" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=1920&q=80)', filter: 'saturate(1.2)' }}>
+        <div className="max-w-md text-center">
           <h1 className="text-6xl font-bold mb-4 tracking-tight">LIGMA</h1>
-          <p className="text-xl text-white/90">Real-time Collaborative Canvas</p>
+          <p className="text-xl text-white">Real-time Collaborative Canvas</p>
         </div>
       </div>
 
