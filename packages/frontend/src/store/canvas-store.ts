@@ -71,6 +71,7 @@ const saveElementsToStorage = (elements: Map<string, CanvasElement>) => {
   if (typeof window !== 'undefined') {
     try {
       const arr = Array.from(elements.values());
+      console.log('Saving', arr.length, 'elements to localStorage');
       localStorage.setItem(ELEMENTS_KEY, JSON.stringify(arr));
     } catch (e) {
       console.error('Failed to save elements:', e);
