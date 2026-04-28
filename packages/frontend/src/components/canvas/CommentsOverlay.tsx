@@ -221,7 +221,7 @@ export function CommentPin({
 }
 
 export function CommentsOverlay() {
-  const { comments, isCommentMode, viewportPosition, viewportZoom, activeCommentId, hoveredCommentId, setActiveCommentId, setHoveredCommentId, addComment, clearSelection } = useCanvasStore();
+  const { comments, isCommentMode, viewportPosition, viewportZoom, activeCommentId, hoveredCommentId, setActiveCommentId, setHoveredCommentId, addComment, clearSelection, setTool, setIsCommentMode } = useCanvasStore();
   const [pendingComment, setPendingComment] = useState<{ x: number; y: number } | null>(null);
   const [newCommentText, setNewCommentText] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -265,6 +265,8 @@ export function CommentsOverlay() {
     addComment(pendingComment.x, pendingComment.y, newCommentText.trim());
     setPendingComment(null);
     setNewCommentText('');
+    setIsCommentMode(false);
+    setTool('select');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
