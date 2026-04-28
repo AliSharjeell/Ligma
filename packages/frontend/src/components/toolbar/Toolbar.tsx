@@ -358,7 +358,6 @@ export function Toolbar() {
           {/* Thickness slider for draw */}
           {tool === 'draw' && (
             <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
-              <span className="text-[10px] text-slate-500">Thickness</span>
               <input
                 type="range"
                 min="1"
