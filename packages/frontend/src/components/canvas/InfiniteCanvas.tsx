@@ -643,7 +643,17 @@ export function InfiniteCanvas() {
         <div className="w-px h-3 bg-slate-300" />
         <span>{elements.size} Elements</span>
         <div className="w-px h-3 bg-slate-300" />
-        <span>{connectionStatus === 'connected' ? 'Synced' : connectionStatus === 'connecting' ? 'Syncing...' : 'Offline'}</span>
+        <div className="flex items-center gap-1.5">
+          <div className={cn(
+            "w-2 h-2 rounded-full",
+            connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
+          )} />
+          <span className={cn(
+            connectionStatus === 'connected' ? 'text-green-600' : connectionStatus === 'connecting' ? 'text-yellow-600' : 'text-red-600'
+          )}>
+            {connectionStatus === 'connected' ? 'Synced' : connectionStatus === 'connecting' ? 'Syncing...' : 'Offline'}
+          </span>
+        </div>
       </div>
     </div>
   );
