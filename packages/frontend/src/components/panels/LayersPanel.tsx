@@ -129,3 +129,6 @@ export function LayersList() {
     </ScrollArea>
   );
 }
+
+// Re-export as LayersPanel for backwards compatibility
+export { LayersList as LayersPanel };

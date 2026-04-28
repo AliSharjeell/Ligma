@@ -2,11 +2,10 @@
 
 import React from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Activity, Plus } from 'lucide-react';
+import { Activity, ChevronLeft } from 'lucide-react';
 import type { CanvasEvent } from '@/types/canvas';
 
 const eventTypeColors = {
@@ -68,46 +67,47 @@ function EventItem({ event }: { event: CanvasEvent }) {
   );
 }
 
-export function EventLog() {
+interface ActivityPanelProps {
+  onBack: () => void;
+}
+
+export function ActivityPanel({ onBack }: ActivityPanelProps) {
   const { eventLog } = useCanvasStore();
 
   return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Activity className="size-4" />
-          Activity
-          {eventLog.length > 0 && (
-            <span className="text-xs text-muted-foreground ml-1">
-              {eventLog.length}
-            </span>
-          )}
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 mb-4">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onBack}>
+          <ChevronLeft className="size-4" />
         </Button>
-      </SheetTrigger>
-      <SheetContent className="w-[380px]">
-        <SheetHeader>
-          <SheetTitle>Event Log</SheetTitle>
-          <SheetDescription>
-            Real-time activity feed of canvas changes
-          </SheetDescription>
-        </SheetHeader>
+        <h3 className="text-sm font-semibold">Activity</h3>
+        {eventLog.length > 0 && (
+          <span className="text-xs text-muted-foreground ml-auto">
+            {eventLog.length}
+          </span>
+        )}
+      </div>
 
-        <ScrollArea className="h-[calc(100vh-150px)] mt-4">
-          {eventLog.length > 0 ? (
-            <div className="space-y-1">
-              {eventLog.map((event) => (
-                <EventItem key={event.id} event={event} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Activity className="size-8 mx-auto mb-2 opacity-50" />
-              <p>No events yet</p>
-              <p className="text-sm">Activity will appear here as you work</p>
-            </div>
-          )}
-        </ScrollArea>
-      </SheetContent>
-    </Sheet>
+      <ScrollArea className="flex-1">
+        {eventLog.length > 0 ? (
+          <div className="space-y-1">
+            {eventLog.map((event) => (
+              <EventItem key={event.id} event={event} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <Activity className="size-8 mx-auto mb-2 opacity-50" />
+            <p>No events yet</p>
+            <p className="text-sm">Activity will appear here as you work</p>
+          </div>
+        )}
+      </ScrollArea>
+    </div>
   );
+}
+
+// Re-export as EventLog for backwards compatibility (no onBack needed, standalone sheet)
+export function EventLog() {
+  return <ActivityPanel onBack={() => {}} />;
 }

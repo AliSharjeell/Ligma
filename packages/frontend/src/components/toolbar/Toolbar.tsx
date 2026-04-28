@@ -37,10 +37,11 @@ import {
   Diamond,
   Hexagon,
   Star,
+  CheckSquare,
 } from 'lucide-react';
 import type { CanvasElement, Tool, ShapeType } from '@/types/canvas';
-import { TaskBoard } from '@/components/panels/TaskBoard';
-import { EventLog } from '@/components/panels/EventLog';
+import { TasksPanel } from '@/components/panels/TaskBoard';
+import { ActivityPanel } from '@/components/panels/EventLog';
 import { LayersList } from '@/components/panels/LayersPanel';
 import {
   Dialog,
@@ -84,6 +85,7 @@ export function Toolbar() {
   const [nameInput, setNameInput] = useState('');
   const [pendingRequests, setPendingRequests] = useState<{ userId: string; userName: string }[]>([]);
   const [hasRequested, setHasRequested] = useState(false);
+  const [rightPanelView, setRightPanelView] = useState<'main' | 'tasks' | 'activity'>('main');
   const router = useRouter();
   const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership, connectionStatus } = useSocket();
 
@@ -567,7 +569,7 @@ export function Toolbar() {
         "absolute top-1/2 -translate-y-1/2 right-4 z-20 flex flex-col transition-all duration-300",
         isRightPanelOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"
       )}>
-        <div className="bg-white rounded-xl shadow-excalidraw border border-slate-200 p-4 w-80 h-full flex flex-col gap-4 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-excalidraw border border-slate-200 p-4 w-80 h-[600px] flex flex-col gap-4 overflow-hidden">
           <div className="flex items-center justify-between shrink-0">
             <h3 className="text-sm font-semibold text-slate-700">Workspace</h3>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsRightPanelOpen(false)}>
@@ -720,10 +722,30 @@ export function Toolbar() {
               {/* Panels Section */}
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] uppercase font-bold text-slate-400">Panels</label>
-                <div className="grid grid-cols-1 gap-2">
-                  <TaskBoard />
-                  <EventLog />
-                </div>
+                {rightPanelView === 'main' && (
+                  <div className="grid grid-cols-1 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 justify-start"
+                      onClick={() => setRightPanelView('tasks')}
+                    >
+                      <CheckSquare className="size-4" />
+                      Tasks
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 justify-start"
+                      onClick={() => setRightPanelView('activity')}
+                    >
+                      <Activity className="size-4" />
+                      Activity
+                    </Button>
+                  </div>
+                )}
+                {rightPanelView === 'tasks' && <TasksPanel onBack={() => setRightPanelView('main')} />}
+                {rightPanelView === 'activity' && <ActivityPanel onBack={() => setRightPanelView('main')} />}
               </div>
 
               <Separator />
