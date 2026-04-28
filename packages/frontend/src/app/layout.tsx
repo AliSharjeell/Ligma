@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
+import { Architects_Daughter } from "next/font/google";
 import "./globals.css";
+
+const architectsDaughter = Architects_Daughter({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-handwritten",
+});
 
 export const metadata: Metadata = {
   title: "LIGMA - Collaborative Canvas",
@@ -13,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">
+      <body className={`${architectsDaughter.variable} antialiased`}>
         {children}
       </body>
     </html>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import rough from 'roughjs';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { cn } from '@/lib/utils';
@@ -14,6 +15,7 @@ export function TextBlock({ element }: TextBlockProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [localContent, setLocalContent] = useState(element.content);
   const inputRef = useRef<HTMLInputElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
@@ -35,6 +37,26 @@ export function TextBlock({ element }: TextBlockProps) {
     }
   }, [element.content, isEditing]);
 
+  // Rough selection border
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const rc = rough.svg(svgRef.current);
+    while (svgRef.current.firstChild) {
+      svgRef.current.removeChild(svgRef.current.firstChild);
+    }
+
+    if (isSelected && !isEditing) {
+      const { width, height } = element.size;
+      const node = rc.rectangle(-4, -4, width + 8, height + 8, {
+        stroke: '#3b82f6',
+        strokeWidth: 1.5,
+        roughness: 1,
+        bowing: 1,
+      });
+      svgRef.current.appendChild(node);
+    }
+  }, [isSelected, isEditing, element.size]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
@@ -45,9 +67,9 @@ export function TextBlock({ element }: TextBlockProps) {
     const startPos = { ...element.position };
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const zoom = useCanvasStore.getState().viewportZoom;
-      const dx = (moveEvent.clientX - startX) / zoom;
-      const dy = (moveEvent.clientY - startY) / zoom;
+      const state = useCanvasStore.getState();
+      const dx = (moveEvent.clientX - startX) / state.viewportZoom;
+      const dy = (moveEvent.clientY - startY) / state.viewportZoom;
       updateElement(element.id, {
         position: { x: startPos.x + dx, y: startPos.y + dy },
       });
@@ -108,7 +130,6 @@ export function TextBlock({ element }: TextBlockProps) {
     <div
       className={cn(
         'absolute select-none cursor-move group',
-        isSelected && 'ring-2 ring-primary',
         isLocked && 'opacity-50 pointer-events-none'
       )}
       style={{
@@ -119,6 +140,12 @@ export function TextBlock({ element }: TextBlockProps) {
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
     >
+      <svg
+        ref={svgRef}
+        className="absolute inset-0 pointer-events-none overflow-visible"
+        style={{ width: '100%', height: '100%' }}
+      />
+
       {isEditing || isBeingEdited ? (
         <input
           ref={inputRef}
@@ -127,10 +154,10 @@ export function TextBlock({ element }: TextBlockProps) {
           onChange={(e) => setLocalContent(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="px-2 py-1 bg-transparent border-none outline-none w-full"
+          className="px-2 py-1 bg-transparent border-none outline-none w-full relative z-10"
           style={{
-            fontSize: element.textStyle?.fontSize || 18,
-            fontFamily: element.textStyle?.fontFamily || 'Georgia, serif',
+            fontSize: element.textStyle?.fontSize || 20,
+            fontFamily: element.textStyle?.fontFamily || 'var(--font-handwritten), cursive',
             fontWeight: element.textStyle?.fontWeight || 'normal',
             textAlign: element.textStyle?.textAlign || 'left',
             color: element.color || '#1f2937',
@@ -140,22 +167,16 @@ export function TextBlock({ element }: TextBlockProps) {
         />
       ) : (
         <div
-          className="px-2 py-1 whitespace-nowrap min-h-[1.5em]"
+          className="px-2 py-1 whitespace-nowrap min-h-[1.5em] relative z-10"
           style={{
             color: element.color || '#1f2937',
-            fontSize: element.textStyle?.fontSize || 18,
-            fontFamily: element.textStyle?.fontFamily || 'Georgia, serif',
+            fontSize: element.textStyle?.fontSize || 20,
+            fontFamily: element.textStyle?.fontFamily || 'var(--font-handwritten), cursive',
             fontWeight: element.textStyle?.fontWeight || 'normal',
             textAlign: element.textStyle?.textAlign || 'left',
           }}
         >
           {element.content || 'Double-click to edit'}
-        </div>
-      )}
-
-      {isSelected && !isLocked && !isEditing && (
-        <div className="absolute -bottom-6 left-0 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-          Double-click to edit
         </div>
       )}
     </div>
