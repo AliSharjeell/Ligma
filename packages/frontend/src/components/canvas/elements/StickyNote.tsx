@@ -134,10 +134,11 @@ export function StickyNote({ element }: StickyNoteProps) {
     );
     if (lockedByMe) return;
     if (isLocked) return;
-    if (tool === 'select') {
+    if (tool === 'select' || tool === 'sticky') {
       setSelectedId(element.id);
     }
-    // For other tools, let the event propagate to canvas
+    // Only allow dragging with select tool
+    if (tool !== 'select') return;
 
     const startX = e.clientX;
     const startY = e.clientY;
@@ -208,7 +209,7 @@ export function StickyNote({ element }: StickyNoteProps) {
         'absolute select-none transition-shadow outline-none',
         isSelected && 'ring-2 ring-primary',
         isLocked && 'opacity-50 pointer-events-none',
-        tool !== 'select' && 'pointer-events-none'
+        tool !== 'select' && tool !== 'sticky' && 'pointer-events-none'
       )}
       style={{
         left: element.position.x,
