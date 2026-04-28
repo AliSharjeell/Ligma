@@ -380,6 +380,25 @@ export function Toolbar() {
             transform: 'translateX(-50%)',
           }}
         >
+          {/* Color Options */}
+          <div className="flex items-center gap-1 pr-2 border-r border-slate-200">
+            {colorSwatches.map((color) => (
+              <button
+                key={color}
+                onClick={() => {
+                  updateElement(selectedId!, { color });
+                  const updated = useCanvasStore.getState().getElement(selectedId!);
+                  if (updated) emitElementUpdate(updated);
+                }}
+                className={cn(
+                  'h-5 w-5 rounded-full border border-slate-200 transition-all hover:scale-110',
+                  selectedElement.color === color && 'ring-2 ring-primary ring-offset-1'
+                )}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+
           {/* Lock/Unlock Button */}
           <Button
             variant="ghost"
