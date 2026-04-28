@@ -212,7 +212,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.set(id, { ...element, ...updates, updatedAt: Date.now() });
-      saveElementsToStorage(newElements);
+      // Use current room from localStorage key if available
+      const roomId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : undefined;
+      saveElementsToStorage(newElements, roomId);
       return { elements: newElements, history: newHistory, redoStack: [] };
     });
   },
