@@ -103,7 +103,8 @@ export function Drawing({ element }: DrawingProps) {
       className={cn(
         'absolute cursor-move',
         isSelected && 'ring-1 ring-blue-400 ring-offset-4 rounded-sm',
-        isLocked && 'opacity-50 pointer-events-none'
+        isLocked && 'opacity-50 pointer-events-none',
+        tool !== 'select' && 'pointer-events-none'
       )}
       style={{
         left: actualPosition.x,

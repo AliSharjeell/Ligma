@@ -282,7 +282,8 @@ export function Shape({ element }: ShapeProps) {
         'absolute select-none group outline-none',
         isSelected ? 'cursor-move' : 'cursor-move',
         isLocked && 'opacity-50 pointer-events-none',
-        isEditing && 'ring-2 ring-yellow-400'
+        isEditing && 'ring-2 ring-yellow-400',
+        tool !== 'select' && 'pointer-events-none'
       )}
       style={{
         left: element.position.x,

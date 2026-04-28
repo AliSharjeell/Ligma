@@ -207,7 +207,8 @@ export function StickyNote({ element }: StickyNoteProps) {
       className={cn(
         'absolute select-none transition-shadow outline-none',
         isSelected && 'ring-2 ring-primary',
-        isLocked && 'opacity-50 pointer-events-none'
+        isLocked && 'opacity-50 pointer-events-none',
+        tool !== 'select' && 'pointer-events-none'
       )}
       style={{
         left: element.position.x,

@@ -254,7 +254,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       className={cn(
         'absolute select-none outline-none',
         isLocked && 'opacity-50 pointer-events-none',
-        tool === 'draw' ? 'cursor-crosshair' : 'cursor-text'
+        tool === 'draw' ? 'cursor-crosshair' : tool === 'select' ? 'cursor-text' : 'pointer-events-none'
       )}
       style={{
         left: element.position.x,
