@@ -305,6 +305,62 @@ export function Toolbar() {
         ))}
       </div>
 
+      {/* Tool Options Bar - shows when draw, shape, or eraser is selected */}
+      {(tool === 'draw' || tool === 'shape' || tool === 'eraser') && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white rounded-xl shadow-excalidraw border border-slate-200 p-2">
+          {/* Draw/Shape Color */}
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              {colorSwatches.slice(0, 5).map((color) => (
+                <button
+                  key={color}
+                  onClick={() => {
+                    if (tool === 'draw') setDrawColor(color);
+                    if (tool === 'shape') setShapeColor(color);
+                  }}
+                  className={cn(
+                    'h-5 w-5 rounded-full border border-slate-200 transition-all hover:scale-110',
+                    (tool === 'draw' ? drawColor : shapeColor) === color && 'ring-2 ring-primary ring-offset-1'
+                  )}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Shape type selector */}
+          {tool === 'shape' && (
+            <div className="flex items-center gap-1 border-l border-slate-200 pl-3">
+              {shapes.map((s) => (
+                <Button
+                  key={s.id}
+                  variant={shapeType === s.id ? 'default' : 'outline'}
+                  size="icon"
+                  onClick={() => setShapeType(s.id)}
+                  className="h-7 w-7 rounded-lg"
+                >
+                  {s.icon}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {/* Thickness slider for draw */}
+          {tool === 'draw' && (
+            <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+              <span className="text-[10px] text-slate-500">Thickness</span>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={2}
+                className="w-16 h-1"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Viewer Mode Indicator with Request Button */}
       {userRole === 'Viewer' && (
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-amber-50 text-amber-700 px-4 py-2 rounded-lg border border-amber-200 text-xs">
