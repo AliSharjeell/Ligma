@@ -313,6 +313,27 @@ export function Toolbar() {
             {t.icon}
           </Button>
         ))}
+        <div className="w-px h-6 bg-slate-200 mx-1" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={undo}
+          disabled={!canUndo()}
+          title="Undo (Ctrl+Z)"
+          className="h-10 w-10 rounded-xl hover:bg-slate-100 text-slate-600 disabled:opacity-30"
+        >
+          <Undo2 className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={redo}
+          disabled={!canRedo()}
+          title="Redo (Ctrl+Shift+Z)"
+          className="h-10 w-10 rounded-xl hover:bg-slate-100 text-slate-600 disabled:opacity-30"
+        >
+          <Redo2 className="size-4" />
+        </Button>
       </div>
 
       {/* Tool Options Bar - shows when draw or shape is selected */}
@@ -707,21 +728,10 @@ export function Toolbar() {
 
               <Separator />
 
-              {/* Controls */}
+              {/* Feature Toggles */}
               <div className="flex flex-col gap-2">
-                <label className="text-[10px] uppercase font-bold text-slate-400">Canvas Controls</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" size="sm" className="h-9 gap-2 text-xs rounded-lg" onClick={undo} disabled={!canUndo()}>
-                    <Undo2 className="size-4" />
-                    Undo
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-9 gap-2 text-xs rounded-lg" onClick={redo} disabled={!canRedo()}>
-                    <Redo2 className="size-4" />
-                    Redo
-                  </Button>
-                </div>
-
-                <div className="flex flex-col gap-2 mt-2">
+                <label className="text-[10px] uppercase font-bold text-slate-400">Features</label>
+                <div className="flex flex-col gap-2">
                   {[
                     { id: 'heatmap', label: 'Activity Heatmap', active: presenceHeatmapEnabled, set: setPresenceHeatmapEnabled, icon: <Activity className="size-4" /> },
                     { id: 'zones', label: 'Presence Zones', active: presenceZonesEnabled, set: setPresenceZonesEnabled, icon: <Map className="size-4" /> },
