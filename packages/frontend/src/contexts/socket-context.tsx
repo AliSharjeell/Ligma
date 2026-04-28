@@ -402,8 +402,9 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         replayQueue(newSocket);
       }
 
-      // Clear old state when joining a new canvas
-      resetCanvas();
+      // Store current elements before joining
+      const savedElements = useCanvasStore.getState().elements;
+
       newSocket.emit('join_canvas', {
         canvasId,
         userId,
@@ -421,17 +422,23 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       setConnectionStatus('disconnected');
     });
 
+    // Flag to track if this is the initial load
+    let isInitialLoad = true;
+
     newSocket.on('sync_response', (payload: { state: { nodes: any[] } }) => {
       if (payload.state && payload.state.nodes) {
         const serverElements = payload.state.nodes.map(nodeStateToCanvasElement);
-        // Only use server state if we have no local elements
-        const currentElements = useCanvasStore.getState().elements;
-        if (currentElements.size === 0) {
-          setElements(serverElements);
+        // Only use server state on first load
+        if (isInitialLoad) {
+          const currentElements = useCanvasStore.getState().elements;
+          if (currentElements.size === 0) {
+            setElements(serverElements);
+          }
+          isInitialLoad = false;
         }
         // Always persist whatever we have
         setTimeout(() => persistElements(canvasId), 100);
-        console.log('Sync response - server has', serverElements.length, 'elements, local has', currentElements.size);
+        console.log('Sync response - server has', serverElements.length, 'elements');
       }
     });
 
