@@ -317,7 +317,7 @@ export function Toolbar() {
 
       {/* Tool Options Bar - shows when draw or shape is selected */}
       {(tool === 'draw' || tool === 'shape') && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white rounded-full shadow-excalidraw border border-slate-200 p-2">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white rounded-full shadow-excalidraw border border-slate-200 py-4 px-3">
           {/* Draw/Shape Color */}
           <div className="flex items-center gap-2">
             <div className="flex gap-1">
