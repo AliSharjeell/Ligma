@@ -55,9 +55,10 @@ export function InfiniteCanvas() {
     addElement,
     updateElement,
     deleteElement,
+    lockElement,
   } = useCanvasStore();
 
-  const { emitCursorMove, emitElementCreate, emitElementUpdate, emitElementDelete } = useSocket();
+  const { emitCursorMove, emitElementCreate, emitElementUpdate, emitElementDelete, emitElementLock } = useSocket();
 
   // Update rough preview
   useEffect(() => {
@@ -106,7 +107,8 @@ export function InfiniteCanvas() {
     const x = (e.clientX - canvasRect.left - viewportPosition.x) / viewportZoom;
     const y = (e.clientY - canvasRect.top - viewportPosition.y) / viewportZoom;
 
-    if (e.button === 1 || (e.button === 0 && tool === 'pan')) {
+    // Grab/Pan by default for Select and Pan tools
+    if (e.button === 1 || (e.button === 0 && (tool === 'pan' || tool === 'select'))) {
       setIsPanning(true);
       setDragStart({ x: e.clientX - viewportPosition.x, y: e.clientY - viewportPosition.y });
       return;
@@ -123,33 +125,6 @@ export function InfiniteCanvas() {
       return;
     }
 
-    if (tool === 'select') {
-      const elementsArray = Array.from(elements.values());
-      const clickedElement = elementsArray.find((element) => isPointInElement(x, y, element));
-
-      if (clickedElement) {
-        if (e.shiftKey) {
-          const newSelection = new Set(selectedIds);
-          if (newSelection.has(clickedElement.id)) {
-            newSelection.delete(clickedElement.id);
-          } else {
-            newSelection.add(clickedElement.id);
-          }
-          setSelectedIds(newSelection);
-        } else {
-          setSelectedId(clickedElement.id);
-        }
-        setIsDragging(true);
-        setDragStart({ x, y });
-      } else {
-        clearSelection();
-        setIsBoxSelecting(true);
-        setBoxStart({ x, y });
-        setBoxEnd({ x, y });
-      }
-      return;
-    }
-
     if (tool === 'draw') {
       setIsDragging(true);
       setDrawPoints([{ x, y }]);
@@ -163,38 +138,10 @@ export function InfiniteCanvas() {
       return;
     }
 
-    if (tool === 'sticky') {
-      const element = addElement({
-        type: 'sticky',
-        position: { x: x - 100, y: y - 75 },
-        size: { width: 200, height: 150 },
-        content: '',
-        color: stickyColor,
-        locked: false,
-        createdBy: userId,
-      });
-      emitElementCreate(element);
-      setSelectedId(element.id);
-    } else if (tool === 'text') {
-      const element = addElement({
-        type: 'text',
-        position: { x, y },
-        size: { width: 200, height: 40 },
-        content: '',
-        color: textColor,
-        textStyle: {
-          fontSize: textFontSize,
-          fontFamily: textFontFamily,
-          fontWeight: textFontWeight,
-          textAlign,
-        },
-        locked: false,
-        createdBy: userId,
-      });
-      emitElementCreate(element);
-      setSelectedId(element.id);
-    }
-  }, [tool, viewportPosition, viewportZoom, elements, selectedIds, setSelectedId, setSelectedIds, clearSelection, addElement, userId, stickyColor, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, emitElementDelete, deleteElement, emitElementCreate]);
+    // In Excalidraw-like mode, single click on sticky does nothing or just pans if background
+    // We keep sticky creation on click for now or move to double? User said "nothing should happen on single click"
+    // So let's disable single-click creation for tools
+  }, [tool, viewportPosition, viewportZoom, elements, emitElementDelete, deleteElement]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -206,7 +153,13 @@ export function InfiniteCanvas() {
     emitCursorMove({ x: e.clientX, y: e.clientY });
 
     if (isPanning && dragStart) {
-      suppressClickClearRef.current = true;
+      const dx = Math.abs(e.clientX - (dragStart.x + viewportPosition.x));
+      const dy = Math.abs(e.clientY - (dragStart.y + viewportPosition.y));
+      
+      if (dx > 3 || dy > 3) {
+        suppressClickClearRef.current = true;
+      }
+
       setViewportPosition({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y,
@@ -315,10 +268,53 @@ export function InfiniteCanvas() {
       suppressClickClearRef.current = false;
       return;
     }
+    // Only clear selection if clicking exactly on canvas and not dragging/panning
     if (e.target === canvasRef.current) {
       clearSelection();
     }
   }, [clearSelection]);
+
+  const handleCanvasDoubleClick = useCallback((e: React.MouseEvent) => {
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+
+    const x = (e.clientX - canvasRect.left - viewportPosition.x) / viewportZoom;
+    const y = (e.clientY - canvasRect.top - viewportPosition.y) / viewportZoom;
+
+    // Check if double clicked an element
+    const elementsArray = Array.from(elements.values());
+    const clickedElement = elementsArray.find((element) => isPointInElement(x, y, element));
+
+    if (clickedElement) {
+      setSelectedId(clickedElement.id);
+      // If it's text, we can also enter edit mode here if needed
+      return;
+    }
+
+    // If double clicked background, create text
+    const element = addElement({
+      type: 'text',
+      position: { x, y: y - 10 },
+      size: { width: 10, height: 24 },
+      content: '',
+      color: textColor,
+      textStyle: {
+        fontSize: textFontSize,
+        fontFamily: textFontFamily,
+        fontWeight: textFontWeight,
+        textAlign,
+      },
+      locked: false,
+      createdBy: userId,
+    });
+    emitElementCreate(element);
+    setSelectedId(element.id);
+    
+    setTimeout(() => {
+      lockElement(element.id);
+      emitElementLock(element.id);
+    }, 50);
+  }, [viewportPosition, viewportZoom, elements, addElement, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, userId, emitElementCreate, setSelectedId, lockElement, emitElementLock]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -340,13 +336,14 @@ export function InfiniteCanvas() {
       ref={canvasRef}
       className={cn(
         'w-full h-full overflow-hidden bg-white relative select-none',
-        isPanning ? 'cursor-grabbing' : tool === 'pan' ? 'cursor-grab' : tool === 'eraser' ? 'cursor-cell' : tool === 'select' ? 'cursor-default' : 'cursor-crosshair'
+        isPanning ? 'cursor-grabbing' : (tool === 'pan' || tool === 'select') ? 'cursor-grab' : tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'
       )}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onClick={handleCanvasClick}
+      onDoubleClick={handleCanvasDoubleClick}
       style={{
         backgroundImage: 'radial-gradient(#e5e7eb 1px, transparent 1px)',
         backgroundSize: `${20 * viewportZoom}px ${20 * viewportZoom}px`,
@@ -380,18 +377,10 @@ export function InfiniteCanvas() {
           className="absolute inset-0 pointer-events-none overflow-visible"
         />
 
-        {/* Box selection while dragging */}
-        {isBoxSelecting && boxStart && boxEnd && (
-          <div
-            className="absolute border border-blue-500 bg-blue-500/5 pointer-events-none"
-            style={{
-              left: Math.min(boxStart.x, boxEnd.x),
-              top: Math.min(boxStart.y, boxEnd.y),
-              width: Math.abs(boxEnd.x - boxStart.x),
-              height: Math.abs(boxEnd.y - boxStart.y),
-            }}
-          />
-        )}
+        {/* Box selection while dragging - maybe disable if we pan on drag? 
+            Excalidraw does box selection on drag if not clicking element.
+            But user wants grab-pan everywhere.
+        */}
       </div>
 
       <CursorPresence />

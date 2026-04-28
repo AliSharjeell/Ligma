@@ -25,11 +25,14 @@ export function TextBlock({ element }: TextBlockProps) {
   const isBeingEdited = element.locked && element.lockedBy === userId;
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
+    if ((isEditing || isBeingEdited) && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select();
+      // Only select if there is content
+      if (localContent) {
+        inputRef.current.select();
+      }
     }
-  }, [isEditing]);
+  }, [isEditing, isBeingEdited]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -37,7 +40,7 @@ export function TextBlock({ element }: TextBlockProps) {
     }
   }, [element.content, isEditing]);
 
-  // Rough selection border
+  // Rough selection border - only shown when selected and NOT editing
   useEffect(() => {
     if (!svgRef.current) return;
     const rc = rough.svg(svgRef.current);
@@ -45,21 +48,21 @@ export function TextBlock({ element }: TextBlockProps) {
       svgRef.current.removeChild(svgRef.current.firstChild);
     }
 
-    if (isSelected && !isEditing) {
+    if (isSelected && !isEditing && !isBeingEdited) {
       const { width, height } = element.size;
       const node = rc.rectangle(-4, -4, width + 8, height + 8, {
         stroke: '#3b82f6',
-        strokeWidth: 1.5,
-        roughness: 1,
-        bowing: 1,
+        strokeWidth: 1,
+        roughness: 0.5,
       });
       svgRef.current.appendChild(node);
     }
-  }, [isSelected, isEditing, element.size]);
+  }, [isSelected, isEditing, isBeingEdited, element.size]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
+    if (isEditing) return; // Don't allow drag while editing
     setSelectedId(element.id);
 
     const startX = e.clientX;
@@ -99,13 +102,13 @@ export function TextBlock({ element }: TextBlockProps) {
 
   const handleBlur = () => {
     setIsEditing(false);
-    if (localContent !== element.content) {
-      updateElement(element.id, { content: localContent });
-      const updatedElement = useCanvasStore.getState().getElement(element.id);
-      if (updatedElement) {
-        emitElementUpdate(updatedElement);
-      }
+    // If empty content, we might want to delete it or keep it? Excalidraw keeps it until blurred
+    updateElement(element.id, { content: localContent });
+    const updatedElement = useCanvasStore.getState().getElement(element.id);
+    if (updatedElement) {
+      emitElementUpdate(updatedElement);
     }
+    
     if (element.locked && element.lockedBy === userId) {
       unlockElement(element.id);
       emitElementUnlock(element.id);
@@ -113,7 +116,7 @@ export function TextBlock({ element }: TextBlockProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       handleBlur();
     }
     if (e.key === 'Escape') {
@@ -129,13 +132,14 @@ export function TextBlock({ element }: TextBlockProps) {
   return (
     <div
       className={cn(
-        'absolute select-none cursor-move group',
+        'absolute select-none cursor-text group outline-none',
         isLocked && 'opacity-50 pointer-events-none'
       )}
       style={{
         left: element.position.x,
         top: element.position.y,
-        minWidth: element.size.width || 100,
+        minWidth: '10px',
+        zIndex: isEditing ? 100 : 1,
       }}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
@@ -154,7 +158,7 @@ export function TextBlock({ element }: TextBlockProps) {
           onChange={(e) => setLocalContent(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="px-2 py-1 bg-transparent border-none outline-none w-full relative z-10"
+          className="px-0 py-0 bg-transparent border-none outline-none relative z-10 w-auto min-w-[1ch]"
           style={{
             fontSize: element.textStyle?.fontSize || 20,
             fontFamily: element.textStyle?.fontFamily || 'var(--font-handwritten), cursive',
@@ -162,12 +166,13 @@ export function TextBlock({ element }: TextBlockProps) {
             textAlign: element.textStyle?.textAlign || 'left',
             color: element.color || '#1f2937',
             caretColor: element.color || '#1f2937',
+            // Simple auto-resize trick for input
+            width: `${Math.max(1, localContent.length)}ch`,
           }}
-          placeholder="Type here..."
         />
       ) : (
         <div
-          className="px-2 py-1 whitespace-nowrap min-h-[1.5em] relative z-10"
+          className="px-0 py-0 whitespace-nowrap min-h-[1.2em] relative z-10"
           style={{
             color: element.color || '#1f2937',
             fontSize: element.textStyle?.fontSize || 20,
@@ -176,7 +181,7 @@ export function TextBlock({ element }: TextBlockProps) {
             textAlign: element.textStyle?.textAlign || 'left',
           }}
         >
-          {element.content || 'Double-click to edit'}
+          {element.content}
         </div>
       )}
     </div>
