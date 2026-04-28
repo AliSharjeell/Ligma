@@ -38,11 +38,13 @@ import {
   Hexagon,
   Star,
   CheckSquare,
+  MessageCircle,
 } from 'lucide-react';
 import type { CanvasElement, Tool, ShapeType } from '@/types/canvas';
 import { TasksPanel } from '@/components/panels/TaskBoard';
 import { ActivityPanel } from '@/components/panels/EventLog';
 import { LayersList } from '@/components/panels/LayersPanel';
+import { CommentsPanel } from '@/components/panels/CommentsPanel';
 import {
   Dialog,
   DialogContent,
@@ -85,7 +87,7 @@ export function Toolbar() {
   const [nameInput, setNameInput] = useState('');
   const [pendingRequests, setPendingRequests] = useState<{ userId: string; userName: string }[]>([]);
   const [hasRequested, setHasRequested] = useState(false);
-  const [rightPanelView, setRightPanelView] = useState<'main' | 'tasks' | 'activity'>('main');
+  const [rightPanelView, setRightPanelView] = useState<'main' | 'tasks' | 'activity' | 'comments'>('main');
   const router = useRouter();
   const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership, connectionStatus } = useSocket();
 
@@ -103,6 +105,7 @@ export function Toolbar() {
     presenceHeatmapEnabled,
     presenceZonesEnabled,
     timeTravelEnabled,
+    isCommentMode,
     selectedIds,
     setTool,
     setShapeType,
@@ -118,6 +121,7 @@ export function Toolbar() {
     setPresenceHeatmapEnabled,
     setPresenceZonesEnabled,
     setTimeTravelEnabled,
+    setIsCommentMode,
     deleteElement,
     lockElement,
     unlockElement,
@@ -240,6 +244,7 @@ export function Toolbar() {
       if (e.key === 't' || e.key === 'T') { setTool('text'); clearSelection(); }
       if (e.key === 'd' || e.key === 'D') { setTool('draw'); clearSelection(); }
       if (e.key === 'e' || e.key === 'E') { setTool('eraser'); clearSelection(); }
+      if (e.key === 'c' || e.key === 'C') { useCanvasStore.getState().setIsCommentMode(!useCanvasStore.getState().isCommentMode); clearSelection(); }
 
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
@@ -315,6 +320,19 @@ export function Toolbar() {
             {t.icon}
           </Button>
         ))}
+        <div className="w-px h-6 bg-slate-200 mx-1" />
+        <Button
+          variant={isCommentMode ? 'default' : 'ghost'}
+          size="icon"
+          onClick={() => setIsCommentMode(!isCommentMode)}
+          title="Comment (C)"
+          className={cn(
+            'h-10 w-10 rounded-xl transition-all',
+            isCommentMode ? 'bg-blue-500 text-white shadow-sm' : 'hover:bg-slate-100 text-slate-600'
+          )}
+        >
+          <MessageCircle className="size-4" />
+        </Button>
         <div className="w-px h-6 bg-slate-200 mx-1" />
         <Button
           variant="ghost"
@@ -742,10 +760,20 @@ export function Toolbar() {
                       <Activity className="size-4" />
                       Activity
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 justify-start"
+                      onClick={() => setRightPanelView('comments')}
+                    >
+                      <MessageCircle className="size-4" />
+                      Comments
+                    </Button>
                   </div>
                 )}
                 {rightPanelView === 'tasks' && <TasksPanel onBack={() => setRightPanelView('main')} />}
                 {rightPanelView === 'activity' && <ActivityPanel onBack={() => setRightPanelView('main')} />}
+                {rightPanelView === 'comments' && <CommentsPanel onBack={() => setRightPanelView('main')} />}
               </div>
 
               <Separator />
