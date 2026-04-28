@@ -463,7 +463,8 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     });
 
     newSocket.on('role_request_denied', () => {
-      alert('Your Contributor request was denied by the Lead.');
+      // This is just logged - actual handling is in Toolbar component
+      console.log('Role request denied received');
     });
 
     newSocket.on('ownership_transferred', (payload: { oldOwnerId: string; newOwnerId: string }) => {
@@ -689,10 +690,13 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
   }, [socket, canvasId, connected, addToQueue]);
 
   const emitDenyRoleRequest = useCallback((targetUserId: string) => {
+    console.log('emitDenyRoleRequest called:', targetUserId, 'connected:', connected);
     const payload = { canvasId, targetUserId };
     if (connected && socket) {
+      console.log('Emitting deny_role_request');
       socket.emit('deny_role_request', payload);
     } else {
+      console.log('Queuing deny_role_request (offline)');
       addToQueue({ type: 'create', eventType: 'deny_role_request', canvasId, payload });
     }
   }, [socket, canvasId, connected, addToQueue]);

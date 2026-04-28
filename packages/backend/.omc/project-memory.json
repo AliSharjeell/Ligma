@@ -84,8 +84,8 @@
   "hotPaths": [
     {
       "path": "src\\socket\\SocketHandler.ts",
-      "accessCount": 12,
-      "lastAccessed": 1777394925910,
+      "accessCount": 21,
+      "lastAccessed": 1777395657606,
       "type": "file"
     },
     {

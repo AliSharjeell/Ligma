@@ -530,15 +530,21 @@ export class SocketHandler {
   }
 
   private handleDenyRoleRequest(socket: Socket, data: { canvasId: string; targetUserId: string }): void {
+    console.log('handleDenyRoleRequest called:', data);
     const { canvasId, targetUserId } = data;
     const requesterId = this.getUserIdFromSocket(socket.id, canvasId);
     const clientState = this.clientStates.get(canvasId);
 
-    if (!requesterId || !clientState) return;
+    if (!requesterId || !clientState) {
+      console.log('Missing requesterId or clientState');
+      return;
+    }
 
     // Only Leads can deny
     const requester = clientState.users.get(requesterId);
+    console.log('Requester:', requesterId, 'Role:', requester?.role);
     if (!requester || requester.role !== 'Lead') {
+      console.log('Not a Lead, cannot deny');
       socket.emit('error', { message: 'Only Leads can deny role requests' });
       return;
     }
@@ -549,11 +555,12 @@ export class SocketHandler {
     // Remove from pending requests
     clientState.roleRequests.delete(targetUserId);
 
-    // Notify the requester they were denied
-    const targetSocket = this.findSocketByUserId(targetUserId, canvasId);
-    if (targetSocket) {
-      targetSocket.emit('role_request_denied', {});
-    }
+    // Notify the requester they were denied - broadcast to room with targetUserId
+    // The frontend will filter for the correct user
+    this.io.to(canvasId).emit('role_request_denied', {
+      userId: targetUserId,
+      denied: true,
+    });
 
     // Notify all Leads that this request was denied (so they can clear it from their UI)
     this.io.to(canvasId).emit('role_request_cleared', {

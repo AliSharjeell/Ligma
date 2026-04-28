@@ -162,14 +162,25 @@ export function Toolbar() {
       setPendingRequests(prev => prev.filter(r => r.userId !== payload.userId));
     };
 
+    const handleRoleRequestDenied = (payload: { userId?: string; denied?: boolean }) => {
+      // When our request was denied, reset the hasRequested state
+      // Only reset if this denial is for the current user
+      if (!payload.userId || payload.userId === userId) {
+        setHasRequested(false);
+        alert('Your Contributor request was denied by the Lead.');
+      }
+    };
+
     socket.on('role_request', handleRoleRequest);
     socket.on('role_changed', handleRoleChanged);
     socket.on('role_request_cleared', handleRoleRequestCleared);
+    socket.on('role_request_denied', handleRoleRequestDenied);
 
     return () => {
       socket.off('role_request', handleRoleRequest);
       socket.off('role_changed', handleRoleChanged);
       socket.off('role_request_cleared', handleRoleRequestCleared);
+      socket.off('role_request_denied', handleRoleRequestDenied);
     };
   }, [socket, userId]);
 
@@ -335,7 +346,12 @@ export function Toolbar() {
                 size="sm"
                 variant="ghost"
                 className="h-5 px-1 text-xs text-green-600 hover:bg-green-100"
-                onClick={() => emitApproveRoleRequest(req.userId)}
+                onClick={() => {
+                  console.log('Approve clicked for:', req.userId);
+                  emitApproveRoleRequest(req.userId);
+                  // Optimistically remove from UI
+                  setPendingRequests(prev => prev.filter(r => r.userId !== req.userId));
+                }}
               >
                 Approve
               </Button>
@@ -343,7 +359,12 @@ export function Toolbar() {
                 size="sm"
                 variant="ghost"
                 className="h-5 px-1 text-xs text-red-600 hover:bg-red-100"
-                onClick={() => emitDenyRoleRequest(req.userId)}
+                onClick={() => {
+                  console.log('Deny clicked for:', req.userId);
+                  emitDenyRoleRequest(req.userId);
+                  // Optimistically remove from UI
+                  setPendingRequests(prev => prev.filter(r => r.userId !== req.userId));
+                }}
               >
                 Deny
               </Button>
