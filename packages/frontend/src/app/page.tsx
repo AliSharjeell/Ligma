@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { SocketProvider } from '@/contexts/socket-context';
-import { Header } from '@/components/layout/Header';
 import { InfiniteCanvas } from '@/components/canvas/InfiniteCanvas';
 import { Toolbar } from '@/components/toolbar/Toolbar';
 import { PresenceHeatmap } from '@/components/canvas/PresenceHeatmap';
@@ -15,15 +14,12 @@ export default function Home() {
   const roomId = 'default';
   return (
     <SocketProvider url={WS_URL} canvasId={roomId}>
-      <main className="h-screen w-screen flex flex-col overflow-hidden">
-        <Header currentRoom={roomId} />
-        <div className="flex-1 relative overflow-hidden">
-          <InfiniteCanvas />
-          <Toolbar />
-          <PresenceHeatmap />
-          <PresenceZones />
-          <TimeTravel />
-        </div>
+      <main className="h-screen w-screen relative overflow-hidden bg-white">
+        <InfiniteCanvas />
+        <Toolbar />
+        <PresenceHeatmap />
+        <PresenceZones />
+        <TimeTravel />
       </main>
     </SocketProvider>
   );

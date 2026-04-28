@@ -344,11 +344,6 @@ export function InfiniteCanvas() {
       onMouseUp={handleMouseUp}
       onClick={handleCanvasClick}
       onDoubleClick={handleCanvasDoubleClick}
-      style={{
-        backgroundImage: 'radial-gradient(#e5e7eb 1px, transparent 1px)',
-        backgroundSize: `${20 * viewportZoom}px ${20 * viewportZoom}px`,
-        backgroundPosition: `${viewportPosition.x}px ${viewportPosition.y}px`,
-      }}
     >
       <div
         className="absolute inset-0 origin-top-left"
