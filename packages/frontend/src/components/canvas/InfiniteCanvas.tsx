@@ -257,7 +257,6 @@ export function InfiniteCanvas() {
         createdBy: userId,
       });
       emitElementCreate(element);
-      setSelectedId(element.id);
       return;
     }
 
@@ -283,7 +282,6 @@ export function InfiniteCanvas() {
         createdBy: userId,
       });
       emitElementCreate(element);
-      setSelectedId(element.id);
       // Auto-enter edit mode
       setTimeout(() => {
         lockElement(element.id);
@@ -392,7 +390,6 @@ export function InfiniteCanvas() {
         createdBy: userId,
       });
       emitElementCreate(element);
-      setSelectedId(element.id);
       setDrawPoints([]);
     }
 
@@ -421,7 +418,6 @@ export function InfiniteCanvas() {
           createdBy: userId,
         });
         emitElementCreate(element);
-        setSelectedId(element.id);
       }
       setShapePreview(null);
       setShapeStart(null);
@@ -545,14 +541,13 @@ export function InfiniteCanvas() {
       createdBy: userId,
     });
     emitElementCreate(element);
-    setSelectedId(element.id);
     setEnteringEditId(element.id);
     setTimeout(() => {
       lockElement(element.id);
       emitElementLock(element.id);
       setEnteringEditId(null);
     }, 50);
-  }, [viewportPosition, viewportZoom, elements, addElement, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, userId, emitElementCreate, setSelectedId, lockElement, emitElementLock, tool]);
+  }, [viewportPosition, viewportZoom, elements, addElement, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, userId, emitElementCreate, lockElement, emitElementLock, tool]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
