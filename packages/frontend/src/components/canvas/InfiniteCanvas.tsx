@@ -75,12 +75,69 @@ export function InfiniteCanvas() {
       const y = Math.min(shapePreview.start.y, shapePreview.end.y);
       const w = Math.abs(shapePreview.end.x - shapePreview.start.x);
       const h = Math.abs(shapePreview.end.y - shapePreview.start.y);
-      
+      const padding = 5;
+
       if (w > 2 && h > 2) {
         const options = { stroke: shapeColor, strokeWidth: 2, roughness: 1.5 };
         let node;
         if (shapeType === 'circle') {
           node = rc.ellipse(x + w / 2, y + h / 2, w, h, options);
+        } else if (shapeType === 'line') {
+          node = rc.line(x, y + h / 2, x + w, y + h / 2, options);
+        } else if (shapeType === 'triangle') {
+          node = rc.polygon([
+            [x + w / 2, y],
+            [x, y + h],
+            [x + w, y + h]
+          ], options);
+        } else if (shapeType === 'diamond') {
+          node = rc.polygon([
+            [x + w / 2, y],
+            [x + w, y + h / 2],
+            [x + w / 2, y + h],
+            [x, y + h / 2]
+          ], options);
+        } else if (shapeType === 'hexagon') {
+          const hexPoints = [];
+          for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i - Math.PI / 2;
+            hexPoints.push([
+              x + w / 2 + (w / 2) * Math.cos(angle),
+              y + h / 2 + (h / 2) * Math.sin(angle)
+            ]);
+          }
+          node = rc.polygon(hexPoints, options);
+        } else if (shapeType === 'star') {
+          const starPoints = [];
+          const outerR = Math.min(w, h) / 2;
+          const innerR = outerR * 0.4;
+          for (let i = 0; i < 10; i++) {
+            const angle = (Math.PI / 5) * i - Math.PI / 2;
+            const r = i % 2 === 0 ? outerR : innerR;
+            starPoints.push([
+              x + w / 2 + r * Math.cos(angle),
+              y + h / 2 + r * Math.sin(angle)
+            ]);
+          }
+          node = rc.polygon(starPoints, options);
+        } else if (shapeType === 'arrow') {
+          const x1 = x + padding;
+          const y1 = y + h / 2;
+          const x2 = x + w - padding;
+          const y2 = y + h / 2;
+          node = rc.line(x1, y1, x2, y2, options);
+          const angle = Math.atan2(y2 - y1, x2 - x1);
+          const headLength = Math.min(w, h) * 0.3;
+          const head1X = x2 - headLength * Math.cos(angle - Math.PI / 6);
+          const head1Y = y2 - headLength * Math.sin(angle - Math.PI / 6);
+          const head2X = x2 - headLength * Math.cos(angle + Math.PI / 6);
+          const head2Y = y2 - headLength * Math.sin(angle + Math.PI / 6);
+          const head1 = rc.line(x2, y2, head1X, head1Y, options);
+          const head2 = rc.line(x2, y2, head2X, head2Y, options);
+          previewSvgRef.current.appendChild(node);
+          previewSvgRef.current.appendChild(head1);
+          previewSvgRef.current.appendChild(head2);
+          return;
         } else {
           node = rc.rectangle(x, y, w, h, options);
         }
