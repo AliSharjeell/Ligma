@@ -413,9 +413,9 @@ export function Toolbar() {
               }
             }}
             className="h-8 w-8 rounded-full hover:bg-slate-100"
-            title={selectedElement.locked ? 'Unlock element' : 'Lock element'}
+            title={selectedElement.locked ? 'Locked - cannot move' : 'Unlock element'}
           >
-            {selectedElement.locked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+            {selectedElement.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
           </Button>
 
           {/* Delete Button */}
@@ -676,8 +676,8 @@ export function Toolbar() {
                           }
                         }}
                       >
-                        {selectedElement.locked ? <Unlock className="size-3" /> : <Lock className="size-3" />}
-                        {selectedElement.locked ? 'Unlock' : 'Lock'}
+                        {selectedElement.locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+                        {selectedElement.locked ? 'Locked' : 'Lock'}
                       </Button>
                       <Button
                         variant="destructive"
