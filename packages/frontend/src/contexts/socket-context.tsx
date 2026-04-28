@@ -135,7 +135,7 @@ interface SocketProviderProps {
   canvasId?: string;
 }
 
-export function SocketProvider({ children, url = 'http://localhost:3001', canvasId = 'default' }: SocketProviderProps) {
+export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', canvasId = 'default' }: SocketProviderProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
 
