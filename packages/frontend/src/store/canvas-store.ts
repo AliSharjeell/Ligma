@@ -243,6 +243,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     set((state) => {
       const newElements = new Map(state.elements);
       newElements.set(id, { ...element, locked: true, lockedBy: userId });
+      const roomId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : undefined;
+      saveElementsToStorage(newElements, roomId);
       return { elements: newElements };
     });
     return true;
@@ -254,6 +256,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       if (!element) return state;
       const newElements = new Map(state.elements);
       newElements.set(id, { ...element, locked: false, lockedBy: undefined });
+      const roomId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : undefined;
+      saveElementsToStorage(newElements, roomId);
       return { elements: newElements };
     });
   },
