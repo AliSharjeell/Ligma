@@ -305,7 +305,7 @@ export function Toolbar() {
             }}
             title={t.label}
             className={cn(
-              'h-8 w-8 rounded-xl transition-all',
+              'h-10 w-10 rounded-xl transition-all',
               tool === t.id ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-slate-100 text-slate-600',
               userRole === 'Viewer' && ['draw', 'sticky', 'shape', 'text', 'eraser'].includes(t.id) && 'opacity-50'
             )}
