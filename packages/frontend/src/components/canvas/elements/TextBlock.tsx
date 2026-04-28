@@ -15,7 +15,7 @@ export function TextBlock({ element }: TextBlockProps) {
   const [localContent, setLocalContent] = useState(element.content);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { selectedIds, setSelectedId, setSelectedIds, updateElement, lockElement, unlockElement, userId } = useCanvasStore();
+  const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
@@ -37,11 +37,7 @@ export function TextBlock({ element }: TextBlockProps) {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const lockedByMe = Array.from(useCanvasStore.getState().elements.values()).find(
-      (item) => item.locked && item.lockedBy === userId && item.id !== element.id
-    );
-    if (lockedByMe) return;
-    if (isLocked || isEditing) return;
+    if (isLocked) return;
     setSelectedId(element.id);
 
     const startX = e.clientX;
@@ -49,9 +45,9 @@ export function TextBlock({ element }: TextBlockProps) {
     const startPos = { ...element.position };
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const state = useCanvasStore.getState();
-      const dx = (moveEvent.clientX - startX) / state.viewportZoom;
-      const dy = (moveEvent.clientY - startY) / state.viewportZoom;
+      const zoom = useCanvasStore.getState().viewportZoom;
+      const dx = (moveEvent.clientX - startX) / zoom;
+      const dy = (moveEvent.clientY - startY) / zoom;
       updateElement(element.id, {
         position: { x: startPos.x + dx, y: startPos.y + dy },
       });
@@ -111,14 +107,14 @@ export function TextBlock({ element }: TextBlockProps) {
   return (
     <div
       className={cn(
-        'absolute select-none cursor-move',
+        'absolute select-none cursor-move group',
         isSelected && 'ring-2 ring-primary',
         isLocked && 'opacity-50 pointer-events-none'
       )}
       style={{
         left: element.position.x,
         top: element.position.y,
-        minWidth: element.size.width,
+        minWidth: element.size.width || 100,
       }}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
@@ -131,18 +127,20 @@ export function TextBlock({ element }: TextBlockProps) {
           onChange={(e) => setLocalContent(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="px-2 py-1 bg-transparent border-none outline-none w-full min-w-[100px]"
+          className="px-2 py-1 bg-transparent border-none outline-none w-full"
           style={{
             fontSize: element.textStyle?.fontSize || 18,
             fontFamily: element.textStyle?.fontFamily || 'Georgia, serif',
             fontWeight: element.textStyle?.fontWeight || 'normal',
             textAlign: element.textStyle?.textAlign || 'left',
             color: element.color || '#1f2937',
+            caretColor: element.color || '#1f2937',
           }}
+          placeholder="Type here..."
         />
       ) : (
         <div
-          className="px-2 py-1 whitespace-nowrap"
+          className="px-2 py-1 whitespace-nowrap min-h-[1.5em]"
           style={{
             color: element.color || '#1f2937',
             fontSize: element.textStyle?.fontSize || 18,
@@ -155,9 +153,9 @@ export function TextBlock({ element }: TextBlockProps) {
         </div>
       )}
 
-      {isSelected && !isLocked && (
-        <div className="absolute -bottom-6 left-0 text-xs text-muted-foreground">
-          Double-click to edit, Shift+drag to resize
+      {isSelected && !isLocked && !isEditing && (
+        <div className="absolute -bottom-6 left-0 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+          Double-click to edit
         </div>
       )}
     </div>

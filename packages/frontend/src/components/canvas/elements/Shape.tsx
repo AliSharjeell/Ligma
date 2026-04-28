@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
+import rough from 'roughjs';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { cn } from '@/lib/utils';
@@ -20,7 +21,8 @@ const STROKE_COLORS = [
 ];
 
 export function Shape({ element }: ShapeProps) {
-  const { selectedIds, setSelectedId, setSelectedIds, updateElement, lockElement, unlockElement, userId } = useCanvasStore();
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
@@ -28,37 +30,73 @@ export function Shape({ element }: ShapeProps) {
   const isEditing = element.locked && element.lockedBy === userId;
   const strokeColor = element.color || STROKE_COLORS[0];
 
+  useEffect(() => {
+    if (!svgRef.current) return;
+    
+    const rc = rough.svg(svgRef.current);
+    // Clear previous drawings
+    while (svgRef.current.firstChild) {
+      svgRef.current.removeChild(svgRef.current.firstChild);
+    }
+
+    const { width, height } = element.size;
+    const padding = 5;
+    const options = {
+      stroke: strokeColor,
+      strokeWidth: isSelected ? 2.5 : 2,
+      roughness: 1.5,
+      bowing: 1.5,
+      seed: element.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0), // Deterministic seed
+    };
+
+    let node: SVGElement;
+    if (element.shapeType === 'circle') {
+      node = rc.ellipse(width / 2, height / 2, width - padding * 2, height - padding * 2, options);
+    } else if (element.shapeType === 'arrow') {
+      const x1 = padding;
+      const y1 = padding;
+      const x2 = width - padding;
+      const y2 = height - padding;
+      node = rc.line(x1, y1, x2, y2, options);
+      
+      // Arrow head
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      const headLength = 15;
+      const head1X = x2 - headLength * Math.cos(angle - Math.PI / 6);
+      const head1Y = y2 - headLength * Math.sin(angle - Math.PI / 6);
+      const head2X = x2 - headLength * Math.cos(angle + Math.PI / 6);
+      const head2Y = y2 - headLength * Math.sin(angle + Math.PI / 6);
+      
+      const head1 = rc.line(x2, y2, head1X, head1Y, options);
+      const head2 = rc.line(x2, y2, head2X, head2Y, options);
+      svgRef.current.appendChild(node);
+      svgRef.current.appendChild(head1);
+      svgRef.current.appendChild(head2);
+      return;
+    } else {
+      node = rc.rectangle(padding, padding, width - padding * 2, height - padding * 2, options);
+    }
+    
+    svgRef.current.appendChild(node);
+  }, [element.shapeType, element.size, element.color, element.id, isSelected, strokeColor]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const lockedByMe = Array.from(useCanvasStore.getState().elements.values()).find(
-      (item) => item.locked && item.lockedBy === userId && item.id !== element.id
-    );
-    if (lockedByMe) return;
     if (isLocked) return;
     setSelectedId(element.id);
 
     const startX = e.clientX;
     const startY = e.clientY;
     const startPos = { ...element.position };
-    const startSize = { ...element.size };
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const state = useCanvasStore.getState();
       const dx = (moveEvent.clientX - startX) / state.viewportZoom;
       const dy = (moveEvent.clientY - startY) / state.viewportZoom;
 
-      if (moveEvent.shiftKey) {
-        updateElement(element.id, {
-          size: {
-            width: Math.max(20, startSize.width + dx),
-            height: Math.max(20, startSize.height + dy),
-          },
-        });
-      } else {
-        updateElement(element.id, {
-          position: { x: startPos.x + dx, y: startPos.y + dy },
-        });
-      }
+      updateElement(element.id, {
+        position: { x: startPos.x + dx, y: startPos.y + dy },
+      });
     };
 
     const handleMouseUp = () => {
@@ -96,46 +134,11 @@ export function Shape({ element }: ShapeProps) {
     }
   };
 
-  const renderShape = () => {
-    const strokeWidth = isSelected ? 3 : 2;
-
-    if (element.shapeType === 'circle') {
-      return (
-        <svg viewBox="0 0 100 100" className="w-full h-full">
-          <ellipse
-            cx="50"
-            cy="50"
-            rx="48"
-            ry="48"
-            fill="none"
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-          />
-        </svg>
-      );
-    }
-
-    return (
-      <svg viewBox="0 0 100 100" className="w-full h-full">
-        <rect
-          x="2"
-          y="2"
-          width="96"
-          height="96"
-          rx="8"
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-        />
-      </svg>
-    );
-  };
-
   return (
     <div
       className={cn(
-        'absolute select-none cursor-move',
-        isSelected && 'ring-2 ring-blue-500 ring-offset-1',
+        'absolute select-none cursor-move group',
+        isSelected && 'ring-1 ring-blue-400 ring-offset-4 rounded-sm',
         isLocked && 'opacity-50 pointer-events-none',
         isEditing && 'ring-2 ring-yellow-400'
       )}
@@ -150,10 +153,15 @@ export function Shape({ element }: ShapeProps) {
       tabIndex={0}
       onBlur={handleBlur}
     >
-      {renderShape()}
+      <svg
+        ref={svgRef}
+        width={element.size.width}
+        height={element.size.height}
+        style={{ overflow: 'visible' }}
+      />
 
       {isSelected && !isLocked && (
-        <div className="absolute -bottom-8 left-0 flex gap-1 bg-white rounded-lg shadow-lg p-1">
+        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 flex gap-1 bg-white rounded-lg shadow-lg p-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
           {STROKE_COLORS.map((color) => (
             <button
               key={color}
@@ -171,41 +179,41 @@ export function Shape({ element }: ShapeProps) {
         </div>
       )}
 
-      <div
-        className="absolute -top-2 -right-2 w-4 h-4 bg-primary rounded-full cursor-se-resize"
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          if (isLocked) return;
+      {isSelected && !isLocked && (
+        <div
+          className="absolute -bottom-1 -right-1 w-3 h-3 bg-white border-2 border-blue-500 rounded-full cursor-se-resize z-10"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startSize = { ...element.size };
 
-          const startX = e.clientX;
-          const startY = e.clientY;
-          const startSize = { ...element.size };
+            const handleResize = (moveEvent: MouseEvent) => {
+              const state = useCanvasStore.getState();
+              const dx = (moveEvent.clientX - startX) / state.viewportZoom;
+              const dy = (moveEvent.clientY - startY) / state.viewportZoom;
+              updateElement(element.id, {
+                size: {
+                  width: Math.max(20, startSize.width + dx),
+                  height: Math.max(20, startSize.height + dy),
+                },
+              });
+            };
 
-          const handleResize = (moveEvent: MouseEvent) => {
-            const state = useCanvasStore.getState();
-            const dx = (moveEvent.clientX - startX) / state.viewportZoom;
-            const dy = (moveEvent.clientY - startY) / state.viewportZoom;
-            updateElement(element.id, {
-              size: {
-                width: Math.max(20, startSize.width + dx),
-                height: Math.max(20, startSize.height + dy),
-              },
-            });
-          };
+            const handleUp = () => {
+              document.removeEventListener('mousemove', handleResize);
+              document.removeEventListener('mouseup', handleUp);
+              const updatedElement = useCanvasStore.getState().getElement(element.id);
+              if (updatedElement) {
+                emitElementUpdate(updatedElement);
+              }
+            };
 
-          const handleUp = () => {
-            document.removeEventListener('mousemove', handleResize);
-            document.removeEventListener('mouseup', handleUp);
-            const updatedElement = useCanvasStore.getState().getElement(element.id);
-            if (updatedElement) {
-              emitElementUpdate(updatedElement);
-            }
-          };
-
-          document.addEventListener('mousemove', handleResize);
-          document.addEventListener('mouseup', handleUp);
-        }}
-      />
+            document.addEventListener('mousemove', handleResize);
+            document.addEventListener('mouseup', handleUp);
+          }}
+        />
+      )}
     </div>
   );
 }

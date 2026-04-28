@@ -10,6 +10,7 @@ import {
   StickyNote,
   Square,
   Circle,
+  ArrowRight,
   Type,
   Pencil,
   Hand,
@@ -39,6 +40,7 @@ const tools: { id: Tool; icon: React.ReactNode; label: string }[] = [
 const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
   { id: 'rectangle', icon: <Square className="size-4" />, label: 'Rectangle' },
   { id: 'circle', icon: <Circle className="size-4" />, label: 'Circle' },
+  { id: 'arrow', icon: <ArrowRight className="size-4" />, label: 'Arrow' },
 ];
 
 export function Toolbar() {

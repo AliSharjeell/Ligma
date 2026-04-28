@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
+import rough from 'roughjs';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { StickyNote } from './elements/StickyNote';
@@ -16,6 +17,7 @@ import type { Position, CanvasElement } from '@/types/canvas';
 
 export function InfiniteCanvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const previewSvgRef = useRef<SVGSVGElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isDrawingShape, setIsDrawingShape] = useState(false);
@@ -53,11 +55,42 @@ export function InfiniteCanvas() {
     addElement,
     updateElement,
     deleteElement,
-    undo,
-    redo,
   } = useCanvasStore();
 
   const { emitCursorMove, emitElementCreate, emitElementUpdate, emitElementDelete } = useSocket();
+
+  // Update rough preview
+  useEffect(() => {
+    if (!previewSvgRef.current) return;
+    const rc = rough.svg(previewSvgRef.current);
+    while (previewSvgRef.current.firstChild) {
+      previewSvgRef.current.removeChild(previewSvgRef.current.firstChild);
+    }
+
+    if (isDrawingShape && shapePreview) {
+      const x = Math.min(shapePreview.start.x, shapePreview.end.x);
+      const y = Math.min(shapePreview.start.y, shapePreview.end.y);
+      const w = Math.abs(shapePreview.end.x - shapePreview.start.x);
+      const h = Math.abs(shapePreview.end.y - shapePreview.start.y);
+      
+      if (w > 2 && h > 2) {
+        const options = { stroke: shapeColor, strokeWidth: 2, roughness: 1.5 };
+        let node;
+        if (shapeType === 'circle') {
+          node = rc.ellipse(x + w / 2, y + h / 2, w, h, options);
+        } else {
+          node = rc.rectangle(x, y, w, h, options);
+        }
+        previewSvgRef.current.appendChild(node);
+      }
+    }
+
+    if (isDragging && tool === 'draw' && drawPoints.length > 1) {
+      const points: [number, number][] = drawPoints.map(p => [p.x, p.y]);
+      const node = rc.curve(points, { stroke: drawColor, strokeWidth: 2, roughness: 1 });
+      previewSvgRef.current.appendChild(node);
+    }
+  }, [isDrawingShape, shapePreview, shapeType, shapeColor, isDragging, tool, drawPoints, drawColor]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -73,19 +106,14 @@ export function InfiniteCanvas() {
     const x = (e.clientX - canvasRect.left - viewportPosition.x) / viewportZoom;
     const y = (e.clientY - canvasRect.top - viewportPosition.y) / viewportZoom;
 
-    const lockedByMe = Array.from(elements.values()).find((element) => element.locked && element.lockedBy === userId);
-
-    // Pan tool or middle mouse button
     if (e.button === 1 || (e.button === 0 && tool === 'pan')) {
       setIsPanning(true);
       setDragStart({ x: e.clientX - viewportPosition.x, y: e.clientY - viewportPosition.y });
       return;
     }
 
-    // Eraser tool
     if (tool === 'eraser') {
       setIsErasing(true);
-      // Find element under cursor and delete
       elements.forEach((element) => {
         if (isPointInElement(x, y, element)) {
           emitElementDelete(element.id);
@@ -95,20 +123,21 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Select tool - click to select element OR start box selection
     if (tool === 'select') {
       const elementsArray = Array.from(elements.values());
       const clickedElement = elementsArray.find((element) => isPointInElement(x, y, element));
 
-      if (lockedByMe && (!clickedElement || clickedElement.id !== lockedByMe.id)) {
-        return;
-      }
-
       if (clickedElement) {
         if (e.shiftKey) {
-          setSelectedId(clickedElement.id);
+          const newSelection = new Set(selectedIds);
+          if (newSelection.has(clickedElement.id)) {
+            newSelection.delete(clickedElement.id);
+          } else {
+            newSelection.add(clickedElement.id);
+          }
+          setSelectedIds(newSelection);
         } else {
-          setSelectedIds(new Set([clickedElement.id]));
+          setSelectedId(clickedElement.id);
         }
         setIsDragging(true);
         setDragStart({ x, y });
@@ -121,14 +150,12 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Draw tool
     if (tool === 'draw') {
       setIsDragging(true);
-      setDrawPoints([{ x: x, y: y }]);
+      setDrawPoints([{ x, y }]);
       return;
     }
 
-    // Shape tool - start drawing rectangle
     if (tool === 'shape') {
       setIsDrawingShape(true);
       setShapeStart({ x, y });
@@ -136,11 +163,10 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Create elements on click
     if (tool === 'sticky') {
       const element = addElement({
         type: 'sticky',
-        position: { x: x - 100, y: y - 50 },
+        position: { x: x - 100, y: y - 75 },
         size: { width: 200, height: 150 },
         content: '',
         color: stickyColor,
@@ -154,7 +180,7 @@ export function InfiniteCanvas() {
         type: 'text',
         position: { x, y },
         size: { width: 200, height: 40 },
-        content: 'Double-click to edit',
+        content: '',
         color: textColor,
         textStyle: {
           fontSize: textFontSize,
@@ -168,7 +194,7 @@ export function InfiniteCanvas() {
       emitElementCreate(element);
       setSelectedId(element.id);
     }
-  }, [tool, viewportPosition, viewportZoom, userId, addElement, setSelectedId, shapeType, emitElementCreate, elements, deleteElement, emitElementDelete, stickyColor, textColor, textFontSize, textFontFamily, textFontWeight, textAlign]);
+  }, [tool, viewportPosition, viewportZoom, elements, selectedIds, setSelectedId, setSelectedIds, clearSelection, addElement, userId, stickyColor, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, emitElementDelete, deleteElement, emitElementCreate]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -188,23 +214,17 @@ export function InfiniteCanvas() {
       return;
     }
 
-    if (isDragging && tool === 'select') {
-      suppressClickClearRef.current = true;
-    }
-
     if (isDragging && tool === 'draw') {
       suppressClickClearRef.current = true;
-      setDrawPoints((prev) => [...prev, { x: x, y: y }]);
+      setDrawPoints((prev) => [...prev, { x, y }]);
     }
 
-    // Shape tool - update preview
     if (isDrawingShape && tool === 'shape' && shapeStart) {
       suppressClickClearRef.current = true;
       setShapePreview({ start: shapeStart, end: { x, y } });
       return;
     }
 
-    // Eraser tool - delete elements under cursor
     if (isErasing && tool === 'eraser') {
       suppressClickClearRef.current = true;
       elements.forEach((element) => {
@@ -215,19 +235,13 @@ export function InfiniteCanvas() {
       });
     }
 
-    // Box selection update
     if (isBoxSelecting && boxStart) {
       suppressClickClearRef.current = true;
       setBoxEnd({ x, y });
     }
-  }, [isPanning, isDragging, isErasing, isBoxSelecting, boxStart, viewportPosition, tool, emitCursorMove, setViewportPosition, elements, deleteElement, emitElementDelete]);
+  }, [isPanning, isDragging, isDrawingShape, isErasing, isBoxSelecting, dragStart, tool, viewportPosition, viewportZoom, shapeStart, boxStart, elements, emitCursorMove, setViewportPosition, emitElementDelete, deleteElement]);
 
   const handleMouseUp = useCallback(() => {
-    if (isPanning) {
-      setIsPanning(false);
-      setDragStart(null);
-    }
-
     if (isDragging && tool === 'draw' && drawPoints.length > 1) {
       const element = addElement({
         type: 'drawing',
@@ -243,20 +257,17 @@ export function InfiniteCanvas() {
       setDrawPoints([]);
     }
 
-    // Create shape on mouse up (paint style)
     if (isDrawingShape && tool === 'shape' && shapePreview) {
       const width = Math.abs(shapePreview.end.x - shapePreview.start.x);
       const height = Math.abs(shapePreview.end.y - shapePreview.start.y);
-      const finalWidth = width > 5 ? width : 140;
-      const finalHeight = height > 5 ? height : 100;
-      if (finalWidth > 0 && finalHeight > 0) {
+      if (width > 5 && height > 5) {
         const element = addElement({
           type: 'shape',
           position: {
             x: Math.min(shapePreview.start.x, shapePreview.end.x),
             y: Math.min(shapePreview.start.y, shapePreview.end.y),
           },
-          size: { width: finalWidth, height: finalHeight },
+          size: { width, height },
           content: '',
           shapeType,
           color: shapeColor,
@@ -270,9 +281,7 @@ export function InfiniteCanvas() {
       setShapeStart(null);
     }
 
-    // Select elements in box selection
     if (isBoxSelecting && boxStart && boxEnd) {
-      suppressClickClearRef.current = true;
       const box = {
         left: Math.min(boxStart.x, boxEnd.x),
         right: Math.max(boxStart.x, boxEnd.x),
@@ -291,6 +300,7 @@ export function InfiniteCanvas() {
       }
     }
 
+    setIsPanning(false);
     setIsDragging(false);
     setIsErasing(false);
     setIsDrawingShape(false);
@@ -298,7 +308,7 @@ export function InfiniteCanvas() {
     setBoxStart(null);
     setBoxEnd(null);
     setDragStart(null);
-  }, [isPanning, isDragging, isDrawingShape, tool, drawPoints, userId, addElement, emitElementCreate, boxStart, boxEnd, elements, setSelectedId, shapePreview, shapeType, selectedIds, updateElement, emitElementUpdate, drawColor, shapeColor]);
+  }, [isPanning, isDragging, isDrawingShape, isBoxSelecting, tool, drawPoints, shapePreview, shapeType, shapeColor, drawColor, boxStart, boxEnd, elements, addElement, userId, emitElementCreate, setSelectedId, setSelectedIds]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (suppressClickClearRef.current) {
@@ -310,15 +320,6 @@ export function InfiniteCanvas() {
     }
   }, [clearSelection]);
 
-  // Listen for element selection from child components
-  useEffect(() => {
-    const handleElementSelect = (e: CustomEvent) => {
-      setSelectedId(e.detail);
-    };
-    window.addEventListener('canvas-element-select' as any, handleElementSelect);
-    return () => window.removeEventListener('canvas-element-select' as any, handleElementSelect);
-  }, []);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size > 0) {
@@ -326,19 +327,19 @@ export function InfiniteCanvas() {
           emitElementDelete(id);
           deleteElement(id);
         });
+        clearSelection();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedIds, deleteElement, emitElementDelete]);
+  }, [selectedIds, deleteElement, emitElementDelete, clearSelection]);
 
   return (
     <div
       ref={canvasRef}
-      data-canvas="true"
       className={cn(
-        'w-full h-full overflow-hidden bg-slate-50 relative select-none',
+        'w-full h-full overflow-hidden bg-white relative select-none',
         isPanning ? 'cursor-grabbing' : tool === 'pan' ? 'cursor-grab' : tool === 'eraser' ? 'cursor-cell' : tool === 'select' ? 'cursor-default' : 'cursor-crosshair'
       )}
       onWheel={handleWheel}
@@ -346,6 +347,11 @@ export function InfiniteCanvas() {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onClick={handleCanvasClick}
+      style={{
+        backgroundImage: 'radial-gradient(#e5e7eb 1px, transparent 1px)',
+        backgroundSize: `${20 * viewportZoom}px ${20 * viewportZoom}px`,
+        backgroundPosition: `${viewportPosition.x}px ${viewportPosition.y}px`,
+      }}
     >
       <div
         className="absolute inset-0 origin-top-left"
@@ -368,72 +374,16 @@ export function InfiniteCanvas() {
           }
         })}
 
-        {isDragging && tool === 'draw' && drawPoints.length > 1 && (
-          <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
-            {(() => {
-              const minX = Math.min(...drawPoints.map(p => p.x));
-              const minY = Math.min(...drawPoints.map(p => p.y));
-
-              const relativePoints = drawPoints.map(p => ({
-                x: p.x - minX,
-                y: p.y - minY,
-              }));
-
-              let path = `M ${relativePoints[0].x} ${relativePoints[0].y}`;
-              for (let i = 1; i < relativePoints.length - 1; i++) {
-                const curr = relativePoints[i];
-                const next = relativePoints[i + 1];
-                const cp2x = curr.x + (next.x - curr.x) * 0.5;
-                const cp2y = curr.y + (next.y - curr.y) * 0.5;
-                path += ` Q ${curr.x} ${curr.y} ${cp2x} ${cp2y}`;
-              }
-              const last = relativePoints[relativePoints.length - 1];
-              path += ` L ${last.x} ${last.y}`;
-
-              return (
-                <g transform={`translate(${minX}, ${minY})`}>
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke={drawColor}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </g>
-              );
-            })()}
-          </svg>
-        )}
-
-        {/* Shape preview while dragging - actual rectangle outline */}
-        {shapePreview && (
-          <svg
-            className="absolute pointer-events-none"
-            style={{
-              left: Math.min(shapePreview.start.x, shapePreview.end.x),
-              top: Math.min(shapePreview.start.y, shapePreview.end.y),
-              width: Math.abs(shapePreview.end.x - shapePreview.start.x),
-              height: Math.abs(shapePreview.end.y - shapePreview.start.y),
-            }}
-          >
-            <rect
-              x="1"
-              y="1"
-              width={Math.abs(shapePreview.end.x - shapePreview.start.x) - 2}
-              height={Math.abs(shapePreview.end.y - shapePreview.start.y) - 2}
-              fill="none"
-              stroke="#3b82f6"
-              strokeWidth="2"
-              strokeDasharray="5,5"
-            />
-          </svg>
-        )}
+        {/* Rough Preview Layer */}
+        <svg
+          ref={previewSvgRef}
+          className="absolute inset-0 pointer-events-none overflow-visible"
+        />
 
         {/* Box selection while dragging */}
         {isBoxSelecting && boxStart && boxEnd && (
           <div
-            className="absolute border-2 border-blue-500 border-dashed bg-blue-500/10 pointer-events-none"
+            className="absolute border border-blue-500 bg-blue-500/5 pointer-events-none"
             style={{
               left: Math.min(boxStart.x, boxEnd.x),
               top: Math.min(boxStart.y, boxEnd.y),
@@ -449,16 +399,16 @@ export function InfiniteCanvas() {
       <PresenceZones />
       <TimeTravel />
 
-      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg px-3 py-2 text-sm">
-        <span className="text-muted-foreground">Zoom: {Math.round(viewportZoom * 100)}%</span>
+      <div className="absolute bottom-4 left-4 flex gap-4 items-center bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600">
+        <span>Zoom: {Math.round(viewportZoom * 100)}%</span>
+        <div className="w-px h-3 bg-slate-300" />
+        <span>{elements.size} Elements</span>
       </div>
     </div>
   );
 }
 
-// Helper function to check if point is in element (including drawings)
 function isPointInElement(x: number, y: number, element: CanvasElement): boolean {
-  // For drawings, use bounding box
   if (element.type === 'drawing' && element.points && element.points.length > 0) {
     const minX = Math.min(...element.points.map(p => p.x));
     const maxX = Math.max(...element.points.map(p => p.x));
@@ -477,7 +427,6 @@ function isPointInElement(x: number, y: number, element: CanvasElement): boolean
   );
 }
 
-// Helper function to check if element is in selection box
 function isElementInBox(element: CanvasElement, box: { left: number; right: number; top: number; bottom: number }): boolean {
   const { position, size } = element;
   const left = position.x;
