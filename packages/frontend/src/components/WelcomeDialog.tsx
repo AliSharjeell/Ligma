@@ -99,8 +99,8 @@ export function WelcomeDialog() {
                 </button>
                 <button
                   onClick={() => handleModeChange('join')}
-                  className="w-full px-4 py-3 rounded-lg transition hover:bg-blue-50"
-                  style={{ border: `2px solid ${BRAND_COLOR}`, color: BRAND_COLOR }}
+                  className="w-full px-4 py-3 rounded-lg transition hover:opacity-90"
+                  style={{ backgroundColor: '#A2D7FF', color: '#1f2937' }}
                 >
                   Join a Room
                 </button>
