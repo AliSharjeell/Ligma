@@ -372,7 +372,14 @@ export function Toolbar() {
 
       {/* Selection Options Bar - shows when element is selected */}
       {selectedElement && userRole !== 'Viewer' && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white rounded-full shadow-excalidraw border border-slate-200 py-3 px-4">
+        <div
+          className="absolute z-20 flex items-center gap-2 bg-white rounded-full shadow-excalidraw border border-slate-200 py-3 px-4"
+          style={{
+            left: selectedElement.position.x + selectedElement.size.width / 2,
+            top: selectedElement.position.y - 60,
+            transform: 'translateX(-50%)',
+          }}
+        >
           {/* Lock/Unlock Button */}
           <Button
             variant="ghost"
