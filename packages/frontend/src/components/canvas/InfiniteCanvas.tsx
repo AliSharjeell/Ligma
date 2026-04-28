@@ -12,6 +12,7 @@ import { CursorPresence } from './CursorPresence';
 import { PresenceHeatmap } from './PresenceHeatmap';
 import { PresenceZones } from './PresenceZones';
 import { TimeTravel } from './TimeTravel';
+import { CommentsOverlay } from './CommentsOverlay';
 import { cn } from '@/lib/utils';
 import type { Position, CanvasElement } from '@/types/canvas';
 
@@ -637,6 +638,7 @@ export function InfiniteCanvas() {
       <PresenceHeatmap />
       <PresenceZones />
       <TimeTravel />
+      <CommentsOverlay />
 
       <div className="absolute bottom-4 left-4 flex gap-4 items-center bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600">
         <span>Zoom: {Math.round(viewportZoom * 100)}%</span>
