@@ -27,7 +27,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build
+        run: npm install && npm run build
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.FRONTEND_API_URL }}
 
