@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Architects_Daughter } from "next/font/google";
+import { Poppins } from "next/font/google";
 import "./globals.css";
 
-const architectsDaughter = Architects_Daughter({
+const poppins = Poppins({
   weight: "400",
   subsets: ["latin"],
-  variable: "--font-handwritten",
+  variable: "--font-poppins",
 });
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${architectsDaughter.variable} antialiased`}>
+      <body className={`${poppins.variable} font-normal antialiased`} style={{ fontFamily: 'var(--font-poppins), system-ui, sans-serif' }}>
         {children}
       </body>
     </html>
