@@ -21,7 +21,7 @@ export function Drawing({ element }: DrawingProps) {
 
   useEffect(() => {
     if (!svgRef.current || !element.points || element.points.length < 2) return;
-    
+
     const rc = rough.svg(svgRef.current);
     while (svgRef.current.firstChild) {
       svgRef.current.removeChild(svgRef.current.firstChild);
@@ -40,7 +40,7 @@ export function Drawing({ element }: DrawingProps) {
       strokeWidth: isSelected ? 2.5 : 2,
       roughness: 1,
     });
-    
+
     svgRef.current.appendChild(node);
   }, [element.points, element.color, isSelected]);
 
