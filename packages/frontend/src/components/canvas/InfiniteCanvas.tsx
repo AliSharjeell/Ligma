@@ -488,7 +488,7 @@ export function InfiniteCanvas() {
     const elementsArray = Array.from(elements.values());
     const clickedElement = elementsArray.find((element) => isPointInElement(x, y, element));
 
-    if (clickedElement) {
+    if (clickedElement && tool === 'select') {
       setSelectedId(clickedElement.id);
       // If it's text, we can also enter edit mode here if needed
       return;
@@ -524,7 +524,7 @@ export function InfiniteCanvas() {
       emitElementLock(element.id);
       setEnteringEditId(null); // Clear after transition
     }, 50);
-  }, [viewportPosition, viewportZoom, elements, addElement, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, userId, emitElementCreate, setSelectedId, lockElement, emitElementLock]);
+  }, [viewportPosition, viewportZoom, elements, addElement, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, userId, emitElementCreate, setSelectedId, lockElement, emitElementLock, tool]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

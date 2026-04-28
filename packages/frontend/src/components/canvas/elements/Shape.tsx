@@ -25,7 +25,7 @@ const STROKE_COLORS = [
 export function Shape({ element }: ShapeProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isHovered, setIsHovered] = useState(false);
-  const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId, userRole } = useCanvasStore();
+  const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId, userRole, tool } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
@@ -203,6 +203,7 @@ export function Shape({ element }: ShapeProps) {
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
+    if (tool !== 'select') return;
     setSelectedId(element.id);
 
     const startX = e.clientX;

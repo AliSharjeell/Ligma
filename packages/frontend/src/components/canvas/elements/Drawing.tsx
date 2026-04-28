@@ -13,7 +13,7 @@ interface DrawingProps {
 
 export function Drawing({ element }: DrawingProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const { selectedIds, setSelectedId, updateElement, userId } = useCanvasStore();
+  const { selectedIds, setSelectedId, updateElement, userId, tool } = useCanvasStore();
   const { emitElementUpdate } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
@@ -57,6 +57,7 @@ export function Drawing({ element }: DrawingProps) {
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
+    if (tool !== 'select') return;
     setSelectedId(element.id);
 
     const startX = e.clientX;

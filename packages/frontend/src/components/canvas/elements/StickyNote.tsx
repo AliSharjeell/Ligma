@@ -27,7 +27,7 @@ export function StickyNote({ element }: StickyNoteProps) {
   const [localContent, setLocalContent] = useState(element.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId, userRole } = useCanvasStore();
+  const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId, userRole, tool } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
@@ -134,6 +134,7 @@ export function StickyNote({ element }: StickyNoteProps) {
     );
     if (lockedByMe) return;
     if (isLocked) return;
+    if (tool !== 'select') return;
     setSelectedId(element.id);
 
     const startX = e.clientX;

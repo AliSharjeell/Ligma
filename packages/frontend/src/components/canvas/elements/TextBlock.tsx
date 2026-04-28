@@ -26,6 +26,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     userId, userRole, clearSelection,
     textFontSize,
     viewportZoom,
+    tool,
   } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
@@ -168,6 +169,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     e.stopPropagation();
     if (isLocked || isResizing) return;
     if (isEditing) return;
+    if (tool !== 'select') return;
     setSelectedId(element.id);
 
     const startX = e.clientX;
