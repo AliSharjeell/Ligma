@@ -24,7 +24,7 @@ import {
   Eraser,
   Undo2,
   Redo2,
-  Menu,
+  Layers,
   Settings,
   ChevronLeft,
   ChevronRight,
