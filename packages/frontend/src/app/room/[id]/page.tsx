@@ -17,6 +17,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const [roomId, setRoomId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const loadElements = useCanvasStore((state) => state.loadElements);
+  const loadComments = useCanvasStore((state) => state.loadComments);
 
   useEffect(() => {
     params.then(p => {
@@ -26,10 +27,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       } else {
         setRoomId(id);
         loadElements(id);
+        loadComments(id);
         setLoading(false);
       }
     });
-  }, [params, router, loadElements]);
+  }, [params, router, loadElements, loadComments]);
 
   if (loading) {
     return (
