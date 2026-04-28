@@ -401,26 +401,6 @@ export function Shape({ element }: ShapeProps) {
             }}
             onMouseDown={(e) => startResize(e, 'e')}
           />
-
-          {/* Color picker on hover */}
-          <div
-            className="absolute -bottom-10 left-1/2 -translate-x-1/2 flex gap-1 bg-white rounded-lg shadow-lg p-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            {STROKE_COLORS.map((color) => (
-              <button
-                key={color}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleColorChange(color);
-                }}
-                className={cn(
-                  'w-6 h-6 rounded-full border-2 transition-transform hover:scale-110',
-                  element.color === color ? 'border-gray-800' : 'border-transparent'
-                )}
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
         </>
       )}
     </div>
