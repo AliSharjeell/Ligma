@@ -49,7 +49,7 @@ export function WelcomeDialog() {
       {/* Left side - Branding */}
       <div className="hidden md:flex md:w-1/2 bg-cover bg-center flex-col justify-center items-center p-12 text-white relative" style={{ backgroundImage: 'url(/pexels-michael-spadoni-269949-813465.jpg)', filter: 'saturate(1.2)' }}>
         <div className="max-w-md text-center">
-          <h1 className="text-6xl font-bold mb-4 tracking-tight" style={{ textShadow: '2px 2px 8px rgba(0,0,0,0.5)' }}>LIGMA</h1>
+          <h1 className="text-6xl font-bold mb-4 tracking-tight" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>LIGMA</h1>
           <p className="text-xl text-white" style={{ textShadow: '1px 1px 4px rgba(0,0,0,0.5)' }}>Real-time Collaborative Canvas</p>
         </div>
       </div>
