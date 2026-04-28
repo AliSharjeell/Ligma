@@ -55,7 +55,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     } catch (e) {
       console.error('Failed to save offline queue:', e);
       // If localStorage is full, we might need to handle this
-      if (e.name === 'QuotaExceededError') {
+      if ((e as Error).name === 'QuotaExceededError') {
         console.warn('localStorage is full! Consider clearing old events.');
       }
     }
