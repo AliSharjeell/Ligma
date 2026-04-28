@@ -61,7 +61,35 @@ interface CanvasStore extends CanvasState {
 
   getElement: (id: string) => CanvasElement | undefined;
   resetCanvas: () => void;
+  persistElements: () => void;
+  loadElements: () => void;
 }
+
+const ELEMENTS_KEY = 'ligma-canvas-elements';
+
+const saveElementsToStorage = (elements: Map<string, CanvasElement>) => {
+  if (typeof window !== 'undefined') {
+    try {
+      const arr = Array.from(elements.values());
+      localStorage.setItem(ELEMENTS_KEY, JSON.stringify(arr));
+    } catch (e) {
+      console.error('Failed to save elements:', e);
+    }
+  }
+};
+
+const loadElementsFromStorage = (): CanvasElement[] => {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem(ELEMENTS_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error('Failed to load elements:', e);
+      return [];
+    }
+  }
+  return [];
+};
 
 const getInitialUserName = () => {
   if (typeof window !== 'undefined') {
@@ -155,6 +183,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.set(element.id, element);
+      saveElementsToStorage(newElements);
       return { elements: newElements, history: newHistory, redoStack: [] };
     });
     return element;
@@ -181,6 +210,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.set(id, { ...element, ...updates, updatedAt: Date.now() });
+      saveElementsToStorage(newElements);
       return { elements: newElements, history: newHistory, redoStack: [] };
     });
   },
@@ -190,6 +220,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.delete(id);
+      saveElementsToStorage(newElements);
       const newSelectedIds = new Set(state.selectedIds);
       newSelectedIds.delete(id);
       return {
@@ -354,6 +385,19 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   getElement: (id) => get().elements.get(id),
+
+  persistElements: () => {
+    saveElementsToStorage(get().elements);
+  },
+
+  loadElements: () => {
+    const saved = loadElementsFromStorage();
+    if (saved.length > 0) {
+      const newElements = new Map<string, CanvasElement>();
+      saved.forEach((el) => newElements.set(el.id, el));
+      set({ elements: newElements });
+    }
+  },
 
   resetCanvas: () => set({
     elements: new Map(),
