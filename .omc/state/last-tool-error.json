@@ -1,7 +1,7 @@
 {
-  "tool_name": "WebFetch",
-  "tool_input_preview": "{\"url\":\"https://claudemem.dev\",\"prompt\":\"What is ClaudeMem? What does it do? Is it related to Claude Code or Anthropic?\"}",
-  "error": "ECONNREFUSED",
-  "timestamp": "2026-04-28T11:56:09.630Z",
+  "tool_name": "mcp__windows-mcp__Click",
+  "tool_input_preview": "{\"clicks\":1,\"loc\":null}",
+  "error": "Error calling tool 'Click': Either loc or label must be provided.",
+  "timestamp": "2026-04-28T20:42:38.115Z",
   "retry_count": 1
 }

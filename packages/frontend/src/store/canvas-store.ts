@@ -377,6 +377,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setElements: (elements) => {
     const newElements = new Map<string, CanvasElement>();
     elements.forEach((el) => newElements.set(el.id, el));
+    console.log('setElements called with', elements.length, 'elements');
     set({ elements: newElements });
   },
 
