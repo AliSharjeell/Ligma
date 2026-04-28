@@ -106,16 +106,16 @@ export function WelcomeDialog() {
 
             {/* Mode Selection Buttons */}
             {mode === 'idle' && (
-              <div className="flex gap-3">
+              <div className="space-y-3">
                 <button
                   onClick={() => handleModeChange('create')}
-                  className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                  className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
                 >
                   Create New Room
                 </button>
                 <button
                   onClick={() => handleModeChange('join')}
-                  className="flex-1 px-4 py-3 bg-white text-indigo-600 border-2 border-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                  className="w-full px-4 py-3 bg-white text-indigo-600 border-2 border-indigo-600 rounded-lg hover:bg-indigo-50 transition"
                 >
                   Join a Room
                 </button>
