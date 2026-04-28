@@ -397,7 +397,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const saved = loadElementsFromStorage(roomId);
     if (saved.length > 0) {
       const newElements = new Map<string, CanvasElement>();
-      saved.forEach((el) => newElements.set(el.id, el));
+      saved.forEach((el) => {
+        // Preserve lock state from storage
+        newElements.set(el.id, el);
+      });
       set({ elements: newElements });
     }
   },
