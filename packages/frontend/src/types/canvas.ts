@@ -1,6 +1,6 @@
-export type ElementType = 'sticky' | 'shape' | 'text' | 'drawing' | 'image';
+export type ElementType = 'sticky' | 'shape' | 'text' | 'drawing' | 'image' | 'comment';
 export type ShapeType = 'rectangle' | 'circle' | 'arrow' | 'line' | 'triangle' | 'diamond' | 'hexagon' | 'star';
-export type Tool = 'select' | 'sticky' | 'shape' | 'text' | 'draw' | 'pan' | 'eraser';
+export type Tool = 'select' | 'sticky' | 'shape' | 'text' | 'draw' | 'pan' | 'eraser' | 'comment';
 
 export interface Position {
   x: number;
