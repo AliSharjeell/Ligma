@@ -455,9 +455,10 @@ export class SocketHandler {
     const { canvasId, requestedRole } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
     const clientState = this.clientStates.get(canvasId);
+    if (!userId) return;
     const user = clientState?.users.get(userId);
 
-    if (!userId || !clientState || !user) return;
+    if (!clientState || !user) return;
 
     // Only Viewers can request Contributor
     if (user.role !== 'Viewer') {
