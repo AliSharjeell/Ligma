@@ -75,6 +75,9 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     e.stopPropagation();
     e.preventDefault();
 
+    // Locked = can't resize
+    if (element.locked) return;
+
     if (userRole === 'Viewer') {
       alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
       return;
@@ -167,7 +170,9 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isLocked || isResizing) return;
+    // Locked by anyone = can't move
+    if (element.locked) return;
+    if (isResizing) return;
     if (isEditing) return;
     if (tool === 'select') {
       setSelectedId(element.id);

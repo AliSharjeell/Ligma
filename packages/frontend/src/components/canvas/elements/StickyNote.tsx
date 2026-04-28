@@ -51,6 +51,9 @@ export function StickyNote({ element }: StickyNoteProps) {
     e.stopPropagation();
     e.preventDefault();
 
+    // Locked = can't resize
+    if (element.locked) return;
+
     if (userRole === 'Viewer') {
       alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
       return;
@@ -129,11 +132,12 @@ export function StickyNote({ element }: StickyNoteProps) {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Locked by anyone = can't move
+    if (element.locked) return;
     const lockedByMe = Array.from(useCanvasStore.getState().elements.values()).find(
       (item) => item.locked && item.lockedBy === userId && item.id !== element.id
     );
     if (lockedByMe) return;
-    if (isLocked) return;
     if (tool === 'select' || tool === 'sticky') {
       setSelectedId(element.id);
     }

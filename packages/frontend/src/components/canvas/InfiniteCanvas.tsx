@@ -332,10 +332,10 @@ export function InfiniteCanvas() {
       const dx = (e.clientX - dragStart.x) / viewportZoom;
       const dy = (e.clientY - dragStart.y) / viewportZoom;
 
-      // Move all selected elements
+      // Move all selected elements (skip locked ones)
       selectedIds.forEach(id => {
         const element = elements.get(id);
-        if (element) {
+        if (element && !element.locked) {
           updateElement(id, {
             position: {
               x: element.position.x + dx,
@@ -438,11 +438,11 @@ export function InfiniteCanvas() {
       }
     }
 
-    // Sync moved elements to server
+    // Sync moved elements to server (skip locked ones)
     if (isDragging && tool === 'select' && selectedIds.size > 0) {
       selectedIds.forEach(id => {
         const element = elements.get(id);
-        if (element) {
+        if (element && !element.locked) {
           emitElementUpdate(element);
         }
       });

@@ -56,7 +56,8 @@ export function Drawing({ element }: DrawingProps) {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isLocked) return;
+    // Locked by anyone = can't move
+    if (element.locked) return;
     if (tool === 'select') {
       setSelectedId(element.id);
     }
