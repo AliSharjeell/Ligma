@@ -290,7 +290,7 @@ export function Toolbar() {
       </div>
 
       {/* Bottom Center Toolbar - COMPACT */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-white rounded-full shadow-excalidraw border border-slate-200 p-1 px-1.5">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-white rounded-xl shadow-excalidraw border border-slate-200 p-1 px-1.5">
         {tools.map((t) => (
           <Button
             key={t.id}
@@ -305,7 +305,7 @@ export function Toolbar() {
             }}
             title={t.label}
             className={cn(
-              'h-8 w-8 rounded-full transition-all',
+              'h-8 w-8 rounded-xl transition-all',
               tool === t.id ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-slate-100 text-slate-600',
               userRole === 'Viewer' && ['draw', 'sticky', 'shape', 'text', 'eraser'].includes(t.id) && 'opacity-50'
             )}
