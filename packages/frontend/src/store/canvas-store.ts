@@ -18,6 +18,9 @@ interface CanvasStore extends CanvasState {
   setTextFontFamily: (family: string) => void;
   setTextFontWeight: (weight: 'normal' | 'bold' | number) => void;
   setTextAlign: (align: 'left' | 'center' | 'right') => void;
+  setPresenceHeatmapEnabled: (enabled: boolean) => void;
+  setPresenceZonesEnabled: (enabled: boolean) => void;
+  setTimeTravelEnabled: (enabled: boolean) => void;
   setSelectedId: (id: string | null) => void;
   setSelectedIds: (ids: Set<string>) => void;
   addToSelection: (id: string) => void;
@@ -67,6 +70,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   textFontFamily: 'Georgia, serif',
   textFontWeight: 'normal',
   textAlign: 'left',
+  presenceHeatmapEnabled: false,
+  presenceZonesEnabled: false,
+  timeTravelEnabled: false,
   users: new Map(),
   tasks: [],
   eventLog: [],
@@ -87,6 +93,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setTextFontFamily: (family) => set({ textFontFamily: family }),
   setTextFontWeight: (weight) => set({ textFontWeight: weight }),
   setTextAlign: (align) => set({ textAlign: align }),
+  setPresenceHeatmapEnabled: (enabled) => set({ presenceHeatmapEnabled: enabled }),
+  setPresenceZonesEnabled: (enabled) => set({ presenceZonesEnabled: enabled }),
+  setTimeTravelEnabled: (enabled) => set({ timeTravelEnabled: enabled }),
   setSelectedId: (id) => set({ selectedIds: id ? new Set([id]) : new Set() }),
   setSelectedIds: (ids) => set({ selectedIds: ids }),
   addToSelection: (id) => set((state) => {

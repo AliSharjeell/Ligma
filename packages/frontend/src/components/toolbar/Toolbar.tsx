@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,6 @@ import {
   Redo2,
 } from 'lucide-react';
 import type { CanvasElement, Tool, ShapeType } from '@/types/canvas';
-import { usePresenceHeatmap } from '@/components/canvas/PresenceHeatmap';
 
 const tools: { id: Tool; icon: React.ReactNode; label: string }[] = [
   { id: 'select', icon: <MousePointer2 className="size-4" />, label: 'Select (V)' },
@@ -54,6 +53,9 @@ export function Toolbar() {
     textFontFamily,
     textFontWeight,
     textAlign,
+    presenceHeatmapEnabled,
+    presenceZonesEnabled,
+    timeTravelEnabled,
     selectedIds,
     setTool,
     setShapeType,
@@ -65,6 +67,9 @@ export function Toolbar() {
     setTextFontFamily,
     setTextFontWeight,
     setTextAlign,
+    setPresenceHeatmapEnabled,
+    setPresenceZonesEnabled,
+    setTimeTravelEnabled,
     deleteElement,
     lockElement,
     unlockElement,
@@ -78,11 +83,9 @@ export function Toolbar() {
   } = useCanvasStore();
   const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate } = useSocket();
 
-  // Creative bonus feature toggles
-  // const [showHeatmap, setShowHeatmap] = useState(false);
-  const { isEnabled: showHeatmap, toggle: setShowHeatmap } = usePresenceHeatmap();
-  const [showZones, setShowZones] = useState(false);
-  const [showTimeTravel, setShowTimeTravel] = useState(false);
+  const showHeatmap = presenceHeatmapEnabled;
+  const showZones = presenceZonesEnabled;
+  const showTimeTravel = timeTravelEnabled;
 
   const selectedId = selectedIds.size === 1 ? Array.from(selectedIds)[0] : null;
   const selectedElement = selectedId ? getElement(selectedId) : null;
@@ -369,7 +372,7 @@ export function Toolbar() {
         <Button
           variant={showHeatmap ? 'default' : 'ghost'}
           size="icon"
-          onClick={() => setShowHeatmap(!showHeatmap)}
+          onClick={() => setPresenceHeatmapEnabled(!showHeatmap)}
           title="Toggle Heatmap"
           className={cn(
             'h-9 w-9',
@@ -381,7 +384,7 @@ export function Toolbar() {
         <Button
           variant={showZones ? 'default' : 'ghost'}
           size="icon"
-          onClick={() => setShowZones(!showZones)}
+          onClick={() => setPresenceZonesEnabled(!showZones)}
           title="Toggle Zones"
           className={cn(
             'h-9 w-9',
@@ -393,7 +396,7 @@ export function Toolbar() {
         <Button
           variant={showTimeTravel ? 'default' : 'ghost'}
           size="icon"
-          onClick={() => setShowTimeTravel(!showTimeTravel)}
+          onClick={() => setTimeTravelEnabled(!showTimeTravel)}
           title="Toggle Time Travel"
           className={cn(
             'h-9 w-9',

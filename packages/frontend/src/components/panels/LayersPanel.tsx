@@ -8,22 +8,20 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Layers, Trash2 } from 'lucide-react';
-import type { CanvasElement } from '@/types/canvas';
+import type { CanvasElement, ElementType } from '@/types/canvas';
 
-function getLayerLabel(element: CanvasElement): string {
-  if (element.type === 'text') {
-    return element.content?.trim() ? `Text: ${element.content.trim().slice(0, 20)}` : 'Text';
-  }
-  if (element.type === 'sticky') {
-    return element.content?.trim() ? `Sticky: ${element.content.trim().slice(0, 20)}` : 'Sticky note';
-  }
-  if (element.type === 'drawing') {
-    return 'Drawing';
-  }
-  if (element.type === 'shape') {
-    return element.shapeType === 'circle' ? 'Circle' : 'Rectangle';
-  }
-  return element.type;
+const LAYER_LABELS: Record<ElementType, string> = {
+  drawing: 'Pen',
+  shape: 'Shape',
+  sticky: 'Sticky',
+  text: 'Text',
+  image: 'Image',
+};
+
+function getLayerLabel(element: CanvasElement, counts: Record<ElementType, number>): string {
+  const base = LAYER_LABELS[element.type] || 'Layer';
+  counts[element.type] += 1;
+  return `${base} ${counts[element.type]}`;
 }
 
 export function LayersPanel() {
@@ -31,6 +29,13 @@ export function LayersPanel() {
   const { emitElementDelete } = useSocket();
 
   const layers = Array.from(elements.values()).reverse();
+  const counts: Record<ElementType, number> = {
+    drawing: 0,
+    shape: 0,
+    sticky: 0,
+    text: 0,
+    image: 0,
+  };
 
   return (
     <Sheet>
@@ -68,7 +73,7 @@ export function LayersPanel() {
                       className="flex-1 text-left text-sm truncate"
                       onClick={() => setSelectedId(element.id)}
                     >
-                      {getLayerLabel(element)}
+                      {getLayerLabel(element, counts)}
                     </button>
                     <Button
                       variant="ghost"

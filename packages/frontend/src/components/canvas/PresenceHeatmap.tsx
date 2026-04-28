@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
-import { cn } from '@/lib/utils';
 interface HeatmapZone {
   x: number;
   y: number;
@@ -20,12 +19,13 @@ const getDensityColor = (count: number): string => {
 };
 
 
-export function PresenceHeatmap() {
-  const { viewportPosition, viewportZoom } = useCanvasStore();
-  const [zones, setZones] = useState<HeatmapZone[]>([]);
-  const [viewportOffset, setViewportOffset] = useState({ x: 0, y: 0 });
+interface PresenceHeatmapProps {
+  visible?: boolean;
+}
 
-  const { isEnabled, toggle } = usePresenceHeatmap();
+export function PresenceHeatmap({ visible }: PresenceHeatmapProps) {
+  const { viewportPosition, viewportZoom, presenceHeatmapEnabled } = useCanvasStore();
+  const [zones, setZones] = useState<HeatmapZone[]>([]);
 
   // Track cursor movements and update heatmap
   useEffect(() => {
@@ -64,7 +64,7 @@ export function PresenceHeatmap() {
 
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [viewportPosition]);
+  }, [viewportPosition, viewportZoom]);
 
   // Calculate the visible grid range
   const visibleGridRange = useMemo(() => {
@@ -82,9 +82,10 @@ export function PresenceHeatmap() {
     const endY = Math.ceil((height - viewportPosition.y) / viewportZoom / GRID_SIZE) + 2;
 
     return { minX: startX, maxX: endX, minY: startY, maxY: endY };
-  }, [viewportPosition]);
+  }, [viewportPosition, viewportZoom]);
 
-  if (!isEnabled) return null;
+  const isVisible = visible ?? presenceHeatmapEnabled;
+  if (!isVisible) return null;
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -128,9 +129,4 @@ export function PresenceHeatmap() {
       </div>
     </div>
   );
-}
-
-export function usePresenceHeatmap() {
-  const [isEnabled, setIsEnabled] = useState(false);
-  return { isEnabled, toggle: (val: boolean) => setIsEnabled(val) };
 }

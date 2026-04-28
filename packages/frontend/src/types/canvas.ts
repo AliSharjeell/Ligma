@@ -63,6 +63,9 @@ export interface CanvasState {
   textFontFamily: string;
   textFontWeight: 'normal' | 'bold' | number;
   textAlign: 'left' | 'center' | 'right';
+  presenceHeatmapEnabled: boolean;
+  presenceZonesEnabled: boolean;
+  timeTravelEnabled: boolean;
   users: Map<string, User>;
   tasks: Task[];
   eventLog: CanvasEvent[];

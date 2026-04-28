@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
-import { cn } from '@/lib/utils';
 
 interface Zone {
   id: string;
@@ -30,11 +29,11 @@ const DEFAULT_ZONES: Zone[] = [
 ];
 
 interface PresenceZonesProps {
-  visible: boolean;
+  visible?: boolean;
 }
 
 export function PresenceZones({ visible }: PresenceZonesProps) {
-  const { users, viewportPosition, viewportZoom, userId } = useCanvasStore();
+  const { users, viewportPosition, viewportZoom, userId, presenceZonesEnabled } = useCanvasStore();
   const [zones, setZones] = useState<Zone[]>(DEFAULT_ZONES);
   const [usersInZones, setUsersInZones] = useState<Map<string, UserInZone[]>>(new Map());
   const lastPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -130,7 +129,8 @@ export function PresenceZones({ visible }: PresenceZonesProps) {
     return () => clearInterval(interval);
   }, []);
 
-  if (!visible) return null;
+  const isVisible = visible ?? presenceZonesEnabled;
+  if (!isVisible) return null;
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -195,10 +195,4 @@ export function PresenceZones({ visible }: PresenceZonesProps) {
       </div>
     </div>
   );
-}
-
-// Hook for managing presence zones toggle
-export function usePresenceZones() {
-  const [isEnabled, setIsEnabled] = useState(false);
-  return { isEnabled, toggle: () => setIsEnabled(prev => !prev) };
 }

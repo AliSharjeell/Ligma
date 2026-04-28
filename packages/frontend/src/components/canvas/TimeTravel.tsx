@@ -53,11 +53,11 @@ class StateReconstructor {
 }
 
 interface TimeTravelProps {
-  visible: boolean;
+  visible?: boolean;
 }
 
 export function TimeTravel({ visible }: TimeTravelProps) {
-  const { eventLog, elements } = useCanvasStore();
+  const { eventLog, elements, timeTravelEnabled } = useCanvasStore();
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [reconstructedElements, setReconstructedElements] = useState<Map<string, CanvasElement>>(elements);
@@ -160,7 +160,8 @@ export function TimeTravel({ visible }: TimeTravelProps) {
 
   const currentSnapshot = snapshots[currentStep];
 
-  if (!visible) return null;
+  const isVisible = visible ?? timeTravelEnabled;
+  if (!isVisible) return null;
 
   return (
     <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-2xl border p-4 w-[500px] z-20">
