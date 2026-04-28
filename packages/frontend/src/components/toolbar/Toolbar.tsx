@@ -370,6 +370,46 @@ export function Toolbar() {
         </div>
       )}
 
+      {/* Selection Options Bar - shows when element is selected */}
+      {selectedElement && userRole !== 'Viewer' && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white rounded-full shadow-excalidraw border border-slate-200 py-3 px-4">
+          {/* Lock/Unlock Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (selectedElement.locked && selectedElement.lockedBy === userId) {
+                unlockElement(selectedId!);
+                emitElementUnlock(selectedId!);
+              } else if (!selectedElement.locked) {
+                lockElement(selectedId!);
+                emitElementLock(selectedId!);
+              }
+            }}
+            className="h-8 w-8 rounded-full hover:bg-slate-100"
+            title={selectedElement.locked ? 'Unlock element' : 'Lock element'}
+          >
+            {selectedElement.locked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+          </Button>
+
+          {/* Delete Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (selectedId) {
+                deleteElement(selectedId);
+                emitElementDelete(selectedId);
+              }
+            }}
+            className="h-8 w-8 rounded-full hover:bg-red-100 text-red-500"
+            title="Delete element"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+
       {/* Viewer Mode Indicator with Request Button */}
       {userRole === 'Viewer' && (
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-amber-50 text-amber-700 px-4 py-2 rounded-lg border border-amber-200 text-xs">
