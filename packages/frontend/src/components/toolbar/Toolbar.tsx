@@ -376,7 +376,7 @@ export function Toolbar() {
           className="absolute z-20 flex items-center gap-2 bg-white rounded-full shadow-excalidraw border border-slate-200 py-3 px-4"
           style={{
             left: selectedElement.position.x + selectedElement.size.width / 2,
-            top: selectedElement.position.y - 60,
+            top: selectedElement.position.y - 80,
             transform: 'translateX(-50%)',
           }}
         >
