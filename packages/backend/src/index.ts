@@ -115,7 +115,7 @@ app.get('/api/tasks/:canvasId', (req, res) => {
 const eventStore = new EventStore();
 const rbac = new RBACService();
 const canvasStore = new CanvasStore(eventStore, rbac);
-const socketHandler = new SocketHandler(io);
+const socketHandler = new SocketHandler(io, eventStore, rbac);
 
 io.on('connection', (socket) => {
   socketHandler.handleConnection(socket);

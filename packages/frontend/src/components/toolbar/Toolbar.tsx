@@ -131,8 +131,15 @@ export function Toolbar() {
   };
 
   const handleCreateRoom = () => {
-    const generated = `room-${Math.random().toString(36).slice(2, 8)}`;
-    router.push(`/room/${generated}`);
+    const trimmed = roomInput.trim();
+    // If user entered a name and it's not the current one, use it
+    if (trimmed && trimmed !== normalizedRoom && trimmed !== 'default') {
+      router.push(`/room/${encodeURIComponent(trimmed)}`);
+    } else {
+      // Otherwise generate a random one
+      const generated = `room-${Math.random().toString(36).slice(2, 8)}`;
+      router.push(`/room/${generated}`);
+    }
   };
 
   const selectedId = selectedIds.size === 1 ? Array.from(selectedIds)[0] : null;

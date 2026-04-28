@@ -156,6 +156,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     addRemoteTask,
     updateTask,
     deleteTask,
+    setElements,
   } = useCanvasStore();
 
   const toTask = useCallback((task: TaskDto): Task => {
@@ -196,6 +197,33 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     };
   }, []);
 
+  const nodeStateToCanvasElement = useCallback((node: any): CanvasElement => {
+    const defaultSizeByType: Partial<Record<string, Size>> = {
+      sticky: { width: 200, height: 150 },
+      text: { width: 200, height: 40 },
+      shape: { width: 160, height: 120 },
+      drawing: { width: 0, height: 0 },
+      image: { width: 240, height: 180 },
+    };
+    const fallbackSize = defaultSizeByType[node.type] || { width: 200, height: 120 };
+    return {
+      id: node.id,
+      type: node.type,
+      position: node.position,
+      size: node.size || fallbackSize,
+      content: node.content || '',
+      color: node.color || '#1f2937',
+      shapeType: node.shapeType,
+      points: node.points,
+      textStyle: node.style as CanvasElement['textStyle'] | undefined,
+      locked: !!node.lockedBy,
+      lockedBy: node.lockedBy,
+      createdBy: node.createdBy || 'unknown',
+      createdAt: node.createdAt || Date.now(),
+      updatedAt: node.updatedAt || Date.now(),
+    };
+  }, []);
+
   const toUser = useCallback((event: UserJoinedEvent): User => {
     return {
       id: event.userId,
@@ -220,11 +248,20 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
         role: 'Contributor',
       });
       newSocket.emit('get_tasks', { canvasId });
+      newSocket.emit('request_sync', { canvasId });
     });
 
     newSocket.on('disconnect', () => {
       setConnected(false);
       console.log('Disconnected from WebSocket server');
+    });
+
+    newSocket.on('sync_response', (payload: { state: { nodes: any[] } }) => {
+      if (payload.state && payload.state.nodes) {
+        const elements = payload.state.nodes.map(nodeStateToCanvasElement);
+        setElements(elements);
+        console.log('Synchronized canvas state:', elements.length, 'elements');
+      }
     });
 
     newSocket.on('node_created', (event: NodeCreatedEvent) => {
@@ -299,7 +336,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     return () => {
       newSocket.disconnect();
     };
-  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask]);
+  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement]);
 
   const emitElementCreate = useCallback((element: CanvasElement) => {
     // For drawing elements, use create_node with nodeType='drawing'

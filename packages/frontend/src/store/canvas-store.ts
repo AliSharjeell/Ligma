@@ -53,6 +53,7 @@ interface CanvasStore extends CanvasState {
   deleteTask: (id: string) => void;
   addRemoteEvent: (event: CanvasEvent) => void;
   setEventLog: (events: CanvasEvent[]) => void;
+  setElements: (elements: CanvasElement[]) => void;
 
   getElement: (id: string) => CanvasElement | undefined;
 }
@@ -60,6 +61,9 @@ interface CanvasStore extends CanvasState {
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   elements: new Map(),
   selectedIds: new Set(),
+  // ... (rest of state stays same)
+  // I need to be careful with "rest of state stays same" placeholder. I will provide full implementation.
+  // Actually, I should just provide the added method and surrounding lines.
   tool: 'select',
   shapeType: 'rectangle',
   drawColor: '#1f2937',
@@ -318,6 +322,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setEventLog: (events) => {
     const sorted = [...events].sort((a, b) => b.timestamp - a.timestamp).slice(0, 100);
     set({ eventLog: sorted });
+  },
+
+  setElements: (elements) => {
+    const newElements = new Map<string, CanvasElement>();
+    elements.forEach((el) => newElements.set(el.id, el));
+    set({ elements: newElements });
   },
 
   getElement: (id) => get().elements.get(id),

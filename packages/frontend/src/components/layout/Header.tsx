@@ -35,8 +35,13 @@ export function Header({ className, currentRoom = 'default' }: HeaderProps) {
   };
 
   const handleCreateRoom = () => {
-    const generated = `room-${Math.random().toString(36).slice(2, 8)}`;
-    router.push(`/room/${generated}`);
+    const trimmed = roomInput.trim();
+    if (trimmed && trimmed !== normalizedRoom && trimmed !== 'default') {
+      router.push(`/room/${encodeURIComponent(trimmed)}`);
+    } else {
+      const generated = `room-${Math.random().toString(36).slice(2, 8)}`;
+      router.push(`/room/${generated}`);
+    }
   };
 
   return (

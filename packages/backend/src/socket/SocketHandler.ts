@@ -60,12 +60,12 @@ export class SocketHandler {
   private activityByCanvas: Map<string, ActivityEvent[]> = new Map();
   private activityLimit = 200;
 
-  constructor(io: Server) {
+  constructor(io: Server, eventStore?: EventStore, rbac?: RBACService) {
     this.io = io;
-    this.eventStore = new EventStore();
+    this.eventStore = eventStore || new EventStore();
     this.eventBus = new EventBus();
     this.stateReconstructor = new StateReconstructor();
-    this.rbac = new RBACService();
+    this.rbac = rbac || new RBACService();
     this.intentExtractor = new IntentExtractor();
     this.taskBoard = new TaskBoard();
     this.setupEventHandlers();
