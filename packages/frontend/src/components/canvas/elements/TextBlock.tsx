@@ -170,6 +170,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     if (isLocked || isResizing) return;
     if (isEditing) return;
     if (tool !== 'select') return;
+    if (tool === 'draw') return; // Let draw tool draw on top of text
     setSelectedId(element.id);
 
     const startX = e.clientX;
