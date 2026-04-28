@@ -305,8 +305,8 @@ export function Toolbar() {
         ))}
       </div>
 
-      {/* Tool Options Bar - shows when draw, shape, or eraser is selected */}
-      {(tool === 'draw' || tool === 'shape' || tool === 'eraser') && (
+      {/* Tool Options Bar - shows when draw or shape is selected */}
+      {(tool === 'draw' || tool === 'shape') && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white rounded-xl shadow-excalidraw border border-slate-200 p-2">
           {/* Draw/Shape Color */}
           <div className="flex items-center gap-2">
