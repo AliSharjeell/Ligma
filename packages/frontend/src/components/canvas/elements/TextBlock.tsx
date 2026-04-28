@@ -75,6 +75,13 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
   const startResize = useCallback((e: React.MouseEvent, position: HandlePosition) => {
     e.stopPropagation();
     e.preventDefault();
+
+    // Prevent Viewers from resizing
+    if (userRole === 'Viewer') {
+      alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
+      return;
+    }
+
     const startY = e.clientY;
     const startFontSize = currentFontSize;
 
@@ -117,7 +124,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [currentFontSize, element.textStyle, element.id, updateElement, emitElementUpdate]);
+  }, [currentFontSize, element.textStyle, element.id, updateElement, emitElementUpdate, userRole]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
