@@ -7,17 +7,35 @@ import { Toolbar } from '@/components/toolbar/Toolbar';
 import { PresenceHeatmap } from '@/components/canvas/PresenceHeatmap';
 import { PresenceZones } from '@/components/canvas/PresenceZones';
 import { TimeTravel } from '@/components/canvas/TimeTravel';
+import { useRouter } from 'next/navigation';
 
 const WS_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
-  const [roomId, setRoomId] = useState<string>('default');
+  const router = useRouter();
+  const [roomId, setRoomId] = useState<string>('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    params.then(p => setRoomId(decodeURIComponent(p.id ?? 'default')));
-  }, [params]);
+    params.then(p => {
+      const id = decodeURIComponent(p.id ?? '');
+      if (!id) {
+        router.push('/');
+      } else {
+        setRoomId(id);
+        setLoading(false);
+      }
+    });
+  }, [params, router]);
 
-  // Force re-mount when roomId changes by using key
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-white">
+        <div className="text-indigo-600">Loading room...</div>
+      </div>
+    );
+  }
+
   return (
     <SocketProvider key={roomId} url={WS_URL} canvasId={roomId}>
       <main className="h-screen w-screen relative overflow-hidden bg-white">
