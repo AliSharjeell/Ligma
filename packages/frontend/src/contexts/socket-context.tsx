@@ -99,6 +99,12 @@ type TasksListPayload = {
   tasks: TaskDto[];
 };
 
+type UserDto = {
+  userId: string;
+  userName: string;
+  role: 'Lead' | 'Contributor' | 'Viewer';
+};
+
 interface SocketContextType {
   socket: Socket | null;
   connected: boolean;
@@ -111,6 +117,13 @@ interface SocketContextType {
   emitTaskCreate: (task: { title: string; description?: string; priority: 'low' | 'medium' | 'high' }) => void;
   emitTaskUpdate: (taskId: string, status: 'pending' | 'in-progress' | 'completed') => void;
   emitTaskDelete: (taskId: string) => void;
+  emitChangeRole: (targetUserId: string, newRole: 'Lead' | 'Contributor' | 'Viewer') => void;
+  // B: Role request system
+  emitRoleRequest: (requestedRole: 'Contributor') => void;
+  emitApproveRoleRequest: (targetUserId: string) => void;
+  emitDenyRoleRequest: (targetUserId: string) => void;
+  // C: Ownership transfer
+  emitTransferOwnership: (targetUserId: string) => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -125,6 +138,11 @@ const SocketContext = createContext<SocketContextType>({
   emitTaskCreate: () => {},
   emitTaskUpdate: () => {},
   emitTaskDelete: () => {},
+  emitChangeRole: () => {},
+  emitRoleRequest: () => {},
+  emitApproveRoleRequest: () => {},
+  emitDenyRoleRequest: () => {},
+  emitTransferOwnership: () => {},
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -157,6 +175,8 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     updateTask,
     deleteTask,
     setElements,
+    setUserRole,
+    setUsers,
   } = useCanvasStore();
 
   const toTask = useCallback((task: TaskDto): Task => {
@@ -245,10 +265,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         canvasId,
         userId,
         userName,
-        role: 'Contributor',
       });
-      newSocket.emit('get_tasks', { canvasId });
-      newSocket.emit('request_sync', { canvasId });
     });
 
     newSocket.on('disconnect', () => {
@@ -262,6 +279,58 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         setElements(elements);
         console.log('Synchronized canvas state:', elements.length, 'elements');
       }
+    });
+
+    newSocket.on('initial_users', (payload: { users: UserDto[], yourRole: 'Lead' | 'Contributor' | 'Viewer' }) => {
+      const formattedUsers: User[] = payload.users.map(u => ({
+        id: u.userId,
+        name: u.userName,
+        role: u.role,
+        color: '#16a34a', // Default color
+      }));
+      setUsers(formattedUsers);
+      setUserRole(payload.yourRole);
+      console.log('Initial users synced. Your role:', payload.yourRole);
+    });
+
+    newSocket.on('role_changed', (payload: { userId: string, newRole: 'Lead' | 'Contributor' | 'Viewer' }) => {
+      if (payload.userId === userId) {
+        setUserRole(payload.newRole);
+      }
+
+      // Update the user in the users map
+      const existingUsers = useCanvasStore.getState().users;
+      const user = existingUsers.get(payload.userId);
+      if (user) {
+        addUser({ ...user, role: payload.newRole });
+      }
+      console.log('Role changed for user:', payload.userId, 'to', payload.newRole);
+    });
+
+    // B: Role request handlers
+    newSocket.on('role_request', (payload: { userId: string; userName: string; requestedRole: string }) => {
+      // Lead receives this when a Viewer requests Contributor
+      console.log('Role request from:', payload.userName, 'for', payload.requestedRole);
+    });
+
+    newSocket.on('role_request_approved', (payload: { userId: string }) => {
+      if (payload.userId === userId) {
+        setUserRole('Contributor');
+        alert('Your Contributor request was approved! You can now edit.');
+      }
+    });
+
+    newSocket.on('role_request_denied', () => {
+      alert('Your Contributor request was denied by the Lead.');
+    });
+
+    // C: Ownership transfer
+    newSocket.on('ownership_transferred', (payload: { oldOwnerId: string; newOwnerId: string }) => {
+      if (payload.newOwnerId === userId) {
+        setUserRole('Lead');
+        alert('You are now the Lead of this room!');
+      }
+      console.log('Ownership transferred from', payload.oldOwnerId, 'to', payload.newOwnerId);
     });
 
     newSocket.on('node_created', (event: NodeCreatedEvent) => {
@@ -333,10 +402,15 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
 
     setSocket(newSocket);
 
+    // Expose socket on window for cross-component access
+    if (typeof window !== 'undefined') {
+      (window as any).__socket = newSocket;
+    }
+
     return () => {
       newSocket.disconnect();
     };
-  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement]);
+  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement, setUsers, setUserRole]);
 
   const emitElementCreate = useCallback((element: CanvasElement) => {
     // For drawing elements, use create_node with nodeType='drawing'
@@ -411,6 +485,28 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     socket?.emit('delete_task', { taskId });
   }, [socket]);
 
+  const emitChangeRole = useCallback((targetUserId: string, newRole: 'Lead' | 'Contributor' | 'Viewer') => {
+    socket?.emit('change_role', { canvasId, targetUserId, newRole });
+  }, [socket, canvasId]);
+
+  // B: Role request system
+  const emitRoleRequest = useCallback((requestedRole: 'Contributor') => {
+    socket?.emit('request_role', { canvasId, requestedRole });
+  }, [socket, canvasId]);
+
+  const emitApproveRoleRequest = useCallback((targetUserId: string) => {
+    socket?.emit('approve_role_request', { canvasId, targetUserId });
+  }, [socket, canvasId]);
+
+  const emitDenyRoleRequest = useCallback((targetUserId: string) => {
+    socket?.emit('deny_role_request', { canvasId, targetUserId });
+  }, [socket, canvasId]);
+
+  // C: Ownership transfer
+  const emitTransferOwnership = useCallback((targetUserId: string) => {
+    socket?.emit('transfer_ownership', { canvasId, targetUserId });
+  }, [socket, canvasId]);
+
   return (
     <SocketContext.Provider
       value={{
@@ -425,9 +521,14 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         emitTaskCreate,
         emitTaskUpdate,
         emitTaskDelete,
+        emitChangeRole,
+        emitRoleRequest,
+        emitApproveRoleRequest,
+        emitDenyRoleRequest,
+        emitTransferOwnership,
       }}
     >
       {children}
     </SocketContext.Provider>
   );
-}
+  }

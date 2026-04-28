@@ -70,8 +70,12 @@ const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
 export function Toolbar() {
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [pendingRequests, setPendingRequests] = useState<{ userId: string; userName: string }[]>([]);
+  const [hasRequested, setHasRequested] = useState(false);
   const router = useRouter();
-  const { connected } = useSocket();
+  const { connected, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership } = useSocket();
 
   const {
     tool,
@@ -107,6 +111,9 @@ export function Toolbar() {
     updateElement,
     getElement,
     userId,
+    userName,
+    setUserName,
+    userRole,
     undo,
     redo,
     canUndo,
@@ -122,12 +129,58 @@ export function Toolbar() {
 
   useEffect(() => {
     setRoomInput(normalizedRoom);
+
+    // Check if name is set, if not, open join modal
+    const storedName = localStorage.getItem('ligma-username');
+    if (!storedName) {
+      setIsJoinModalOpen(true);
+    } else {
+      setNameInput(storedName);
+    }
   }, [normalizedRoom]);
+
+  // B: Listen for role request events
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const socket = (window as any).__socket;
+    if (!socket) return;
+
+    const handleRoleRequest = (payload: { userId: string; userName: string }) => {
+      setPendingRequests(prev => [...prev.filter(r => r.userId !== payload.userId), payload]);
+    };
+
+    const handleRoleChanged = (payload: { userId: string; newRole: string }) => {
+      // Remove from pending requests if their role changed
+      setPendingRequests(prev => prev.filter(r => r.userId !== payload.userId));
+      // If current user got promoted, update their state
+      if (payload.userId === userId && payload.newRole === 'Contributor') {
+        setHasRequested(false);
+      }
+    };
+
+    socket.on('role_request', handleRoleRequest);
+    socket.on('role_changed', handleRoleChanged);
+
+    return () => {
+      socket.off('role_request', handleRoleRequest);
+      socket.off('role_changed', handleRoleChanged);
+    };
+  }, [userId]);
 
   const handleJoinRoom = () => {
     const trimmed = roomInput.trim();
     if (!trimmed) return;
     router.push(`/room/${encodeURIComponent(trimmed)}`);
+  };
+
+  const handleUpdateName = () => {
+    if (nameInput.trim()) {
+      setUserName(nameInput.trim());
+      setIsJoinModalOpen(false);
+      // Reload to reconnect with new name
+      window.location.reload();
+    }
   };
 
   const handleCreateRoom = () => {
@@ -217,17 +270,82 @@ export function Toolbar() {
             key={t.id}
             variant={tool === t.id ? 'default' : 'ghost'}
             size="icon"
-            onClick={() => setTool(t.id)}
+            onClick={() => {
+              if (userRole === 'Viewer' && t.id !== 'select' && t.id !== 'pan') {
+                alert('Viewers cannot use this tool. Changes will not sync.');
+                return;
+              }
+              setTool(t.id);
+            }}
             title={t.label}
             className={cn(
               'h-8 w-8 rounded-lg transition-all',
-              tool === t.id ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-slate-100 text-slate-600'
+              tool === t.id ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-slate-100 text-slate-600',
+              userRole === 'Viewer' && ['draw', 'sticky', 'shape', 'text', 'eraser'].includes(t.id) && 'opacity-50'
             )}
           >
             {t.icon}
           </Button>
         ))}
       </div>
+
+      {/* Viewer Mode Indicator with Request Button */}
+      {userRole === 'Viewer' && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 mt-14 z-20 flex items-center gap-3 bg-amber-50 text-amber-700 px-4 py-2 rounded-lg border border-amber-200 text-xs">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            <span className="font-medium">Viewer Mode</span>
+          </div>
+          {!hasRequested && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+              onClick={() => {
+                emitRoleRequest('Contributor');
+                setHasRequested(true);
+                alert('Request sent! Waiting for Lead approval.');
+              }}
+            >
+              Request Edit Access
+            </Button>
+          )}
+          {hasRequested && (
+            <span className="text-amber-600 italic">Request pending...</span>
+          )}
+        </div>
+      )}
+
+      {/* Lead: Pending Role Requests */}
+      {userRole === 'Lead' && pendingRequests.length > 0 && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 mt-14 z-20 flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-lg border border-blue-200 text-xs">
+          <span className="font-medium">{pendingRequests.length} request(s) pending:</span>
+          {pendingRequests.map(req => (
+            <div key={req.userId} className="flex items-center gap-1">
+              <span>{req.userName}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 px-1 text-xs text-green-600 hover:bg-green-100"
+                onClick={() => emitApproveRoleRequest(req.userId)}
+              >
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 px-1 text-xs text-red-600 hover:bg-red-100"
+                onClick={() => emitDenyRoleRequest(req.userId)}
+              >
+                Deny
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Top Right Settings Button */}
       <div className="absolute top-4 right-4 z-20">
@@ -475,22 +593,78 @@ export function Toolbar() {
                 <label className="text-[10px] uppercase font-bold text-slate-400">
                   Online Users ({users.size + 1})
                 </label>
-                <div className="flex flex-wrap gap-2">
-                   <div className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
-                     <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-[10px] text-white font-bold">
-                        ME
-                     </div>
-                     <span className="text-xs font-medium text-slate-700">You</span>
-                   </div>
-                   {Array.from(users.values()).map((user) => (
-                     <div key={user.id} className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
-                       <div 
-                         className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white font-bold"
-                         style={{ backgroundColor: user.color }}
-                        >
-                          {user.name[0].toUpperCase()}
+                <div className="flex flex-col gap-2">
+                   {/* Current User */}
+                   <div className="flex items-center justify-between bg-slate-50 pl-1 pr-3 py-1.5 rounded-xl border border-slate-100">
+                     <div className="flex items-center gap-2">
+                       <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs text-white font-bold">
+                          ME
                        </div>
-                       <span className="text-xs font-medium text-slate-700">{user.name}</span>
+                       <div className="flex flex-col">
+                         <span className="text-xs font-bold text-slate-700">{userName} (You)</span>
+                         <span className={cn(
+                           "text-[10px] font-medium",
+                           userRole === 'Lead' ? "text-amber-600" : userRole === 'Contributor' ? "text-blue-600" : "text-slate-500"
+                         )}>
+                           {userRole}
+                         </span>
+                       </div>
+                     </div>
+                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsJoinModalOpen(true)}>
+                       <Settings className="size-3" />
+                     </Button>
+                   </div>
+
+                   {/* Other Users */}
+                   {Array.from(users.values()).map((user) => (
+                     <div key={user.id} className="flex items-center justify-between bg-white pl-1 pr-3 py-1.5 rounded-xl border border-slate-100 shadow-sm">
+                       <div className="flex items-center gap-2">
+                         <div 
+                           className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-bold"
+                           style={{ backgroundColor: user.color }}
+                          >
+                            {user.name[0].toUpperCase()}
+                         </div>
+                         <div className="flex flex-col">
+                           <span className="text-xs font-medium text-slate-700">{user.name}</span>
+                           <span className={cn(
+                             "text-[10px] font-medium",
+                             user.role === 'Lead' ? "text-amber-600" : user.role === 'Contributor' ? "text-blue-600" : "text-slate-500"
+                           )}>
+                             {user.role}
+                           </span>
+                         </div>
+                       </div>
+
+                       {/* Lead Controls */}
+                       {userRole === 'Lead' && (
+                         <div className="flex gap-1">
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className="h-7 w-7"
+                             title={user.role === 'Contributor' ? 'Demote to Viewer' : 'Promote to Contributor'}
+                             onClick={() => emitChangeRole(user.id, user.role === 'Contributor' ? 'Viewer' : 'Contributor')}
+                            >
+                             {user.role === 'Contributor' ? <ArrowRight className="size-3 rotate-90 text-slate-400" /> : <PlusCircle className="size-3 text-blue-500" />}
+                           </Button>
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className="h-7 w-7"
+                             title="Transfer Ownership"
+                             onClick={() => {
+                               if (confirm(`Transfer ownership to ${user.name}? You will become a Contributor.`)) {
+                                 emitTransferOwnership(user.id);
+                               }
+                             }}
+                           >
+                             <svg className="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                             </svg>
+                           </Button>
+                         </div>
+                       )}
                      </div>
                    ))}
                 </div>
@@ -547,6 +721,36 @@ export function Toolbar() {
           </ScrollArea>
         </div>
       </div>
+
+      {/* Join Modal - Identify User */}
+      <Dialog open={isJoinModalOpen} onOpenChange={setIsJoinModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Welcome to LIGMA</DialogTitle>
+            <DialogDescription>
+              Please enter your name to start collaborating.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                className="col-span-3"
+                placeholder="John Doe"
+                onKeyDown={(e) => e.key === 'Enter' && handleUpdateName()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleUpdateName}>Start Collaborating</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

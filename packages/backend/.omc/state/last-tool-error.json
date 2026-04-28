@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"powershell -Command \\\"Stop-Process -Id 21484 -Force -ErrorAction SilentlyContinue; Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction Sil...",
+  "error": "Exit code 1",
+  "timestamp": "2026-04-28T12:22:21.379Z",
+  "retry_count": 1
+}
