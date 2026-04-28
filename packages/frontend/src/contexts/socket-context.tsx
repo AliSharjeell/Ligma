@@ -175,6 +175,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     updateTask,
     deleteTask,
     setElements,
+    resetCanvas,
     setUserRole,
     setUsers,
   } = useCanvasStore();
@@ -261,6 +262,8 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     newSocket.on('connect', () => {
       setConnected(true);
       console.log('Connected to WebSocket server');
+      // Clear old state when joining a new canvas
+      resetCanvas();
       newSocket.emit('join_canvas', {
         canvasId,
         userId,
@@ -410,7 +413,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     return () => {
       newSocket.disconnect();
     };
-  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement, setUsers, setUserRole]);
+  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement, setUsers, setUserRole, resetCanvas]);
 
   const emitElementCreate = useCallback((element: CanvasElement) => {
     // For drawing elements, use create_node with nodeType='drawing'

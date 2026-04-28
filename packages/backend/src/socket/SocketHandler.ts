@@ -243,23 +243,34 @@ export class SocketHandler {
     const existingRoles = await this.persistence.getRoomRoles(canvasId);
     const existingOwner = await this.persistence.getRoomOwner(canvasId);
 
-    // D: Restore role from DB if exists, otherwise assign based on first user
-    let finalRole: 'Lead' | 'Contributor' | 'Viewer' = assignedRole;
-    if (existingRoles.length > 0) {
+    // Determine role: restore from DB if exists, otherwise check ownership
+    let finalRole: 'Lead' | 'Contributor' | 'Viewer';
+
+    if (existingOwner && existingOwner === userId) {
+      // User is the owner - always Lead
+      finalRole = 'Lead';
+      user.role = 'Lead';
+      clientState.ownerId = userId;
+      console.log(`User ${userName} is the room owner (restored)`);
+    } else if (existingOwner) {
+      // There IS an owner, check if this user has a saved role
       const userRole = existingRoles.find(r => r.userId === userId);
       if (userRole) {
         finalRole = userRole.role as 'Lead' | 'Contributor' | 'Viewer';
         user.role = finalRole;
         console.log(`Restored role ${finalRole} for ${userName} from DB`);
+      } else {
+        // New user joining a room that has an owner - default to Viewer
+        finalRole = 'Viewer';
+        user.role = 'Viewer';
+        console.log(`User ${userName} joined as Viewer`);
       }
-    }
-
-    // C: Set owner if first user or if no owner exists
-    if (clientState.users.size === 1 || !existingOwner) {
-      clientState.ownerId = userId;
+    } else {
+      // No owner exists - first user becomes owner
       finalRole = 'Lead';
       user.role = 'Lead';
-      console.log(`User ${userName} is now the room owner`);
+      clientState.ownerId = userId;
+      console.log(`User ${userName} is now the room owner (first user)`);
     }
 
     this.rbac.registerUser(userId, userName, finalRole, canvasId);

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { SocketProvider } from '@/contexts/socket-context';
 import { InfiniteCanvas } from '@/components/canvas/InfiniteCanvas';
 import { Toolbar } from '@/components/toolbar/Toolbar';
@@ -10,11 +10,16 @@ import { TimeTravel } from '@/components/canvas/TimeTravel';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
 
-export default function RoomPage({ params }: { params: { id: string } }) {
-  const roomId = decodeURIComponent(params.id ?? 'default');
+export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
+  const [roomId, setRoomId] = useState<string>('default');
 
+  useEffect(() => {
+    params.then(p => setRoomId(decodeURIComponent(p.id ?? 'default')));
+  }, [params]);
+
+  // Force re-mount when roomId changes by using key
   return (
-    <SocketProvider url={WS_URL} canvasId={roomId}>
+    <SocketProvider key={roomId} url={WS_URL} canvasId={roomId}>
       <main className="h-screen w-screen relative overflow-hidden bg-white">
         <InfiniteCanvas />
         <Toolbar />

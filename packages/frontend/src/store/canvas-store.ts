@@ -353,4 +353,14 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   getElement: (id) => get().elements.get(id),
+
+  resetCanvas: () => set({
+    elements: new Map(),
+    selectedIds: new Set(),
+    users: new Map(),
+    tasks: [],
+    eventLog: [],
+    history: [],
+    redoStack: [],
+  }),
 }));
