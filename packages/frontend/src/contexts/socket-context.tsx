@@ -425,7 +425,8 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       if (payload.state && payload.state.nodes) {
         const elements = payload.state.nodes.map(nodeStateToCanvasElement);
         setElements(elements);
-        persistElements(canvasId);
+        // Save server state to localStorage for persistence
+        setTimeout(() => persistElements(canvasId), 100);
         console.log('Synchronized canvas state:', elements.length, 'elements');
       }
     });
@@ -584,6 +585,8 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       } else {
         addToQueue({ type: 'create', eventType: 'create_node', canvasId, payload });
       }
+      // Save locally
+      persistElements(canvasId);
     } else {
       const payload = {
         canvasId,
@@ -601,8 +604,10 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       } else {
         addToQueue({ type: 'create', eventType: 'create_node', canvasId, payload });
       }
+      // Save locally
+      persistElements(canvasId);
     }
-  }, [socket, canvasId, connected, addToQueue]);
+  }, [socket, canvasId, connected, addToQueue, persistElements]);
 
   const emitElementUpdate = useCallback((element: CanvasElement) => {
     const payload = {
@@ -624,7 +629,8 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     } else {
       addToQueue({ type: 'update', eventType: 'update_node', canvasId, payload });
     }
-  }, [socket, canvasId, connected, addToQueue]);
+    persistElements(canvasId);
+  }, [socket, canvasId, connected, addToQueue, persistElements]);
 
   const emitElementDelete = useCallback((elementId: string) => {
     const payload = { canvasId, nodeId: elementId };
@@ -633,7 +639,8 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     } else {
       addToQueue({ type: 'delete', eventType: 'delete_node', canvasId, payload });
     }
-  }, [socket, canvasId, connected, addToQueue]);
+    persistElements(canvasId);
+  }, [socket, canvasId, connected, addToQueue, persistElements]);
 
   const emitElementLock = useCallback((elementId: string) => {
     const payload = { canvasId, nodeId: elementId };
