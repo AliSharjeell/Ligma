@@ -277,6 +277,8 @@ export function CommentsOverlay() {
     if (e.key === 'Escape') {
       setPendingComment(null);
       setNewCommentText('');
+      setIsCommentMode(false);
+      setTool('select');
     }
   };
 
@@ -357,6 +359,8 @@ export function CommentsOverlay() {
                 onClick={() => {
                   setPendingComment(null);
                   setNewCommentText('');
+                  setIsCommentMode(false);
+                  setTool('select');
                 }}
                 className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700"
               >
