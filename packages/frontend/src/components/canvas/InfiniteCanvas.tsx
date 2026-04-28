@@ -119,10 +119,44 @@ export function InfiniteCanvas() {
     const x = (e.clientX - canvasRect.left - viewportPosition.x) / viewportZoom;
     const y = (e.clientY - canvasRect.top - viewportPosition.y) / viewportZoom;
 
+    // Check if clicking on an element
+    const clickedElement = Array.from(elements.values()).find(el => isPointInElement(x, y, el));
+
+    // If clicking on background with select tool
+    if (tool === 'select' && !clickedElement) {
+      // Start box selection
+      setIsBoxSelecting(true);
+      setBoxStart({ x, y });
+      setBoxEnd({ x, y });
+      return;
+    }
+
+    // If elements are already selected and clicking on background (for potential multi-drag)
+    if (tool === 'select' && !clickedElement && selectedIds.size > 1) {
+      // Clear selection if clicking empty area
+      clearSelection();
+      return;
+    }
+
+    // If clicking on an element with select tool
+    if (tool === 'select' && clickedElement) {
+      // If element is not selected, select it
+      if (!selectedIds.has(clickedElement.id)) {
+        setSelectedId(clickedElement.id);
+      }
+      // Start dragging (either single or multiple)
+      setIsDragging(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+      return;
+    }
+
     // Grab/Pan by default for Select and Pan tools
     if (e.button === 1 || (e.button === 0 && (tool === 'pan' || tool === 'select'))) {
-      setIsPanning(true);
-      setDragStart({ x: e.clientX - viewportPosition.x, y: e.clientY - viewportPosition.y });
+      // Only pan if we're not clicking on an element or in select mode
+      if (!clickedElement) {
+        setIsPanning(true);
+        setDragStart({ x: e.clientX - viewportPosition.x, y: e.clientY - viewportPosition.y });
+      }
       return;
     }
 
@@ -190,6 +224,27 @@ export function InfiniteCanvas() {
       return;
     }
 
+    // Multi-drag: when dragging selected elements
+    if (isDragging && tool === 'select' && selectedIds.size > 0 && dragStart) {
+      suppressClickClearRef.current = true;
+      const dx = (e.clientX - dragStart.x) / viewportZoom;
+      const dy = (e.clientY - dragStart.y) / viewportZoom;
+
+      // Move all selected elements
+      selectedIds.forEach(id => {
+        const element = elements.get(id);
+        if (element) {
+          updateElement(id, {
+            position: {
+              x: element.position.x + dx,
+              y: element.position.y + dy,
+            },
+          });
+        }
+      });
+      return;
+    }
+
     if (isErasing && tool === 'eraser') {
       suppressClickClearRef.current = true;
       elements.forEach((element) => {
@@ -204,7 +259,7 @@ export function InfiniteCanvas() {
       suppressClickClearRef.current = true;
       setBoxEnd({ x, y });
     }
-  }, [isPanning, isDragging, isDrawingShape, isErasing, isBoxSelecting, dragStart, tool, viewportPosition, viewportZoom, shapeStart, boxStart, elements, emitCursorMove, setViewportPosition, emitElementDelete, deleteElement]);
+  }, [isPanning, isDragging, isDrawingShape, isErasing, isBoxSelecting, dragStart, tool, viewportPosition, viewportZoom, shapeStart, boxStart, elements, emitCursorMove, setViewportPosition, emitElementDelete, deleteElement, selectedIds, updateElement]);
 
   const handleMouseUp = useCallback(() => {
     if (isDragging && tool === 'draw' && drawPoints.length > 1) {
@@ -278,6 +333,16 @@ export function InfiniteCanvas() {
       }
     }
 
+    // Sync moved elements to server
+    if (isDragging && tool === 'select' && selectedIds.size > 0) {
+      selectedIds.forEach(id => {
+        const element = elements.get(id);
+        if (element) {
+          emitElementUpdate(element);
+        }
+      });
+    }
+
     setIsPanning(false);
     setIsDragging(false);
     setIsErasing(false);
@@ -286,7 +351,7 @@ export function InfiniteCanvas() {
     setBoxStart(null);
     setBoxEnd(null);
     setDragStart(null);
-  }, [isPanning, isDragging, isDrawingShape, isBoxSelecting, tool, drawPoints, shapePreview, shapeType, shapeColor, drawColor, boxStart, boxEnd, elements, addElement, userId, emitElementCreate, setSelectedId, setSelectedIds]);
+  }, [isPanning, isDragging, isDrawingShape, isBoxSelecting, tool, drawPoints, shapePreview, shapeType, shapeColor, drawColor, boxStart, boxEnd, elements, addElement, userId, emitElementCreate, emitElementUpdate, setSelectedId, setSelectedIds]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (suppressClickClearRef.current) {
@@ -408,10 +473,36 @@ export function InfiniteCanvas() {
           className="absolute inset-0 pointer-events-none overflow-visible"
         />
 
-        {/* Box selection while dragging - maybe disable if we pan on drag? 
-            Excalidraw does box selection on drag if not clicking element.
-            But user wants grab-pan everywhere.
-        */}
+        {/* Selection box visual */}
+        {isBoxSelecting && boxStart && boxEnd && (
+          <div
+            className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10 z-50"
+            style={{
+              left: Math.min(boxStart.x, boxEnd.x),
+              top: Math.min(boxStart.y, boxEnd.y),
+              width: Math.abs(boxEnd.x - boxStart.x),
+              height: Math.abs(boxEnd.y - boxStart.y),
+            }}
+          />
+        )}
+
+        {/* Multi-selection indicator */}
+        {selectedIds.size > 1 && (
+          <div
+            className="absolute pointer-events-none border-2 border-blue-500 rounded-sm"
+            style={{
+              left: -2,
+              top: -2,
+              right: -2,
+              bottom: -2,
+              zIndex: 9999,
+            }}
+          >
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
+              {selectedIds.size} selected
+            </div>
+          </div>
+        )}
       </div>
 
       <CursorPresence />
