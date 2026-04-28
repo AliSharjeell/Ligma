@@ -244,6 +244,7 @@ export function SocketProvider({ children, url = 'http://localhost:3001', canvas
     });
 
     newSocket.on('node_deleted', (event: NodeDeletedEvent) => {
+      console.log('Node deleted:', event);
       deleteElement(event.nodeId);
     });
 

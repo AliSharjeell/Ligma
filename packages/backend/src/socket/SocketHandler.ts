@@ -257,7 +257,7 @@ export class SocketHandler {
     this.eventStore.append(event);
     this.eventBus.publish(event);
 
-    socket.to(canvasId).emit('node_created', event);
+    this.io.to(canvasId).emit('node_created', event);
     socket.emit('node_created_ack', { nodeId, eventId: event.id });
 
     const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
@@ -324,7 +324,7 @@ export class SocketHandler {
     this.eventStore.append(event);
     this.eventBus.publish(event);
 
-    socket.to(canvasId).emit('node_updated', event);
+    this.io.to(canvasId).emit('node_updated', event);
     socket.emit('node_updated_ack', { eventId: event.id });
 
     const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
@@ -358,7 +358,7 @@ export class SocketHandler {
   private handleDeleteNode(socket: Socket, data: { canvasId: string; nodeId: string }): void {
     const { canvasId, nodeId } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
-
+    
     if (!userId || !this.rbac.canPerformAction(userId, canvasId, 'canDelete')) {
       socket.emit('error', { message: 'Permission denied' });
       return;
@@ -381,7 +381,9 @@ export class SocketHandler {
     this.eventStore.append(event);
     this.eventBus.publish(event);
 
-    socket.to(canvasId).emit('node_deleted', event);
+    console.log(`Node deleted: ${nodeId} by user ${userId} on canvas ${canvasId}`);
+
+    this.io.to(canvasId).emit('node_deleted', event);
     socket.emit('node_deleted_ack', { eventId: event.id });
 
     const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
