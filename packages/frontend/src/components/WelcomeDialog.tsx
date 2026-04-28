@@ -47,7 +47,7 @@ export function WelcomeDialog() {
   return (
     <div className="min-h-screen flex">
       {/* Left side - Branding */}
-      <div className="hidden md:flex md:w-1/2 bg-cover bg-center flex-col justify-center items-center p-12 text-white relative" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1920&q=80)' }}>
+      <div className="hidden md:flex md:w-1/2 bg-cover bg-center flex-col justify-center items-center p-12 text-white relative" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1920&q=80)' }}>
         <div className="absolute inset-0 bg-black/40"></div>
         <div className="relative max-w-md text-center z-10">
           <h1 className="text-6xl font-bold mb-4 tracking-tight">LIGMA</h1>
