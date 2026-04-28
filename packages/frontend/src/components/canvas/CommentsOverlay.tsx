@@ -307,7 +307,7 @@ export function CommentsOverlay() {
     <div
       className={cn(
         'absolute inset-0 pointer-events-none z-40',
-        isCommentMode && !activeCommentId && 'pointer-events-auto cursor-crosshair'
+        pendingComment && 'pointer-events-auto cursor-crosshair'
       )}
       onClick={(e) => {
         handleOverlayClick(e);
