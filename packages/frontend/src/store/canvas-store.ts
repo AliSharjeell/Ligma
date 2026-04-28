@@ -493,7 +493,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   saveComments: (roomId) => {
     if (typeof window !== 'undefined') {
-      const key = `ligma-comments-${roomId || 'default'}`;
+      // Use current room from URL if no roomId provided
+      const currentRoomId = roomId || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : 'default');
+      const key = `ligma-comments-${currentRoomId}`;
       console.log('Saving', get().comments.length, 'comments to localStorage with key:', key);
       localStorage.setItem(key, JSON.stringify(get().comments));
     }
@@ -501,7 +503,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   loadComments: (roomId) => {
     if (typeof window !== 'undefined') {
-      const key = `ligma-comments-${roomId || 'default'}`;
+      // Use current room from URL if no roomId provided
+      const currentRoomId = roomId || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : 'default');
+      const key = `ligma-comments-${currentRoomId}`;
       console.log('Loading comments with key:', key);
       const saved = localStorage.getItem(key);
       if (saved) {
