@@ -60,7 +60,7 @@ export function InfiniteCanvas() {
     lockElement,
   } = useCanvasStore();
 
-  const { emitCursorMove, emitElementCreate, emitElementUpdate, emitElementDelete, emitElementLock } = useSocket();
+  const { emitCursorMove, emitElementCreate, emitElementUpdate, emitElementDelete, emitElementLock, connectionStatus } = useSocket();
 
   // Update rough preview
   useEffect(() => {
@@ -642,6 +642,8 @@ export function InfiniteCanvas() {
         <span>Zoom: {Math.round(viewportZoom * 100)}%</span>
         <div className="w-px h-3 bg-slate-300" />
         <span>{elements.size} Elements</span>
+        <div className="w-px h-3 bg-slate-300" />
+        <span>{connectionStatus === 'connected' ? 'Synced' : connectionStatus === 'connecting' ? 'Syncing...' : 'Offline'}</span>
       </div>
     </div>
   );
