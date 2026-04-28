@@ -38,7 +38,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission> = {
     canCreate: true,
     canRead: true,
     canUpdate: true,
-    canDelete: false,
+    canDelete: true,
     canLock: true,
     canGrantAccess: false
   },
