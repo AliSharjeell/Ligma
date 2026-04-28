@@ -184,10 +184,61 @@ export function InfiniteCanvas() {
       return;
     }
 
+    // Create sticky note on click
+    if (tool === 'sticky') {
+      if (userRole === 'Viewer') {
+        alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
+        return;
+      }
+      const element = addElement({
+        type: 'sticky',
+        position: { x, y },
+        size: { width: 200, height: 150 },
+        content: '',
+        color: stickyColor,
+        locked: false,
+        createdBy: userId,
+      });
+      emitElementCreate(element);
+      setSelectedId(element.id);
+      return;
+    }
+
+    // Create text on click
+    if (tool === 'text') {
+      if (userRole === 'Viewer') {
+        alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
+        return;
+      }
+      const element = addElement({
+        type: 'text',
+        position: { x, y },
+        size: { width: 200, height: 40 },
+        content: '',
+        color: textColor,
+        textStyle: {
+          fontSize: textFontSize,
+          fontFamily: textFontFamily,
+          fontWeight: textFontWeight,
+          textAlign: textAlign || 'left',
+        },
+        locked: false,
+        createdBy: userId,
+      });
+      emitElementCreate(element);
+      setSelectedId(element.id);
+      // Auto-enter edit mode
+      setTimeout(() => {
+        lockElement(element.id);
+        emitElementLock(element.id);
+      }, 50);
+      return;
+    }
+
     // In Excalidraw-like mode, single click on sticky does nothing or just pans if background
     // We keep sticky creation on click for now or move to double? User said "nothing should happen on single click"
     // So let's disable single-click creation for tools
-  }, [tool, viewportPosition, viewportZoom, elements, emitElementDelete, deleteElement]);
+  }, [tool, viewportPosition, viewportZoom, elements, emitElementDelete, deleteElement, stickyColor, userRole, textColor, textFontSize, textFontFamily, textFontWeight, textAlign]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
