@@ -221,7 +221,7 @@ export function CommentPin({
 }
 
 export function CommentsOverlay() {
-  const { comments, isCommentMode, viewportPosition, viewportZoom, activeCommentId, hoveredCommentId, setActiveCommentId, setHoveredCommentId, addComment } = useCanvasStore();
+  const { comments, isCommentMode, viewportPosition, viewportZoom, activeCommentId, hoveredCommentId, setActiveCommentId, setHoveredCommentId, addComment, clearSelection } = useCanvasStore();
   const [pendingComment, setPendingComment] = useState<{ x: number; y: number } | null>(null);
   const [newCommentText, setNewCommentText] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -250,6 +250,7 @@ export function CommentsOverlay() {
     if (!isCommentMode) return;
     if (e.target !== e.currentTarget) return;
 
+    clearSelection();
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;

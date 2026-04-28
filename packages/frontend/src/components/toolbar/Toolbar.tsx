@@ -320,7 +320,6 @@ export function Toolbar() {
             {t.icon}
           </Button>
         ))}
-        <div className="w-px h-6 bg-slate-200 mx-1" />
         <Button
           variant={isCommentMode ? 'default' : 'ghost'}
           size="icon"
