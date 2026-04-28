@@ -287,7 +287,7 @@ export function Shape({ element }: ShapeProps) {
       className={cn(
         'absolute select-none group outline-none',
         isSelected ? 'cursor-move' : 'cursor-move',
-        isLockedByOther && 'opacity-50 pointer-events-none',
+        isLockedByOther && 'pointer-events-none',
         isEditing && 'ring-2 ring-yellow-400',
         !isLockedByOther && tool !== 'select' && 'pointer-events-none'
       )}

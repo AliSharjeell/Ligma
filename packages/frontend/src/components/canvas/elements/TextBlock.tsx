@@ -260,7 +260,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     <div
       className={cn(
         'absolute select-none outline-none',
-        isLockedByOther && 'opacity-50 pointer-events-none',
+        isLockedByOther && 'pointer-events-none',
         !isLocked && tool !== 'select' && 'pointer-events-none',
         !isLocked && tool === 'draw' && 'cursor-crosshair',
         !isLocked && tool === 'select' && 'cursor-text'
