@@ -55,11 +55,49 @@ export function Shape({ element }: ShapeProps) {
     let node: SVGElement;
     if (element.shapeType === 'circle') {
       node = rc.ellipse(width / 2, height / 2, width - padding * 2, height - padding * 2, options);
+    } else if (element.shapeType === 'line') {
+      node = rc.line(padding, height / 2, width - padding, height / 2, options);
+    } else if (element.shapeType === 'triangle') {
+      node = rc.polygon([
+        [width / 2, padding],
+        [padding, height - padding],
+        [width - padding, height - padding]
+      ], options);
+    } else if (element.shapeType === 'diamond') {
+      node = rc.polygon([
+        [width / 2, padding],
+        [width - padding, height / 2],
+        [width / 2, height - padding],
+        [padding, height / 2]
+      ], options);
+    } else if (element.shapeType === 'hexagon') {
+      const hexPoints = [];
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i - Math.PI / 2;
+        hexPoints.push([
+          width / 2 + (width / 2 - padding) * Math.cos(angle),
+          height / 2 + (height / 2 - padding) * Math.sin(angle)
+        ]);
+      }
+      node = rc.polygon(hexPoints, options);
+    } else if (element.shapeType === 'star') {
+      const starPoints = [];
+      const outerRadius = Math.min(width, height) / 2 - padding;
+      const innerRadius = outerRadius * 0.4;
+      for (let i = 0; i < 10; i++) {
+        const angle = (Math.PI / 5) * i - Math.PI / 2;
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        starPoints.push([
+          width / 2 + radius * Math.cos(angle),
+          height / 2 + radius * Math.sin(angle)
+        ]);
+      }
+      node = rc.polygon(starPoints, options);
     } else if (element.shapeType === 'arrow') {
       const x1 = padding;
-      const y1 = padding;
+      const y1 = height / 2;
       const x2 = width - padding;
-      const y2 = height - padding;
+      const y2 = height / 2;
       node = rc.line(x1, y1, x2, y2, options);
 
       const angle = Math.atan2(y2 - y1, x2 - x1);

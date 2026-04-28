@@ -1,5 +1,5 @@
 export type ElementType = 'sticky' | 'shape' | 'text' | 'drawing' | 'image';
-export type ShapeType = 'rectangle' | 'circle' | 'arrow';
+export type ShapeType = 'rectangle' | 'circle' | 'arrow' | 'line' | 'triangle' | 'diamond' | 'hexagon' | 'star';
 export type Tool = 'select' | 'sticky' | 'shape' | 'text' | 'draw' | 'pan' | 'eraser';
 
 export interface Position {

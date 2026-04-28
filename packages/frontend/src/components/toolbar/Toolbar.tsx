@@ -33,6 +33,11 @@ import {
   LogOut,
   PlusCircle,
   RefreshCw,
+  Minus,
+  Triangle,
+  Diamond,
+  Hexagon,
+  Star,
 } from 'lucide-react';
 import type { CanvasElement, Tool, ShapeType } from '@/types/canvas';
 import { TaskBoard } from '@/components/panels/TaskBoard';
@@ -65,6 +70,11 @@ const tools: { id: Tool; icon: React.ReactNode; label: string }[] = [
 const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
   { id: 'rectangle', icon: <Square className="size-4" />, label: 'Rectangle' },
   { id: 'circle', icon: <Circle className="size-4" />, label: 'Circle' },
+  { id: 'line', icon: <Minus className="size-4" />, label: 'Line' },
+  { id: 'triangle', icon: <Triangle className="size-4" />, label: 'Triangle' },
+  { id: 'diamond', icon: <Diamond className="size-4" />, label: 'Diamond' },
+  { id: 'hexagon', icon: <Hexagon className="size-4" />, label: 'Hexagon' },
+  { id: 'star', icon: <Star className="size-4" />, label: 'Star' },
   { id: 'arrow', icon: <ArrowRight className="size-4" />, label: 'Arrow' },
 ];
 
