@@ -2,9 +2,10 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
+import { useSocket } from '@/contexts/socket-context';
 import { cn } from '@/lib/utils';
-import { Check, X, Trash2, AtSign, Paperclip, Image as ImageIcon, XCircle } from 'lucide-react';
-import type { Mention, CommentAttachment } from '@/types/canvas';
+import { Check, X, Trash2, AtSign } from 'lucide-react';
+import type { Mention, MentionNotification } from '@/types/canvas';
 
 interface CommentPinProps {
   comment: {
@@ -16,7 +17,6 @@ interface CommentPinProps {
     authorColor: string;
     content: string;
     mentions: Mention[];
-    attachments: CommentAttachment[];
     timestamp: number;
     resolved: boolean;
     replies: Array<{
@@ -25,7 +25,6 @@ interface CommentPinProps {
       authorName: string;
       content: string;
       mentions: Mention[];
-      attachments: CommentAttachment[];
       timestamp: number;
       isRead: boolean;
     }>;
@@ -58,13 +57,16 @@ export function CommentPin({
   onMouseEnter,
   onMouseLeave,
 }: CommentPinProps) {
-  const { resolveComment, deleteComment, users, parseMentions, fileToDataUrl } = useCanvasStore();
+  const { resolveComment, deleteComment, users, parseMentions, updateCommentPosition, viewportPosition, viewportZoom } = useCanvasStore();
+  const { emitCommentReply, emitCommentDelete, emitCommentUpdate, emitMentionNotification } = useSocket();
   const [showPopover, setShowPopover] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
-  const [attachments, setAttachments] = useState<CommentAttachment[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const pinRef = useRef<HTMLDivElement>(null);
 
   // Get online users for mention autocomplete
   const onlineUsers = Array.from(users.values()).filter(u => u.id !== comment.authorId);
@@ -111,38 +113,41 @@ export function CommentPin({
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    for (const file of Array.from(files)) {
-      try {
-        const url = await fileToDataUrl(file);
-        setAttachments(prev => [...prev, {
-          id: crypto.randomUUID(),
-          name: file.name,
-          url,
-          type: file.type,
-          size: file.size,
-        }]);
-      } catch (error) {
-        console.error('Failed to attach file:', error);
-      }
-    }
-    // Reset input
-    e.target.value = '';
-  };
-
-  const removeAttachment = (id: string) => {
-    setAttachments(prev => prev.filter(a => a.id !== id));
-  };
-
   const handleReply = () => {
-    if (!replyText.trim() && attachments.length === 0) return;
+    if (!replyText.trim()) return;
     const mentions = parseMentions(replyText);
-    useCanvasStore.getState().addReply(comment.id, replyText.trim(), mentions, attachments);
+    const currentUserId = useCanvasStore.getState().userId;
+    const currentUserName = useCanvasStore.getState().userName;
+    const replyData = {
+      id: crypto.randomUUID(),
+      authorId: currentUserId,
+      authorName: currentUserName,
+      content: replyText.trim(),
+      mentions,
+      timestamp: Date.now(),
+      isRead: false,
+    };
+    // Use addReply with existing reply to ensure same ID
+    const reply = useCanvasStore.getState().addReply(comment.id, replyText.trim(), mentions, [], replyData);
+    emitCommentReply(comment.id, reply);
+
+    // Emit mention notifications for each mentioned user
+    mentions.forEach(mention => {
+      const notification: MentionNotification = {
+        id: crypto.randomUUID(),
+        commentId: comment.id,
+        authorId: currentUserId,
+        authorName: currentUserName,
+        authorColor: '#3B82F6',
+        content: replyText.trim(),
+        mentionedUserId: mention.userId,
+        timestamp: Date.now(),
+        read: false,
+      };
+      emitMentionNotification(notification);
+    });
+
     setReplyText('');
-    setAttachments([]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -156,28 +161,87 @@ export function CommentPin({
     }
   };
 
+  // Drag handlers for moving comment pin
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left click
+    e.stopPropagation();
+
+    // Don't start drag if clicking on popover or inside it
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-popover]')) return;
+
+    let dragging = true;
+    setIsDragging(true);
+    const startX = e.clientX;
+    const startY = e.clientY;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragging) return;
+      // Update position in real-time but don't save yet
+    };
+
+    const handleMouseUp = (upEvent: MouseEvent) => {
+      if (!dragging) return;
+      dragging = false;
+      setIsDragging(false);
+
+      // Only update if actually dragged more than 5 pixels
+      const dx = Math.abs(upEvent.clientX - startX);
+      const dy = Math.abs(upEvent.clientY - startY);
+
+      if (dx > 5 || dy > 5) {
+        // Calculate new canvas position
+        const currentScreenX = screenX + (upEvent.clientX - startX);
+        const currentScreenY = screenY + (upEvent.clientY - startY);
+
+        // Convert screen coordinates back to canvas coordinates
+        const newCanvasX = (currentScreenX - viewportPosition.x) / viewportZoom;
+        const newCanvasY = (currentScreenY - viewportPosition.y) / viewportZoom;
+
+        // Update comment position
+        updateCommentPosition(comment.id, newCanvasX, newCanvasY);
+
+        // Emit to other users
+        emitCommentUpdate(comment.id, { canvasX: newCanvasX, canvasY: newCanvasY });
+      }
+
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   return (
     <div
+      ref={pinRef}
       className="absolute z-50"
       style={{
         left: screenX,
         top: screenY,
         transform: 'translate(-50%, -100%)',
+        cursor: isDragging ? 'grabbing' : 'grab',
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      onMouseDown={handleMouseDown}
     >
       {/* Pin */}
       <button
-        onClick={() => {
-          onClick();
-          setShowPopover(true);
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isDragging) {
+            onClick();
+            setShowPopover(true);
+          }
         }}
         className={cn(
           'relative flex items-center justify-center rounded-full border-2 border-white shadow-lg transition-all duration-150',
           isHovered && 'scale-110',
           isActive && 'scale-110 ring-2 ring-blue-500',
-          comment.resolved && 'opacity-50'
+          comment.resolved && 'opacity-50',
+          isDragging && 'scale-110'
         )}
         style={{
           width: 32,
@@ -233,6 +297,7 @@ export function CommentPin({
               <button
                 onClick={() => {
                   deleteComment(comment.id);
+                  emitCommentDelete(comment.id);
                   setShowPopover(false);
                 }}
                 className="p-1.5 rounded hover:bg-red-50 hover:text-red-500 transition-colors"
@@ -305,52 +370,13 @@ export function CommentPin({
                 rows={2}
               />
 
-              {/* Attachments preview */}
-              {attachments.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {attachments.map(attachment => (
-                    <div key={attachment.id} className="relative group">
-                      {attachment.type.startsWith('image/') ? (
-                        <img
-                          src={attachment.url}
-                          alt={attachment.name}
-                          className="w-12 h-12 object-cover rounded border border-gray-200"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded border border-gray-200">
-                          <Paperclip className="size-4 text-gray-500" />
-                        </div>
-                      )}
-                      <button
-                        onClick={() => removeAttachment(attachment.id)}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <XCircle className="size-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between mt-2">
-                <div className="flex gap-1">
-                  <label className="p-1 rounded hover:bg-gray-100 cursor-pointer" title="Attach file">
-                    <input
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={handleFileSelect}
-                      accept="image/*,.pdf,.doc,.docx"
-                    />
-                    <Paperclip className="size-4 text-gray-500" />
-                  </label>
-                </div>
+              <div className="flex items-center justify-end mt-2">
                 <button
                   onClick={handleReply}
-                  disabled={!replyText.trim() && attachments.length === 0}
+                  disabled={!replyText.trim()}
                   className={cn(
                     'px-3 py-1 text-xs font-medium rounded transition-colors',
-                    replyText.trim() || attachments.length > 0
+                    replyText.trim()
                       ? 'bg-blue-500 text-white hover:bg-blue-600'
                       : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   )}
@@ -367,11 +393,11 @@ export function CommentPin({
 }
 
 export function CommentsOverlay() {
-  const { comments, isCommentMode, viewportPosition, viewportZoom, activeCommentId, hoveredCommentId, setActiveCommentId, setHoveredCommentId, addComment, setTool, setIsCommentMode, pendingCommentX, pendingCommentY, users, parseMentions, fileToDataUrl } = useCanvasStore();
+  const { comments, isCommentMode, viewportPosition, viewportZoom, activeCommentId, hoveredCommentId, setActiveCommentId, setHoveredCommentId, addComment, setTool, setIsCommentMode, pendingCommentX, pendingCommentY, users, parseMentions, userId, userName } = useCanvasStore();
+  const { emitCommentCreate, emitCommentDelete, emitMentionNotification } = useSocket();
   const [newCommentText, setNewCommentText] = useState('');
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
-  const [attachments, setAttachments] = useState<CommentAttachment[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Get online users for mention autocomplete
@@ -440,38 +466,31 @@ export function CommentsOverlay() {
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    for (const file of Array.from(files)) {
-      try {
-        const url = await fileToDataUrl(file);
-        setAttachments(prev => [...prev, {
-          id: crypto.randomUUID(),
-          name: file.name,
-          url,
-          type: file.type,
-          size: file.size,
-        }]);
-      } catch (error) {
-        console.error('Failed to attach file:', error);
-      }
-    }
-    e.target.value = '';
-  };
-
-  const removeAttachment = (id: string) => {
-    setAttachments(prev => prev.filter(a => a.id !== id));
-  };
-
   const handleCreateComment = () => {
-    if (!pendingComment || (!newCommentText.trim() && attachments.length === 0)) return;
+    if (!pendingComment || !newCommentText.trim()) return;
     const mentions = parseMentions(newCommentText);
-    addComment(pendingComment.x, pendingComment.y, newCommentText.trim(), mentions, attachments);
+    // Use addComment which generates the ID and returns the comment
+    const comment = addComment(pendingComment.x, pendingComment.y, newCommentText.trim(), mentions, []);
+    emitCommentCreate(comment);
+
+    // Emit mention notifications for each mentioned user
+    mentions.forEach(mention => {
+      const notification: MentionNotification = {
+        id: crypto.randomUUID(),
+        commentId: comment.id,
+        authorId: userId,
+        authorName: userName,
+        authorColor: '#3B82F6',
+        content: newCommentText.trim(),
+        mentionedUserId: mention.userId,
+        timestamp: Date.now(),
+        read: false,
+      };
+      emitMentionNotification(notification);
+    });
+
     useCanvasStore.setState({ pendingCommentX: null, pendingCommentY: null });
     setNewCommentText('');
-    setAttachments([]);
     setIsCommentMode(false);
     setTool('select');
   };
@@ -479,7 +498,6 @@ export function CommentsOverlay() {
   const handleCancelComment = () => {
     useCanvasStore.setState({ pendingCommentX: null, pendingCommentY: null });
     setNewCommentText('');
-    setAttachments([]);
     setIsCommentMode(false);
     setTool('select');
   };
@@ -493,7 +511,7 @@ export function CommentsOverlay() {
           style={{
             left: canvasToScreen(pendingComment.x, pendingComment.y).screenX,
             top: canvasToScreen(pendingComment.x, pendingComment.y).screenY,
-            transform: 'translate(-50%, -100%)',
+            transform: 'translate(-50%, 0)',
           }}
         >
           <div className="w-72 p-3">
@@ -537,64 +555,25 @@ export function CommentsOverlay() {
               autoFocus
             />
 
-            {/* Attachments preview */}
-            {attachments.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {attachments.map(attachment => (
-                  <div key={attachment.id} className="relative group">
-                    {attachment.type.startsWith('image/') ? (
-                      <img
-                        src={attachment.url}
-                        alt={attachment.name}
-                        className="w-12 h-12 object-cover rounded border border-gray-200"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded border border-gray-200">
-                        <Paperclip className="size-4 text-gray-500" />
-                      </div>
-                    )}
-                    <button
-                      onClick={() => removeAttachment(attachment.id)}
-                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <XCircle className="size-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex items-center justify-between mt-2">
-              <label className="p-1 rounded hover:bg-gray-100 cursor-pointer" title="Attach file">
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileSelect}
-                  accept="image/*,.pdf,.doc,.docx"
-                />
-                <Paperclip className="size-4 text-gray-500" />
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCancelComment}
-                  className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreateComment}
-                  disabled={!newCommentText.trim() && attachments.length === 0}
-                  className={cn(
-                    'px-3 py-1 text-xs font-medium rounded transition-colors',
-                    newCommentText.trim() || attachments.length > 0
-                      ? 'bg-blue-500 text-white hover:bg-blue-600'
-                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  )}
-                >
-                  Post
-                </button>
-              </div>
+            <div className="flex items-center justify-end mt-2">
+              <button
+                onClick={handleCancelComment}
+                className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700 mr-2"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateComment}
+                disabled={!newCommentText.trim()}
+                className={cn(
+                  'px-3 py-1 text-xs font-medium rounded transition-colors',
+                  newCommentText.trim()
+                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                )}
+              >
+                Post
+              </button>
             </div>
           </div>
         </div>

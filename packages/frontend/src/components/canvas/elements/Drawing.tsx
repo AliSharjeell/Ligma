@@ -43,7 +43,7 @@ export function Drawing({ element }: DrawingProps) {
     const node = rc.curve(relativePoints, {
       stroke: element.color || '#1f2937',
       strokeWidth: isSelected ? strokeWidth + 0.5 : strokeWidth,
-      roughness: 1,
+      roughness: 0,
     });
 
     svgRef.current.appendChild(node);
@@ -59,6 +59,9 @@ export function Drawing({ element }: DrawingProps) {
   const actualPosition = { x: minX, y: minY };
   const actualSize = { width: maxX - minX, height: maxY - minY };
 
+  // For select tool: pass pointer events through to canvas drag handler unless selected
+  const passThroughPointerEvents = tool === 'select' && !isLockedByOther && !isSelected;
+
 
   return (
     <div
@@ -73,6 +76,7 @@ export function Drawing({ element }: DrawingProps) {
         top: actualPosition.y,
         width: actualSize.width,
         height: actualSize.height,
+        pointerEvents: passThroughPointerEvents ? 'none' : 'auto',
       }}
     >
       <svg

@@ -44,6 +44,12 @@ export interface CanvasElement {
   intentTag?: IntentTag;
 }
 
+export interface AuthUser {
+  id: string;
+  username: string;
+  createdAt: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -92,6 +98,8 @@ export interface CanvasState {
   userName: string;
   history: { elements: Map<string, CanvasElement>; timestamp: number }[];
   redoStack: { elements: Map<string, CanvasElement>; timestamp: number }[];
+  sessionTimeline: { elements: Map<string, CanvasElement>; timestamp: number }[];
+  replayFrameElements: Map<string, CanvasElement> | null;
   comments: Comment[];
   isCommentMode: boolean;
   activeCommentId: string | null;
@@ -118,7 +126,7 @@ export interface CommentReply {
   timestamp: number;
   isRead: boolean;
   mentions: Mention[];
-  attachments: CommentAttachment[];
+  attachments?: CommentAttachment[];
 }
 
 export interface Mention {
@@ -184,6 +192,19 @@ export interface GroupPermission {
   canManageOwners: boolean;
 }
 
+export interface MentionNotification {
+  id: string;
+  commentId: string;
+  authorId: string;
+  authorName: string;
+  authorColor: string;
+  content: string;
+  mentionedUserId: string;
+  timestamp: number;
+  read: boolean;
+}
+}
+
 export interface SocketEvents {
   create_node: CanvasElement;
   update_node: CanvasElement;
@@ -199,7 +220,7 @@ export interface SocketEvents {
   cursor_move: { userId: string; position: Position };
   user_joined: User;
   user_left: string;
-  // Group events
+// Group events
   group_created: { group: GroupState; event: any };
   group_deleted: { groupId: string; event: any };
   group_owner_added: { group: GroupState; event: any };

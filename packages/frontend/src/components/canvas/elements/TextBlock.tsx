@@ -100,6 +100,20 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     }
   }, [element.content, currentFontSize, fontFamily, fontWeight, fontColor]);
 
+  // Update element size in store to match measured text bounds (for proper hit detection)
+  useEffect(() => {
+    if (!element.content || isEditing || isBeingEdited) return;
+    if (textBounds.width <= 0 || textBounds.height <= 0) return;
+
+    // Only update if bounds are significantly different
+    const sizeDiff = Math.abs(element.size.width - textBounds.width) + Math.abs(element.size.height - textBounds.height);
+    if (sizeDiff > 5) {
+      updateElement(element.id, {
+        size: { width: textBounds.width, height: textBounds.height }
+      });
+    }
+  }, [textBounds, element.id, element.size, isEditing, isBeingEdited]);
+
   useEffect(() => {
     if ((isEditing || isBeingEdited) && inputRef.current) {
       inputRef.current.focus();
@@ -220,10 +234,22 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
       return;
     }
+    enterEditMode();
+  };
+
+  const enterEditMode = () => {
     setSelectedId(element.id);
     setIsEditing(true);
     lockElement(element.id);
     emitElementLock(element.id);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    // If text tool is active and we click an existing text box, enter edit mode
+    if (tool === 'text' && !isEditing && !isBeingEdited && !isLocked) {
+      e.stopPropagation();
+      enterEditMode();
+    }
   };
 
   const handleBlur = () => {
@@ -301,6 +327,11 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
 
   const handleSize = 8;
 
+  // For select tool: pass pointer events through to canvas drag handler unless editing or resizing
+  // We no longer use pointer-events: none for the select tool because we need to catch double-clicks.
+  // Instead, we just don't stopPropagation on mousedown so InfiniteCanvas can still handle dragging.
+  const passThroughPointerEvents = !isEditing && !isBeingEdited && !isResizing && tool !== 'select' && tool !== 'text';
+
   return (
     <div
       className={cn(
@@ -316,8 +347,10 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
         top: element.position.y,
         minWidth: '10px',
         zIndex: isEditing ? 100 : 1,
+        pointerEvents: passThroughPointerEvents ? 'none' : 'auto',
       }}
       onDoubleClick={handleDoubleClick}
+      onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -451,15 +484,18 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       ) : (
         <span
           ref={textRef}
-          className="px-0 py-0 whitespace-nowrap relative z-10"
+          className={cn(
+            "px-0 py-0 whitespace-nowrap relative z-10",
+            !element.content && "text-slate-400 italic opacity-50"
+          )}
           style={{
-            color: fontColor,
+            color: element.content ? fontColor : undefined,
             fontSize: currentFontSize,
             fontFamily,
             fontWeight,
           }}
         >
-          {element.content}
+          {element.content || 'Type something...'}
         </span>
       )}
 

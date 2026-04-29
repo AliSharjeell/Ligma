@@ -24,6 +24,7 @@ const COLORS = [
 export function StickyNote({ element }: StickyNoteProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [localContent, setLocalContent] = useState(element.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -34,14 +35,15 @@ export function StickyNote({ element }: StickyNoteProps) {
   // Only faded when locked by ANOTHER user, not yourself
   const isLockedByOther = element.locked && element.lockedBy !== userId;
   const isLocked = element.locked;
+  const isBeingEdited = element.locked && element.lockedBy === userId;
   const showSelection = isSelected || isHovered;
 
   useEffect(() => {
-    if (isEditing && textareaRef.current) {
+    if ((isEditing || isBeingEdited) && textareaRef.current) {
       textareaRef.current.focus();
       textareaRef.current.select();
     }
-  }, [isEditing]);
+  }, [isEditing, isBeingEdited]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -61,6 +63,7 @@ export function StickyNote({ element }: StickyNoteProps) {
       return;
     }
 
+    setIsResizing(true);
     const startX = e.clientX;
     const startY = e.clientY;
     const startPos = { ...element.position };
@@ -122,6 +125,7 @@ export function StickyNote({ element }: StickyNoteProps) {
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      setIsResizing(false);
       const updatedElement = useCanvasStore.getState().getElement(element.id);
       if (updatedElement) {
         emitElementUpdate(updatedElement);
@@ -140,10 +144,22 @@ export function StickyNote({ element }: StickyNoteProps) {
       alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
       return;
     }
+    enterEditMode();
+  };
+
+  const enterEditMode = () => {
     setSelectedId(element.id);
     setIsEditing(true);
     lockElement(element.id);
     emitElementLock(element.id);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    // If sticky tool is active and we click an existing sticky, enter edit mode
+    if (tool === 'sticky' && !isEditing && !isLocked) {
+      e.stopPropagation();
+      enterEditMode();
+    }
   };
 
   const handleBlur = () => {
@@ -163,6 +179,11 @@ export function StickyNote({ element }: StickyNoteProps) {
 
   const handleSize = 8;
 
+  // For select tool: pass pointer events through to canvas drag handler unless editing or resizing
+  // We no longer use pointer-events: none for the select tool because we need to catch double-clicks.
+  // Instead, we just don't stopPropagation on mousedown so InfiniteCanvas can still handle dragging.
+  const passThroughPointerEvents = !isEditing && !isBeingEdited && !isResizing && tool !== 'select' && tool !== 'sticky';
+
   return (
     <div
       className={cn(
@@ -177,12 +198,14 @@ export function StickyNote({ element }: StickyNoteProps) {
         width: element.size.width,
         height: element.size.height,
         backgroundColor: element.color || COLORS[0],
+        pointerEvents: passThroughPointerEvents ? 'none' : 'auto',
       }}
       onDoubleClick={handleDoubleClick}
+      onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {isEditing ? (
+      {isEditing || isBeingEdited ? (
         <textarea
           ref={textareaRef}
           value={localContent}
