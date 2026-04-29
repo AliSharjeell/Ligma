@@ -43,6 +43,9 @@ interface CanvasStore extends CanvasState {
   lockElement: (id: string) => boolean;
   unlockElement: (id: string) => void;
 
+  groupElements: (ids: Set<string>) => string | null;
+  ungroupElements: (groupId: string) => void;
+
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -327,6 +330,39 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       newElements.set(id, { ...element, locked: false, lockedBy: undefined });
       saveElementsToStorage(newElements, getCurrentRoomId());
       return { elements: newElements };
+    });
+  },
+
+  groupElements: (ids) => {
+    if (ids.size < 2) return null;
+    const groupId = uuidv4();
+    set((state) => {
+      const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
+      const newElements = new Map(state.elements);
+      ids.forEach((id) => {
+        const element = newElements.get(id);
+        if (element) {
+          newElements.set(id, { ...element, groupId });
+        }
+      });
+      saveElementsToStorage(newElements, getCurrentRoomId());
+      return { elements: newElements, history: newHistory, redoStack: [] };
+    });
+    return groupId;
+  },
+
+  ungroupElements: (groupId) => {
+    set((state) => {
+      const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
+      const newElements = new Map(state.elements);
+      newElements.forEach((element, id) => {
+        if (element.groupId === groupId) {
+          const { groupId: _, ...rest } = element;
+          newElements.set(id, rest as CanvasElement);
+        }
+      });
+      saveElementsToStorage(newElements, getCurrentRoomId());
+      return { elements: newElements, history: newHistory, redoStack: [] };
     });
   },
 
