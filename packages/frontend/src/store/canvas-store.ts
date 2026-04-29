@@ -39,12 +39,13 @@ interface CanvasStore extends CanvasState {
   deleteRemoteElement: (id: string) => void;
   setRemoteElementLock: (id: string, lockedBy?: string) => void;
   updateElement: (id: string, updates: Partial<CanvasElement>) => void;
+  updateElements: (updates: Record<string, Partial<CanvasElement>>, skipHistory?: boolean) => void;
   deleteElement: (id: string) => void;
   lockElement: (id: string) => boolean;
   unlockElement: (id: string) => void;
 
   groupElements: (ids: Set<string>) => string | null;
-  ungroupElements: (groupId: string) => void;
+  ungroupElements: (groupId: string) => string[];
 
   undo: () => void;
   redo: () => void;
@@ -292,6 +293,36 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     });
   },
 
+  updateElements: (updates, skipHistory = false) => {
+    set((state) => {
+      const { userId } = get();
+      const newElements = new Map(state.elements);
+      let changed = false;
+
+      for (const [id, elementUpdates] of Object.entries(updates)) {
+        const element = newElements.get(id);
+        if (!element) continue;
+        if (element.locked && element.lockedBy !== userId) continue;
+        
+        newElements.set(id, { ...element, ...elementUpdates, updatedAt: Date.now() });
+        changed = true;
+      }
+
+      if (!changed) return state;
+
+      const newHistory = skipHistory 
+        ? state.history 
+        : [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
+
+      saveElementsToStorage(newElements, getCurrentRoomId());
+      return { 
+        elements: newElements, 
+        history: newHistory, 
+        redoStack: skipHistory ? state.redoStack : [] 
+      };
+    });
+  },
+
   deleteElement: (id) => {
     set((state) => {
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
@@ -352,6 +383,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   ungroupElements: (groupId) => {
+    let affectedIds: string[] = [];
     set((state) => {
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
@@ -359,11 +391,13 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         if (element.groupId === groupId) {
           const { groupId: _, ...rest } = element;
           newElements.set(id, rest as CanvasElement);
+          affectedIds.push(id);
         }
       });
       saveElementsToStorage(newElements, getCurrentRoomId());
       return { elements: newElements, history: newHistory, redoStack: [] };
     });
+    return affectedIds;
   },
 
   undo: () => {

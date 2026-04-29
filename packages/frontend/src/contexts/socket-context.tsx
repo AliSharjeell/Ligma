@@ -38,6 +38,7 @@ type NodeUpdatedEvent = {
     color: string;
     shapeType: ShapeType;
     points: Position[];
+    groupId?: string;
   }>;
   timestamp: number;
 };
@@ -634,6 +635,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         shapeType: element.shapeType,
         points: element.points,
         style: element.textStyle,
+        groupId: element.groupId,
       },
       vectorClock: {},
     };

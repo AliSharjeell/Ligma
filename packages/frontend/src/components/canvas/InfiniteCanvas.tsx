@@ -33,6 +33,7 @@ export function InfiniteCanvas() {
   const [isErasing, setIsErasing] = useState(false);
   const [enteringEditId, setEnteringEditId] = useState<string | null>(null);
   const suppressClickClearRef = useRef(false);
+  const hasDraggedRef = useRef(false);
 
   const {
     elements,
@@ -280,27 +281,33 @@ export function InfiniteCanvas() {
       console.log('Clicked element:', clickedElement.id, 'groupId:', clickedElement.groupId);
       console.log('Current selected:', Array.from(currentSelectedIds));
 
-      // If element is part of a group, select all group members
-      let idsToSelect = new Set<string>([clickedElement.id]);
-      if (clickedElement.groupId) {
-        console.log('Element has groupId:', clickedElement.groupId);
-        currentElements.forEach((e, id) => {
-          if (e.groupId === clickedElement.groupId) {
-            idsToSelect.add(id);
-            console.log('Adding group member:', id);
-          }
-        });
-      } else if (currentSelectedIds.size > 0) {
-        currentSelectedIds.forEach(id => {
-          const el = currentElements.get(id);
-          if (el?.groupId) {
-            currentElements.forEach((e, eid) => {
-              if (e.groupId === el.groupId) idsToSelect.add(eid);
-            });
-          } else {
-            idsToSelect.add(id);
-          }
-        });
+      let idsToSelect = new Set<string>();
+      if (e.shiftKey) {
+        idsToSelect = new Set(currentSelectedIds);
+        if (clickedElement.groupId) {
+           const isGroupSelected = currentSelectedIds.has(clickedElement.id);
+           currentElements.forEach((el, id) => {
+             if (el.groupId === clickedElement.groupId) {
+               if (isGroupSelected) idsToSelect.delete(id);
+               else idsToSelect.add(id);
+             }
+           });
+        } else {
+           if (currentSelectedIds.has(clickedElement.id)) idsToSelect.delete(clickedElement.id);
+           else idsToSelect.add(clickedElement.id);
+        }
+      } else {
+        if (currentSelectedIds.has(clickedElement.id)) {
+           idsToSelect = new Set(currentSelectedIds);
+        } else {
+           if (clickedElement.groupId) {
+             currentElements.forEach((el, id) => {
+               if (el.groupId === clickedElement.groupId) idsToSelect.add(id);
+             });
+           } else {
+             idsToSelect.add(clickedElement.id);
+           }
+        }
       }
 
       console.log('Selecting:', Array.from(idsToSelect));
@@ -310,6 +317,7 @@ export function InfiniteCanvas() {
       if (userRole !== 'Viewer') {
         setIsDragging(true);
         setDragStart({ x: e.clientX, y: e.clientY });
+        hasDraggedRef.current = false;
       }
       return;
     }
@@ -453,18 +461,27 @@ export function InfiniteCanvas() {
         }
       });
 
+      if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+        hasDraggedRef.current = true;
+      }
+
+      const updates: Record<string, Partial<CanvasElement>> = {};
       // Move all elements (skip locked ones)
       elementsToMove.forEach(id => {
         const element = currentElements.get(id);
         if (element && !element.locked) {
-          useCanvasStore.getState().updateElement(id, {
+          updates[id] = {
             position: {
               x: element.position.x + dx,
               y: element.position.y + dy,
             },
-          });
+          };
         }
       });
+
+      if (Object.keys(updates).length > 0) {
+        useCanvasStore.getState().updateElements(updates, true); // skipHistory = true during drag
+      }
 
       // Reset dragStart so delta doesn't accumulate
       setDragStart({ x: e.clientX, y: e.clientY });
@@ -565,7 +582,7 @@ export function InfiniteCanvas() {
     }
 
     // Sync moved elements to server (skip locked ones)
-    if (isDragging && tool === 'select' && userRole !== 'Viewer' && selectedIds.size > 0) {
+    if (isDragging && tool === 'select' && userRole !== 'Viewer' && selectedIds.size > 0 && hasDraggedRef.current) {
       // Get all elements that were moved (selected + their group members)
       const elementsMoved = new Set<string>();
       selectedIds.forEach(id => {
@@ -584,6 +601,13 @@ export function InfiniteCanvas() {
           emitElementUpdate(element);
         }
       });
+
+      // Save history after multi-drag finishes
+      useCanvasStore.setState(state => {
+        const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
+        return { history: newHistory, redoStack: [] };
+      });
+      hasDraggedRef.current = false;
     }
 
     setIsPanning(false);
@@ -691,6 +715,11 @@ export function InfiniteCanvas() {
         e.preventDefault();
         const groupId = useCanvasStore.getState().groupElements(selectedIds);
         if (groupId) {
+          const currentElements = useCanvasStore.getState().elements;
+          selectedIds.forEach((id) => {
+            const el = currentElements.get(id);
+            if (el) emitElementUpdate(el);
+          });
           clearSelection();
         }
       }
@@ -698,7 +727,12 @@ export function InfiniteCanvas() {
         e.preventDefault();
         const element = elements.get(Array.from(selectedIds)[0]);
         if (element?.groupId) {
-          useCanvasStore.getState().ungroupElements(element.groupId);
+          const affectedIds = useCanvasStore.getState().ungroupElements(element.groupId);
+          const currentElements = useCanvasStore.getState().elements;
+          affectedIds.forEach((id) => {
+            const el = currentElements.get(id);
+            if (el) emitElementUpdate(el);
+          });
           clearSelection();
         }
       }
@@ -776,22 +810,46 @@ export function InfiniteCanvas() {
         )}
 
         {/* Multi-selection indicator */}
-        {selectedIds.size > 1 && (
-          <div
-            className="absolute pointer-events-none border-2 border-blue-500 rounded-sm"
-            style={{
-              left: -2,
-              top: -2,
-              right: -2,
-              bottom: -2,
-              zIndex: 9999,
-            }}
-          >
-            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
-              {selectedIds.size} selected
+        {selectedIds.size > 1 && (() => {
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          selectedIds.forEach(id => {
+             const el = elements.get(id);
+             if (el) {
+               if (el.type === 'drawing' && el.points && el.points.length > 0) {
+                 const pMinX = Math.min(...el.points.map(p => p.x));
+                 const pMaxX = Math.max(...el.points.map(p => p.x));
+                 const pMinY = Math.min(...el.points.map(p => p.y));
+                 const pMaxY = Math.max(...el.points.map(p => p.y));
+                 minX = Math.min(minX, pMinX);
+                 minY = Math.min(minY, pMinY);
+                 maxX = Math.max(maxX, pMaxX);
+                 maxY = Math.max(maxY, pMaxY);
+               } else {
+                 minX = Math.min(minX, el.position.x);
+                 minY = Math.min(minY, el.position.y);
+                 maxX = Math.max(maxX, el.position.x + el.size.width);
+                 maxY = Math.max(maxY, el.position.y + el.size.height);
+               }
+             }
+          });
+          if (minX === Infinity) return null;
+          return (
+            <div
+              className="absolute pointer-events-none border-2 border-blue-500 rounded-sm"
+              style={{
+                left: minX - 4,
+                top: minY - 4,
+                width: maxX - minX + 8,
+                height: maxY - minY + 8,
+                zIndex: 9999,
+              }}
+            >
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
+                {selectedIds.size} selected
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       <CursorPresence />

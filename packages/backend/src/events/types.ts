@@ -40,6 +40,7 @@ export interface NodeUpdatedEvent extends BaseEvent {
     color: string;
     shapeType: 'rectangle' | 'circle';
     points: { x: number; y: number }[];
+    groupId?: string;
   }>;
   version: number;
   causallyDependsOn: string[];

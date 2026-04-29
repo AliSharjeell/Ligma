@@ -25,7 +25,7 @@ interface GroupedLayer {
 
 export function LayersList() {
   const { elements, selectedIds, setSelectedId, setSelectedIds, deleteElement, lockElement, unlockElement, ungroupElements } = useCanvasStore();
-  const { emitElementDelete, emitElementLock, emitElementUnlock } = useSocket();
+  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate } = useSocket();
   const [lastSelectedId, setLastSelectedId] = React.useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(new Set());
 
@@ -150,7 +150,12 @@ export function LayersList() {
                     className="h-5 w-5"
                     onClick={(e) => {
                       e.stopPropagation();
-                      ungroupElements(group.groupId);
+                      const affectedIds = ungroupElements(group.groupId);
+                      const currentElements = useCanvasStore.getState().elements;
+                      affectedIds.forEach(id => {
+                        const el = currentElements.get(id);
+                        if (el) emitElementUpdate(el);
+                      });
                     }}
                     title="Ungroup"
                   >

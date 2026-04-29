@@ -71,8 +71,8 @@
     },
     {
       "path": "packages\\frontend\\src\\store\\canvas-store.ts",
-      "accessCount": 34,
-      "lastAccessed": 1777429454617,
+      "accessCount": 40,
+      "lastAccessed": 1777450520633,
       "type": "file"
     },
     {
@@ -89,9 +89,15 @@
     },
     {
       "path": "packages\\frontend\\src\\components\\canvas\\InfiniteCanvas.tsx",
-      "accessCount": 18,
-      "lastAccessed": 1777429697240,
+      "accessCount": 22,
+      "lastAccessed": 1777452463570,
       "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 11,
+      "lastAccessed": 1777450426402,
+      "type": "directory"
     },
     {
       "path": "packages\\frontend\\src\\app\\room\\[id]\\page.tsx",
@@ -106,27 +112,27 @@
       "type": "file"
     },
     {
+      "path": "packages\\frontend\\src\\types\\canvas.ts",
+      "accessCount": 6,
+      "lastAccessed": 1777450476572,
+      "type": "file"
+    },
+    {
       "path": "packages\\frontend\\src\\components\\canvas\\elements\\Drawing.tsx",
       "accessCount": 5,
       "lastAccessed": 1777410658102,
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 4,
-      "lastAccessed": 1777401500896,
-      "type": "directory"
+      "path": "packages\\frontend\\src\\components\\canvas\\elements\\Shape.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1777450408480,
+      "type": "file"
     },
     {
       "path": "packages\\frontend\\package.json",
       "accessCount": 4,
       "lastAccessed": 1777405361823,
-      "type": "file"
-    },
-    {
-      "path": "packages\\frontend\\src\\components\\canvas\\elements\\Shape.tsx",
-      "accessCount": 4,
-      "lastAccessed": 1777410430106,
       "type": "file"
     },
     {
@@ -142,12 +148,6 @@
       "type": "file"
     },
     {
-      "path": "packages\\frontend\\src\\types\\canvas.ts",
-      "accessCount": 3,
-      "lastAccessed": 1777409767936,
-      "type": "file"
-    },
-    {
       "path": "packages/frontend/src/components/toolbar/Toolbar.tsx",
       "accessCount": 3,
       "lastAccessed": 1777410245942,
@@ -157,6 +157,24 @@
       "path": "packages/frontend/src/store/canvas-store.ts",
       "accessCount": 3,
       "lastAccessed": 1777411800216,
+      "type": "directory"
+    },
+    {
+      "path": "packages\\frontend\\src\\components\\panels\\LayersPanel.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1777450613976,
+      "type": "file"
+    },
+    {
+      "path": "packages\\backend\\src",
+      "accessCount": 3,
+      "lastAccessed": 1777452427302,
+      "type": "directory"
+    },
+    {
+      "path": "packages\\backend\\src\\events\\types.ts",
+      "accessCount": 3,
+      "lastAccessed": 1777452446374,
       "type": "directory"
     },
     {
@@ -188,12 +206,6 @@
       "accessCount": 2,
       "lastAccessed": 1777407586524,
       "type": "file"
-    },
-    {
-      "path": "packages\\backend\\src",
-      "accessCount": 2,
-      "lastAccessed": 1777407614551,
-      "type": "directory"
     },
     {
       "path": "packages\\frontend\\public",
@@ -262,12 +274,6 @@
       "type": "file"
     },
     {
-      "path": "packages\\backend\\src\\events\\types.ts",
-      "accessCount": 1,
-      "lastAccessed": 1777407619763,
-      "type": "directory"
-    },
-    {
       "path": "packages\\frontend\\src",
       "accessCount": 1,
       "lastAccessed": 1777408221716,
@@ -277,6 +283,24 @@
       "path": "packages\\frontend\\src\\components\\canvas\\elements\\StickyNote.tsx",
       "accessCount": 1,
       "lastAccessed": 1777409246063,
+      "type": "file"
+    },
+    {
+      "path": "hackathon-details.md",
+      "accessCount": 1,
+      "lastAccessed": 1777450427364,
+      "type": "file"
+    },
+    {
+      "path": "packages\\backend",
+      "accessCount": 1,
+      "lastAccessed": 1777452419175,
+      "type": "directory"
+    },
+    {
+      "path": "packages\\backend\\data\\ligma-data.json",
+      "accessCount": 1,
+      "lastAccessed": 1777452457904,
       "type": "file"
     }
   ],
