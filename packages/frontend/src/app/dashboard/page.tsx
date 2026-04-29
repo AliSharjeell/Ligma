@@ -6,6 +6,7 @@ import { useCanvasStore } from '@/store/canvas-store';
 import { generateRoomCode } from '@/lib/utils';
 import * as Dialog from '@radix-ui/react-dialog';
 import { LogOut, Plus, Users, Clock, Layers } from 'lucide-react';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 const BRAND_COLOR = '#50B5FF';
 
@@ -126,6 +127,7 @@ export default function DashboardPage() {
   };
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
@@ -275,5 +277,6 @@ export default function DashboardPage() {
         </Dialog.Portal>
       </Dialog.Root>
     </div>
+    </ProtectedRoute>
   );
 }
