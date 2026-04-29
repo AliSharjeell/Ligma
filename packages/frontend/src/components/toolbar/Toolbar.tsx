@@ -396,8 +396,24 @@ export function Toolbar() {
 
   return (
     <>
-      {/* Top Left Branding + Layers + Export */}
+      {/* Top Left - Layers Button (Separate) */}
       <div className="absolute top-4 left-4 z-20">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+          className={cn(
+            "h-10 w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
+            isLeftPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
+          )}
+          title="Layers"
+        >
+          <Layers className="size-5 text-slate-600" />
+        </Button>
+      </div>
+
+      {/* Top Left - Branding + Export */}
+      <div className="absolute top-4 left-[60px] z-20">
         <div className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 shadow-excalidraw px-3 py-2">
           <button
             onClick={() => router.push('/dashboard')}
@@ -406,18 +422,6 @@ export function Toolbar() {
           >
             Ligma
           </button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
-            className={cn(
-              "h-9 w-9 rounded-lg",
-              isLeftPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
-            )}
-            title="Layers"
-          >
-            <Layers className="size-4" />
-          </Button>
           <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
             <DialogTrigger asChild>
               <Button
