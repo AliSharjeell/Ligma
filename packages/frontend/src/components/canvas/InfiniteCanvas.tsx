@@ -683,35 +683,9 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Text tool always creates new text, even on top of existing elements
-    if (tool === 'text') {
-      setEnteringEditId('');
-      const element = addElement({
-        type: 'text',
-        position: { x, y: y - 10 },
-        size: { width: 10, height: 24 },
-        content: '',
-        color: textColor,
-        textStyle: {
-          fontSize: textFontSize,
-          fontFamily: textFontFamily,
-          fontWeight: textFontWeight,
-          textAlign,
-        },
-        locked: false,
-        createdBy: userId,
-      });
-      emitElementCreate(element);
-      setSelectedId(element.id);
-      setEnteringEditId(element.id);
-      setTimeout(() => {
-        lockElement(element.id);
-        emitElementLock(element.id);
-        setEnteringEditId(null);
-      }, 50);
-      return;
-    }
-  }, [viewportPosition, viewportZoom, elements, addElement, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, userId, emitElementCreate, setSelectedId]);
+    // Text tool already creates text on single click in handleMouseDown
+    // Double click only for other purposes (element selection)
+  }, [viewportPosition, viewportZoom, elements, setSelectedId]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
