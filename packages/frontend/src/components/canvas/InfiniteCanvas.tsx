@@ -13,6 +13,7 @@ import { PresenceHeatmap } from './PresenceHeatmap';
 import { PresenceZones } from './PresenceZones';
 import { TimeTravel } from './TimeTravel';
 import { CommentsOverlay } from './CommentsOverlay';
+import { MentionNotifications } from './MentionNotifications';
 import { cn } from '@/lib/utils';
 import { Minus, Plus } from 'lucide-react';
 import type { Position, CanvasElement } from '@/types/canvas';
@@ -863,6 +864,7 @@ export function InfiniteCanvas() {
       <PresenceZones />
       <TimeTravel />
       <CommentsOverlay />
+      <MentionNotifications />
 
       <div
         className="absolute bottom-4 left-4 flex gap-4 items-center bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 cursor-default"

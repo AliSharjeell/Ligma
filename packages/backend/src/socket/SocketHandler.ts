@@ -217,6 +217,27 @@ export class SocketHandler {
       this.handleDeleteTask(socket, data);
     });
 
+    // Comment operations
+    socket.on('create_comment', (data: { canvasId: string; comment: any }) => {
+      this.handleCreateComment(socket, data);
+    });
+
+    socket.on('add_comment_reply', (data: { canvasId: string; commentId: string; reply: any }) => {
+      this.handleAddCommentReply(socket, data);
+    });
+
+    socket.on('delete_comment', (data: { canvasId: string; commentId: string }) => {
+      this.handleDeleteComment(socket, data);
+    });
+
+    socket.on('mention_notification', (data: { canvasId: string; notification: any }) => {
+      this.handleMentionNotification(socket, data);
+    });
+
+    socket.on('update_comment', (data: { canvasId: string; commentId: string; updates: { canvasX: number; canvasY: number } }) => {
+      this.handleUpdateComment(socket, data);
+    });
+
     // OT Text Operations
     socket.on('text_operation', (data: { canvasId: string; nodeId: string; opType: 'insert' | 'delete'; position: number; text?: string; length?: number; baseVersion: number }) => {
       this.handleTextOperation(socket, data);
@@ -1308,6 +1329,65 @@ export class SocketHandler {
       await this.persistence.deleteTask(taskId);
       const canvasId = task.canvasId;
       this.io.to(canvasId).emit('task_deleted', { taskId });
+    }
+  }
+
+  // Comment handlers
+  private async handleCreateComment(socket: Socket, data: { canvasId: string; comment: any }): Promise<void> {
+    const { canvasId, comment } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    // Broadcast to all users in the room
+    this.io.to(canvasId).emit('comment_created', comment);
+    console.log(`Comment created by ${userId} on canvas ${canvasId}`);
+  }
+
+  private async handleAddCommentReply(socket: Socket, data: { canvasId: string; commentId: string; reply: any }): Promise<void> {
+    const { canvasId, commentId, reply } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    // Broadcast to all users in the room
+    this.io.to(canvasId).emit('comment_reply', { commentId, reply });
+    console.log(`Reply added to comment ${commentId} by ${userId}`);
+  }
+
+  private async handleDeleteComment(socket: Socket, data: { canvasId: string; commentId: string }): Promise<void> {
+    const { canvasId, commentId } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    // Broadcast to all users in the room
+    this.io.to(canvasId).emit('comment_deleted', { commentId });
+    console.log(`Comment ${commentId} deleted by ${userId}`);
+  }
+
+  private handleUpdateComment(socket: Socket, data: { canvasId: string; commentId: string; updates: { canvasX: number; canvasY: number } }): void {
+    const { canvasId, commentId, updates } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    // Broadcast to all users in the room including sender
+    this.io.to(canvasId).emit('comment_updated', { commentId, updates });
+    console.log(`Comment ${commentId} position updated by ${userId}`);
+  }
+
+  private handleMentionNotification(socket: Socket, data: { canvasId: string; notification: any }): void {
+    const { canvasId, notification } = data;
+    const { mentionedUserId } = notification;
+
+    if (!mentionedUserId) return;
+
+    // Find the socket of the mentioned user and send them the notification
+    const mentionedUserSocket = this.findSocketByUserId(mentionedUserId, canvasId);
+    if (mentionedUserSocket) {
+      mentionedUserSocket.emit('mention_notification', notification);
+      console.log(`Mention notification sent to user ${mentionedUserId}`);
     }
   }
 

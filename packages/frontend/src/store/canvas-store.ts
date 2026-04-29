@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { CanvasElement, Position, Tool, ShapeType, Task, CanvasEvent, User, CanvasState, Comment, Mention, CommentAttachment } from '@/types/canvas';
+import type { CanvasElement, Position, Tool, ShapeType, Task, CanvasEvent, User, CanvasState, Comment, Mention, CommentAttachment, MentionNotification, CommentReply } from '@/types/canvas';
 
 interface HistoryEntry {
   elements: Map<string, CanvasElement>;
@@ -8,6 +8,12 @@ interface HistoryEntry {
 }
 
 interface CanvasStore extends CanvasState {
+  // Mention notifications
+  mentionNotifications: MentionNotification[];
+  addMentionNotification: (notification: Omit<MentionNotification, 'id' | 'timestamp' | 'read'>) => void;
+  markMentionNotificationRead: (notificationId: string) => void;
+  clearMentionNotifications: () => void;
+  unreadMentionCount: () => number;
   userRole: 'Lead' | 'Contributor' | 'Viewer';
   setUserRole: (role: 'Lead' | 'Contributor' | 'Viewer') => void;
   setUserName: (name: string) => void;
@@ -34,7 +40,6 @@ interface CanvasStore extends CanvasState {
   setViewportPosition: (position: Position) => void;
   setViewportZoom: (zoom: number) => void;
   parseMentions: (content: string) => Mention[];
-  fileToDataUrl: (file: File) => Promise<string>;
   addElement: (element: Omit<CanvasElement, 'id' | 'createdAt' | 'updatedAt'>) => CanvasElement;
   addRemoteElement: (element: CanvasElement) => void;
   updateRemoteElement: (id: string, updates: Partial<CanvasElement>) => void;
@@ -78,8 +83,9 @@ interface CanvasStore extends CanvasState {
   setIsCommentMode: (enabled: boolean) => void;
   setActiveCommentId: (id: string | null) => void;
   setHoveredCommentId: (id: string | null) => void;
-  addComment: (x: number, y: number, content: string, mentions?: Mention[], attachments?: CommentAttachment[]) => void;
-  addReply: (commentId: string, content: string, mentions?: Mention[], attachments?: CommentAttachment[]) => void;
+  addComment: (x: number, y: number, content: string, mentions?: Mention[], attachments?: CommentAttachment[], existingId?: string) => Comment;
+  addReply: (commentId: string, content: string, mentions?: Mention[], attachments?: CommentAttachment[], existingReply?: CommentReply) => CommentReply;
+  updateCommentPosition: (commentId: string, x: number, y: number) => void;
   resolveComment: (commentId: string) => void;
   deleteComment: (commentId: string) => void;
   markRepliesAsRead: (commentId: string) => void;
@@ -110,16 +116,6 @@ const parseMentions = (content: string, users: Map<string, User>): Mention[] => 
     }
   }
   return mentions;
-};
-
-// Helper to convert file to base64 data URL
-const fileToDataUrl = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 };
 
 const getCurrentRoomId = (): string | undefined => {
@@ -195,6 +191,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   hoveredCommentId: null,
   pendingCommentX: null,
   pendingCommentY: null,
+  mentionNotifications: [],
 
   setUserRole: (userRole) => set({ userRole }),
   setUserName: (name) => {
@@ -245,10 +242,6 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   parseMentions: (content: string) => {
     const { users } = get();
     return parseMentions(content, users);
-  },
-
-  fileToDataUrl: (file: File) => {
-    return fileToDataUrl(file);
   },
 
   addElement: (elementData) => {
@@ -577,11 +570,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setActiveCommentId: (id) => set({ activeCommentId: id }),
   setHoveredCommentId: (id) => set({ hoveredCommentId: id }),
 
-  addComment: (x, y, content, mentions = [], attachments = []) => {
+  addComment: (x, y, content, mentions = [], attachments = [], existingId?: string) => {
     const { userId, userName, users } = get();
     const user = users.get(userId);
     const comment: Comment = {
-      id: uuidv4(),
+      id: existingId || uuidv4(),
       canvasX: x,
       canvasY: y,
       authorId: userId,
@@ -597,24 +590,25 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     };
     set((state) => ({ comments: [...state.comments, comment] }));
     get().saveComments();
+    return comment;
   },
 
-  addReply: (commentId, content, mentions = [], attachments = []) => {
+  addReply: (commentId, content, mentions = [], attachments = [], existingReply?: CommentReply) => {
     const { userId, userName, users } = get();
     const user = users.get(userId);
+    const reply: CommentReply = existingReply || {
+      id: uuidv4(),
+      authorId: userId,
+      authorName: userName,
+      content,
+      mentions,
+      attachments,
+      timestamp: Date.now(),
+      isRead: false,
+    };
     set((state) => ({
       comments: state.comments.map((c) => {
         if (c.id !== commentId) return c;
-        const reply = {
-          id: uuidv4(),
-          authorId: userId,
-          authorName: userName,
-          content,
-          mentions,
-          attachments,
-          timestamp: Date.now(),
-          isRead: false,
-        };
         return {
           ...c,
           replies: [...c.replies, reply],
@@ -623,12 +617,22 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       }),
     }));
     get().saveComments();
+    return reply;
   },
 
   resolveComment: (commentId) => {
     set((state) => ({
       comments: state.comments.map((c) =>
         c.id === commentId ? { ...c, resolved: !c.resolved } : c
+      ),
+    }));
+    get().saveComments();
+  },
+
+  updateCommentPosition: (commentId, x, y) => {
+    set((state) => ({
+      comments: state.comments.map((c) =>
+        c.id === commentId ? { ...c, canvasX: x, canvasY: y } : c
       ),
     }));
     get().saveComments();
@@ -671,6 +675,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const currentRoomId = roomId || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : 'default');
       const key = `ligma-comments-${currentRoomId}`;
       console.log('Loading comments with key:', key);
+      // Clear existing comments first to avoid merging from different rooms
+      set({ comments: [] });
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -678,6 +684,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         set({ comments: parsed });
       } else {
         console.log('No saved comments found');
+        set({ comments: [] });
       }
     }
   },
@@ -706,5 +713,35 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     eventLog: [],
     history: [],
     redoStack: [],
+    mentionNotifications: [],
   }),
+
+  // Mention notifications
+  addMentionNotification: (notification) => {
+    const newNotification: MentionNotification = {
+      ...notification,
+      id: uuidv4(),
+      timestamp: Date.now(),
+      read: false,
+    };
+    set((state) => ({
+      mentionNotifications: [newNotification, ...state.mentionNotifications].slice(0, 50),
+    }));
+  },
+
+  markMentionNotificationRead: (notificationId) => {
+    set((state) => ({
+      mentionNotifications: state.mentionNotifications.map(n =>
+        n.id === notificationId ? { ...n, read: true } : n
+      ),
+    }));
+  },
+
+  clearMentionNotifications: () => {
+    set({ mentionNotifications: [] });
+  },
+
+  unreadMentionCount: () => {
+    return get().mentionNotifications.filter(n => !n.read).length;
+  },
 }));

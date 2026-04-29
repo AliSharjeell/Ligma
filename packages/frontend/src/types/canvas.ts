@@ -118,7 +118,7 @@ export interface CommentReply {
   timestamp: number;
   isRead: boolean;
   mentions: Mention[];
-  attachments: CommentAttachment[];
+  attachments?: CommentAttachment[];
 }
 
 export interface Mention {
@@ -164,6 +164,18 @@ export interface CanvasExportData {
     shapes: number;
     drawings: number;
   };
+}
+
+export interface MentionNotification {
+  id: string;
+  commentId: string;
+  authorId: string;
+  authorName: string;
+  authorColor: string;
+  content: string;
+  mentionedUserId: string;
+  timestamp: number;
+  read: boolean;
 }
 
 export interface SocketEvents {

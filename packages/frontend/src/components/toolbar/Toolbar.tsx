@@ -65,7 +65,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Download, FileJson, FileText, Image } from 'lucide-react';
+import { Download, FileJson, FileText, Image, AtSign } from 'lucide-react';
 
 const tools: { id: Tool; icon: React.ReactNode; label: string }[] = [
   { id: 'select', icon: <MousePointer2 className="size-4" />, label: 'Select (V)' },
@@ -88,6 +88,14 @@ const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
   { id: 'arrow', icon: <ArrowRight className="size-4" />, label: 'Arrow' },
 ];
 
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return `${Math.floor(diff / 86400000)}d ago`;
+}
+
 export function Toolbar() {
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
@@ -97,8 +105,9 @@ export function Toolbar() {
   const [nameInput, setNameInput] = useState('');
   const [pendingRequests, setPendingRequests] = useState<{ userId: string; userName: string }[]>([]);
   const [hasRequested, setHasRequested] = useState(false);
-  const [rightPanelView, setRightPanelView] = useState<'main' | 'tasks' | 'activity' | 'comments'>('main');
+  const [rightPanelView, setRightPanelView] = useState<'main' | 'tasks' | 'activity' | 'comments' | 'notifications'>('main');
   const [newTaskCount, setNewTaskCount] = useState(0);
+  const [mentionNotificationCount, setMentionNotificationCount] = useState(0);
   const [summaryData, setSummaryData] = useState<any>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
@@ -107,6 +116,9 @@ export function Toolbar() {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership, emitGenerateSummary, connectionStatus } = useSocket();
+
+  // Subscribe to mention notifications count
+  const mentionNotifications = useCanvasStore((state) => state.mentionNotifications);
 
   const {
     tool,
@@ -159,6 +171,9 @@ export function Toolbar() {
     canUndo,
     canRedo,
     users,
+    comments,
+    setActiveCommentId,
+    setHoveredCommentId,
   } = useCanvasStore();
   const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate, emitElementLock: emitLock, emitCanvasScreenshot } = useSocket();
 
@@ -249,7 +264,15 @@ export function Toolbar() {
     if (rightPanelView === 'tasks') {
       setNewTaskCount(0);
     }
+    if (rightPanelView === 'notifications') {
+      setMentionNotificationCount(0);
+    }
   }, [rightPanelView]);
+
+  // Update mention notification count
+  useEffect(() => {
+    setMentionNotificationCount(mentionNotifications.filter(n => !n.read).length);
+  }, [mentionNotifications]);
 
   const handleJoinRoom = () => {
     const trimmed = roomInput.trim();
@@ -970,9 +993,9 @@ export function Toolbar() {
           title="Workspace & Settings"
         >
           <Settings className="size-5 text-slate-600" />
-          {newTaskCount > 0 && (
+          {(newTaskCount > 0 || mentionNotificationCount > 0) && (
             <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-              {newTaskCount}
+              {newTaskCount + mentionNotificationCount}
             </span>
           )}
         </Button>
@@ -1185,17 +1208,108 @@ export function Toolbar() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-2 justify-start"
+                      className="gap-2 justify-start relative"
                       onClick={() => setRightPanelView('comments')}
                     >
                       <MessageCircle className="size-4" />
                       Comments
+                      {mentionNotificationCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                          {mentionNotificationCount}
+                        </span>
+                      )}
                     </Button>
+                    {mentionNotificationCount > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 justify-start relative"
+                        onClick={() => setRightPanelView('notifications')}
+                      >
+                        <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        Mentions
+                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                          {mentionNotificationCount}
+                        </span>
+                      </Button>
+                    )}
                   </div>
                 )}
                 {rightPanelView === 'tasks' && <TasksPanel onBack={() => setRightPanelView('main')} />}
                 {rightPanelView === 'activity' && <ActivityPanel onBack={() => setRightPanelView('main')} />}
                 {rightPanelView === 'comments' && <CommentsPanel onBack={() => setRightPanelView('main')} />}
+                {rightPanelView === 'notifications' && (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Mention Notifications</span>
+                      {mentionNotifications.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={() => useCanvasStore.getState().clearMentionNotifications()}
+                        >
+                          Clear all
+                        </Button>
+                      )}
+                    </div>
+                    {mentionNotifications.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {mentionNotifications.slice(0, 10).map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={cn(
+                              "p-3 rounded-lg border text-sm",
+                              !notification.read ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-bold"
+                                style={{ backgroundColor: notification.authorColor }}
+                              >
+                                {notification.authorName[0].toUpperCase()}
+                              </div>
+                              <span className="font-medium">{notification.authorName}</span>
+                              <span className="text-xs text-muted-foreground ml-auto">
+                                {formatRelativeTime(notification.timestamp)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1 ml-8">{notification.content}</p>
+                            {!notification.read && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs ml-8 mt-1 text-blue-500"
+                                onClick={() => {
+                                  useCanvasStore.getState().markMentionNotificationRead(notification.id);
+                                  setActiveCommentId(notification.commentId);
+                                  setHoveredCommentId(notification.commentId);
+                                  // Pan to the comment
+                                  const comment = comments.find(c => c.id === notification.commentId);
+                                  if (comment) {
+                                    useCanvasStore.getState().setViewportPosition({
+                                      x: -comment.canvasX + 400,
+                                      y: -comment.canvasY + 300,
+                                    });
+                                  }
+                                }}
+                              >
+                                View comment
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-muted-foreground text-sm">
+                        No mention notifications
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <Separator />

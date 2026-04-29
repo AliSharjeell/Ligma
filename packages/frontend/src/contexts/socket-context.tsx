@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useCanvasStore } from '@/store/canvas-store';
-import type { CanvasElement, CanvasEvent, Position, ShapeType, Size, Task, User } from '@/types/canvas';
+import type { CanvasElement, CanvasEvent, Position, ShapeType, Size, Task, User, MentionNotification } from '@/types/canvas';
 
 type NodeCreatedEvent = {
   id: string;
@@ -147,6 +147,11 @@ interface SocketContextType {
   emitChatMessage: (message: string) => void;
   emitClearChat: () => void;
   emitCanvasScreenshot: (screenshot: string) => void;
+  emitCommentCreate: (comment: any) => void;
+  emitCommentReply: (commentId: string, reply: any) => void;
+  emitCommentDelete: (commentId: string) => void;
+  emitCommentUpdate: (commentId: string, updates: { canvasX: number; canvasY: number }) => void;
+  emitMentionNotification: (notification: MentionNotification) => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -172,6 +177,11 @@ const SocketContext = createContext<SocketContextType>({
   emitChatMessage: () => {},
   emitClearChat: () => {},
   emitCanvasScreenshot: () => {},
+  emitCommentCreate: () => {},
+  emitCommentReply: () => {},
+  emitCommentDelete: () => {},
+  emitCommentUpdate: () => {},
+  emitMentionNotification: () => {},
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -591,6 +601,61 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       deleteTask(taskId);
     });
 
+    // Comment sync events
+    newSocket.on('comment_created', (comment: any) => {
+      console.log('Comment created event received:', comment);
+      // Add to store only if not already there (avoid duplicates from socket echo)
+      const existingComments = useCanvasStore.getState().comments;
+      if (!existingComments.find(c => c.id === comment.id)) {
+        useCanvasStore.setState({ comments: [...existingComments, comment] });
+      }
+    });
+
+    newSocket.on('comment_reply', ({ commentId, reply }: { commentId: string; reply: any }) => {
+      console.log('Comment reply event received:', commentId, reply);
+      useCanvasStore.setState(state => ({
+        comments: state.comments.map(c => {
+          if (c.id === commentId) {
+            // Check if reply already exists (avoid duplicates from socket echo)
+            if (c.replies.some(r => r.id === reply.id)) {
+              return c;
+            }
+            return {
+              ...c,
+              replies: [...c.replies, reply],
+              unreadCount: c.unreadCount + 1,
+            };
+          }
+          return c;
+        }),
+      }));
+    });
+
+    newSocket.on('comment_deleted', ({ commentId }: { commentId: string }) => {
+      console.log('Comment deleted event received:', commentId);
+      useCanvasStore.setState(state => ({
+        comments: state.comments.filter(c => c.id !== commentId),
+      }));
+    });
+
+    newSocket.on('comment_updated', ({ commentId, updates }: { commentId: string; updates: { canvasX: number; canvasY: number } }) => {
+      console.log('Comment updated event received:', commentId, updates);
+      useCanvasStore.setState(state => ({
+        comments: state.comments.map(c =>
+          c.id === commentId ? { ...c, ...updates } : c
+        ),
+      }));
+    });
+
+    newSocket.on('mention_notification', (notification: MentionNotification) => {
+      console.log('Mention notification received:', notification);
+      // Only add if the notification is for the current user
+      const currentUserId = useCanvasStore.getState().userId;
+      if (notification.mentionedUserId === currentUserId) {
+        useCanvasStore.getState().addMentionNotification(notification);
+      }
+    });
+
     newSocket.on('intent_classified', ({ nodeId, intent }: { nodeId: string; intent: any }) => {
       updateRemoteElement(nodeId, { intentTag: intent });
       console.log('Intent classified for node:', nodeId, intent);
@@ -821,6 +886,36 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     }
   }, [socket, canvasId, connected]);
 
+  const emitCommentCreate = useCallback((comment: any) => {
+    if (connected && socket) {
+      socket.emit('create_comment', { canvasId, comment });
+    }
+  }, [socket, canvasId, connected]);
+
+  const emitCommentReply = useCallback((commentId: string, reply: any) => {
+    if (connected && socket) {
+      socket.emit('add_comment_reply', { canvasId, commentId, reply });
+    }
+  }, [socket, canvasId, connected]);
+
+  const emitCommentDelete = useCallback((commentId: string) => {
+    if (connected && socket) {
+      socket.emit('delete_comment', { canvasId, commentId });
+    }
+  }, [socket, canvasId, connected]);
+
+  const emitCommentUpdate = useCallback((commentId: string, updates: { canvasX: number; canvasY: number }) => {
+    if (connected && socket) {
+      socket.emit('update_comment', { canvasId, commentId, updates });
+    }
+  }, [socket, canvasId, connected]);
+
+  const emitMentionNotification = useCallback((notification: MentionNotification) => {
+    if (connected && socket) {
+      socket.emit('mention_notification', { canvasId, notification });
+    }
+  }, [socket, canvasId, connected]);
+
   return (
     <SocketContext.Provider
       value={{
@@ -846,6 +941,11 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         emitChatMessage,
         emitClearChat,
         emitCanvasScreenshot,
+        emitCommentCreate,
+        emitCommentReply,
+        emitCommentDelete,
+        emitCommentUpdate,
+        emitMentionNotification,
       }}
     >
       {children}
