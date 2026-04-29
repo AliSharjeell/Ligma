@@ -469,15 +469,18 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       ) : (
         <span
           ref={textRef}
-          className="px-0 py-0 whitespace-nowrap relative z-10"
+          className={cn(
+            "px-0 py-0 whitespace-nowrap relative z-10",
+            !element.content && "text-slate-400 italic opacity-50"
+          )}
           style={{
-            color: fontColor,
+            color: element.content ? fontColor : undefined,
             fontSize: currentFontSize,
             fontFamily,
             fontWeight,
           }}
         >
-          {element.content}
+          {element.content || 'Type something...'}
         </span>
       )}
 

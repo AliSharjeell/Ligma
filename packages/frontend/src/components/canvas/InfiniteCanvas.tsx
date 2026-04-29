@@ -380,10 +380,12 @@ export function InfiniteCanvas() {
         size: { width: 200, height: 150 },
         content: '',
         color: stickyColor,
-        locked: false,
+        locked: true,
+        lockedBy: userId,
         createdBy: userId,
       });
       emitElementCreate(element);
+      emitElementLock(element.id);
       setSelectedId(element.id);
       return;
     }
@@ -406,10 +408,13 @@ export function InfiniteCanvas() {
           fontWeight: textFontWeight,
           textAlign: textAlign || 'left',
         },
-        locked: false,
+        locked: true,
+        lockedBy: userId,
         createdBy: userId,
       });
       emitElementCreate(element);
+      emitElementLock(element.id);
+      setSelectedId(element.id);
       return;
     }
 
