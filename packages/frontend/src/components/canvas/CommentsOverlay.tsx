@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { cn } from '@/lib/utils';
-import { Check, X } from 'lucide-react';
+import { Check, X, Trash2 } from 'lucide-react';
 
 interface CommentPinProps {
   comment: {
@@ -162,6 +162,15 @@ export function CommentPin({
                 }}
                 className="p-1.5 rounded hover:bg-red-50 hover:text-red-500 transition-colors"
                 title="Delete"
+              >
+                <Trash2 className="size-4" />
+              </button>
+              <button
+                onClick={() => {
+                  setShowPopover(false);
+                }}
+                className="p-1.5 rounded hover:bg-gray-100 text-gray-500 transition-colors"
+                title="Close"
               >
                 <X className="size-4" />
               </button>
