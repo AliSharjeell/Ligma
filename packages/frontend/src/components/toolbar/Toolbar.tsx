@@ -403,7 +403,7 @@ export function Toolbar() {
           size="icon"
           onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
           className={cn(
-            "h-[42px] w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
+            "h-[53px] w-[53px] rounded-xl bg-white shadow-excalidraw border border-slate-200",
             isLeftPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
           )}
           title="Layers"
@@ -413,7 +413,7 @@ export function Toolbar() {
       </div>
 
       {/* Top Left - Branding + Export */}
-      <div className="absolute top-4 left-[60px] z-20">
+      <div className="absolute top-4 left-[80px] z-20">
         <div className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 shadow-excalidraw px-3 py-2">
           <button
             onClick={() => router.push('/dashboard')}
@@ -721,7 +721,7 @@ export function Toolbar() {
           size="icon"
           onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
           className={cn(
-            "h-[42px] w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
+            "h-[53px] w-[53px] rounded-xl bg-white shadow-excalidraw border border-slate-200",
             isRightPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
           )}
           title="Workspace & Settings"
