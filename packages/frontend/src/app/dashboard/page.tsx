@@ -155,21 +155,21 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <div className="flex items-center justify-center gap-4 mb-8">
           <button
             onClick={handleCreateRoom}
-            className="flex items-center justify-center gap-3 px-6 py-5 text-white rounded-xl transition hover:opacity-90 shadow-md"
+            className="flex items-center justify-center gap-2 px-4 py-3 text-white rounded-lg transition hover:opacity-90 shadow-sm text-sm font-medium"
             style={{ backgroundColor: BRAND_COLOR }}
           >
-            <Plus className="w-6 h-6" />
-            <span className="text-lg font-semibold">Create New Room</span>
+            <Plus className="w-4 h-4" />
+            <span>Create New Room</span>
           </button>
           <button
             onClick={() => setShowJoinModal(true)}
-            className="flex items-center justify-center gap-3 px-6 py-5 text-gray-700 bg-white border-2 border-gray-200 rounded-xl transition hover:border-gray-300 hover:bg-gray-50 shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg transition hover:border-gray-400 hover:bg-gray-50 shadow-sm text-sm font-medium"
           >
-            <Users className="w-6 h-6" />
-            <span className="text-lg font-semibold">Join a Room</span>
+            <Users className="w-4 h-4" />
+            <span>Join a Room</span>
           </button>
         </div>
 
