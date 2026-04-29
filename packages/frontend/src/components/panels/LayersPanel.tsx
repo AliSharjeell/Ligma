@@ -211,7 +211,6 @@ export function LayersList() {
                   </div>
                 );
               })}
-              )}
             </div>
           );
         })}
