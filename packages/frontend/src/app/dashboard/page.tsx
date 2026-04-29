@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCanvasStore } from '@/store/canvas-store';
 import { generateRoomCode } from '@/lib/utils';
 import * as Dialog from '@radix-ui/react-dialog';
-import { LogOut, Plus, Users, Clock, Layers } from 'lucide-react';
+import { LogOut, Plus, Users, Clock, Layers, User, ChevronDown } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 const BRAND_COLOR = '#50B5FF';
@@ -39,9 +39,26 @@ export default function DashboardPage() {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [joinError, setJoinError] = useState('');
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadRecentRooms();
+    // Check if user is signed in from localStorage
+    const storedUsername = localStorage.getItem('ligma-username');
+    setIsSignedIn(!!storedUsername && storedUsername !== '');
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowUserDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const loadRecentRooms = () => {
@@ -123,56 +140,105 @@ export default function DashboardPage() {
       localStorage.removeItem('ligma-username');
     }
     setUserName('');
+    setIsSignedIn(false);
+    setShowUserDropdown(false);
     router.push('/');
+  };
+
+  const handleSignIn = () => {
+    router.push('/auth');
   };
 
   return (
     <ProtectedRoute>
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR, fontFamily: 'var(--font-lora), serif' }}>
-              Ligma
-            </h1>
-            <div className="flex items-center gap-4">
-              <span className="text-gray-600">
-                Welcome, <span className="font-medium text-gray-900">{userName}</span>
-              </span>
+      {/* Full-width Header with Background Image */}
+      <header
+        className="relative w-full h-64 flex flex-col items-center justify-center"
+        style={{
+          backgroundImage: 'url(/pexels-michael-spadoni-269949-813465.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/40" />
+
+        {/* User dropdown - top right corner */}
+        <div className="absolute top-4 right-4 z-10" ref={dropdownRef}>
+          {isSignedIn ? (
+            <div className="relative">
               <button
-                onClick={handleSignOut}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                className="flex items-center gap-2 px-3 py-2 bg-white/20 backdrop-blur-sm text-white rounded-lg hover:bg-white/30 transition border border-white/30"
               >
-                <LogOut className="w-4 h-4" />
-                Sign Out
+                <User className="w-5 h-5" />
+                <ChevronDown className={`w-4 h-4 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} />
               </button>
+
+              {showUserDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-20">
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                </div>
+              )}
             </div>
+          ) : (
+            <button
+              onClick={handleSignIn}
+              className="px-4 py-2 bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition text-sm font-medium"
+            >
+              Sign In
+            </button>
+          )}
+        </div>
+
+        {/* Centered content */}
+        <div className="relative z-10 text-center">
+          <h1
+            className="text-6xl font-bold text-white"
+            style={{
+              fontFamily: 'var(--font-lora), serif',
+              textShadow: '2px 2px 8px rgba(0, 0, 0, 0.5)',
+            }}
+          >
+            Ligma
+          </h1>
+          <p className="mt-4 text-xl text-white" style={{ textShadow: '1px 1px 4px rgba(0, 0, 0, 0.5)' }}>
+            Welcome, {userName}!
+          </p>
+
+          {/* Compact Action Buttons */}
+          <div className="flex items-center justify-center gap-3 mt-6">
+            <button
+              onClick={handleCreateRoom}
+              className="flex items-center justify-center gap-2 px-4 py-2 text-white rounded-lg transition hover:opacity-90 text-sm font-medium"
+              style={{ backgroundColor: BRAND_COLOR }}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Room</span>
+            </button>
+            <button
+              onClick={() => setShowJoinModal(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg transition hover:border-gray-400 hover:bg-gray-50 text-sm font-medium"
+            >
+              <Users className="w-4 h-4" />
+              <span>Join Room</span>
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Action Buttons */}
-        <div className="flex items-start gap-4 mb-8">
-          <button
-            onClick={handleCreateRoom}
-            className="flex items-center justify-center gap-2 px-4 py-3 text-white rounded-lg transition hover:opacity-90 shadow-sm text-sm font-medium"
-            style={{ backgroundColor: BRAND_COLOR }}
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create New Room</span>
-          </button>
-          <button
-            onClick={() => setShowJoinModal(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg transition hover:border-gray-400 hover:bg-gray-50 shadow-sm text-sm font-medium"
-          >
-            <Users className="w-4 h-4" />
-            <span>Join a Room</span>
-          </button>
-        </div>
-
         {/* Recent Canvases Grid */}
         <section>
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Canvases</h2>
