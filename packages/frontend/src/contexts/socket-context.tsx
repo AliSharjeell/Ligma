@@ -285,6 +285,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       createdBy: node.createdBy || 'unknown',
       createdAt: node.createdAt || Date.now(),
       updatedAt: node.updatedAt || Date.now(),
+      groupId: node.groupId,
     };
   }, []);
 
