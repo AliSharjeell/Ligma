@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
+import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
 import { cn, generateRoomCode } from '@/lib/utils';
 import {
@@ -160,17 +161,28 @@ export function Toolbar() {
   const normalizedRoom = currentRoom && currentRoom !== 'undefined' ? currentRoom : 'default';
   const [roomInput, setRoomInput] = useState(normalizedRoom);
 
+  const { isAuthenticated, username: authUserName, userId: authUserId } = useAuthStore();
+
   useEffect(() => {
     setRoomInput(normalizedRoom);
 
-    // Check if name is set, if not, open join modal
+    // If authenticated, automatically use auth details and skip modal
+    if (isAuthenticated && authUserName && authUserId) {
+      setUserName(authUserName);
+      // Sync userId to canvas store so backend recognizes us
+      useCanvasStore.setState({ userId: authUserId });
+      setIsJoinModalOpen(false);
+      return;
+    }
+
+    // Otherwise check for legacy stored name
     const storedName = localStorage.getItem('ligma-username');
     if (!storedName) {
       setIsJoinModalOpen(true);
     } else {
       setNameInput(storedName);
     }
-  }, [normalizedRoom]);
+  }, [normalizedRoom, isAuthenticated, authUserName, authUserId, setUserName]);
 
   // B: Listen for role request events
   useEffect(() => {
