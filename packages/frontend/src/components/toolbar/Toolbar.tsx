@@ -396,22 +396,20 @@ export function Toolbar() {
 
   return (
     <>
-      {/* Top Left - Layers Button (Separate) */}
+      {/* Top Left - Layers Button (Separate, matches bar height) */}
       <div className="absolute top-4 left-4 z-20">
-        <div className="flex items-center justify-center rounded-xl bg-white border border-slate-200 shadow-excalidraw w-11 h-11">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
-            className={cn(
-              "h-9 w-9 rounded-lg",
-              isLeftPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
-            )}
-            title="Layers"
-          >
-            <Layers className="size-4 text-slate-600" />
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+          className={cn(
+            "h-[42px] w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
+            isLeftPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
+          )}
+          title="Layers"
+        >
+          <Layers className="size-5 text-slate-600" />
+        </Button>
       </div>
 
       {/* Top Left - Branding + Export */}
@@ -718,20 +716,18 @@ export function Toolbar() {
 
       {/* Top Right Settings Button */}
       <div className="absolute top-4 right-4 z-20">
-        <div className="flex items-center justify-center rounded-xl bg-white border border-slate-200 shadow-excalidraw w-11 h-11">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
-            className={cn(
-              "h-9 w-9 rounded-lg relative",
-              isRightPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
-            )}
-            title="Workspace & Settings"
-          >
-            <Settings className="size-4 text-slate-600" />
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
+          className={cn(
+            "h-[42px] w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
+            isRightPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
+          )}
+          title="Workspace & Settings"
+        >
+          <Settings className="size-5 text-slate-600" />
+        </Button>
       </div>
 
       {/* Left Sidebar - Layers */}

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCanvasStore } from '@/store/canvas-store';
 import { generateRoomCode } from '@/lib/utils';
 import * as Dialog from '@radix-ui/react-dialog';
-import { LogOut, Plus, Users, Clock, Layers, User, ChevronDown } from 'lucide-react';
+import { LogOut, Plus, Users, Clock, Layers, User, ChevronDown, MoreHorizontal, Share2, Trash2 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 const BRAND_COLOR = '#50B5FF';
@@ -41,7 +41,9 @@ export default function DashboardPage() {
   const [joinError, setJoinError] = useState('');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadRecentRooms();
@@ -56,10 +58,29 @@ export default function DashboardPage() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowUserDropdown(false);
       }
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleShareRoom = (roomId: string) => {
+    navigator.clipboard.writeText(`${window.location.origin}/room/${roomId}`);
+    setOpenMenuId(null);
+  };
+
+  const handleDeleteRoom = (roomId: string) => {
+    if (confirm('Are you sure you want to remove this canvas from your recent list?')) {
+      const recentKey = 'ligma-recent-rooms';
+      const recent = JSON.parse(localStorage.getItem(recentKey) || '[]');
+      const filtered = recent.filter((r: string) => r !== roomId);
+      localStorage.setItem(recentKey, JSON.stringify(filtered));
+      loadRecentRooms();
+    }
+    setOpenMenuId(null);
+  };
 
   const loadRecentRooms = () => {
     if (typeof window === 'undefined') return;
@@ -255,9 +276,42 @@ export default function DashboardPage() {
                     <h3 className="font-semibold text-gray-900 truncate pr-2 group-hover:text-blue-600 transition">
                       {room.name}
                     </h3>
-                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded font-mono">
-                      {room.id}
-                    </span>
+                    <div className="relative" ref={openMenuId === room.id ? menuRef : null}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === room.id ? null : room.id);
+                        }}
+                        className="p-1.5 hover:bg-gray-100 rounded-lg transition"
+                        title="More options"
+                      >
+                        <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                      </button>
+                      {openMenuId === room.id && (
+                        <div className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShareRoom(room.id);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
+                          >
+                            <Share2 className="w-4 h-4" />
+                            Share
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRoom(room.id);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2 text-sm text-gray-500">
                     <div className="flex items-center gap-2">
