@@ -199,10 +199,9 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     userId,
     userName,
     addRemoteElement,
-    updateElement,
-    deleteElement,
-    lockElement,
-    unlockElement,
+    updateRemoteElement,
+    deleteRemoteElement,
+    setRemoteElementLock,
     updateUserCursor,
     addUser,
     removeUser,
@@ -424,14 +423,15 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
 
     // Flag to track if this is the initial load
     let isInitialLoad = true;
+    let receivedInitialNodeEvents = false;
 
     newSocket.on('sync_response', (payload: { state: { nodes: any[] } }) => {
       if (payload.state && payload.state.nodes) {
         const serverElements = payload.state.nodes.map(nodeStateToCanvasElement);
-        // Only use server state on first load
+        // On join, backend may stream historical node events first and then send an empty
+        // snapshot from in-memory state; do not wipe already-received nodes in that case.
         if (isInitialLoad) {
-          const currentElements = useCanvasStore.getState().elements;
-          if (currentElements.size === 0) {
+          if (serverElements.length > 0 || !receivedInitialNodeEvents) {
             setElements(serverElements);
           }
           isInitialLoad = false;
@@ -491,6 +491,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     });
 
     newSocket.on('node_created', (event: NodeCreatedEvent) => {
+      if (isInitialLoad) receivedInitialNodeEvents = true;
       addRemoteElement(toCanvasElement(event));
       console.log('Node created:', event);
     });
@@ -502,21 +503,21 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       if (event.changes.style) {
         nextChanges.textStyle = event.changes.style as CanvasElement['textStyle'];
       }
-      updateElement(event.nodeId, nextChanges);
+      updateRemoteElement(event.nodeId, nextChanges);
       console.log('Node updated:', event);
     });
 
     newSocket.on('node_deleted', (event: NodeDeletedEvent) => {
       console.log('Node deleted:', event);
-      deleteElement(event.nodeId);
+      deleteRemoteElement(event.nodeId);
     });
 
     newSocket.on('node_locked', (event: NodeLockedEvent) => {
-      lockElement(event.nodeId);
+      setRemoteElementLock(event.nodeId, event.lockedBy);
     });
 
     newSocket.on('node_unlocked', (event: NodeUnlockedEvent) => {
-      unlockElement(event.nodeId);
+      setRemoteElementLock(event.nodeId, undefined);
     });
 
     newSocket.on('cursor_moved', ({ userId: cursorUserId, position }: { userId: string; position: Position }) => {
@@ -566,7 +567,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     return () => {
       newSocket.disconnect();
     };
-  }, [url, userId, userName, canvasId, addRemoteElement, updateElement, deleteElement, lockElement, unlockElement, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement, setUsers, setUserRole, resetCanvas, replayQueue, persistElements]);
+  }, [url, userId, userName, canvasId, addRemoteElement, updateRemoteElement, deleteRemoteElement, setRemoteElementLock, updateUserCursor, addUser, removeUser, addRemoteEvent, setEventLog, setTasks, addRemoteTask, updateTask, deleteTask, toCanvasElement, toUser, toTask, setElements, nodeStateToCanvasElement, setUsers, setUserRole, resetCanvas, replayQueue, persistElements]);
 
   const addToQueue = useCallback((event: Omit<QueuedEvent, 'id' | 'timestamp'>) => {
     const queuedEvent: QueuedEvent = {

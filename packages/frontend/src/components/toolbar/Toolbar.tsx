@@ -280,26 +280,59 @@ export function Toolbar() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      if (e.key === 'v' || e.key === 'V') { setTool('select'); clearSelection(); }
-      if (e.key === 'h' || e.key === 'H') { setTool('pan'); clearSelection(); }
-      if (e.key === 's' || e.key === 'S') { setTool('sticky'); clearSelection(); }
-      if (e.key === 'r' || e.key === 'R') { setTool('shape'); clearSelection(); }
-      if (e.key === 't' || e.key === 'T') { setTool('text'); clearSelection(); }
-      if (e.key === 'd' || e.key === 'D') { setTool('draw'); clearSelection(); }
-      if (e.key === 'e' || e.key === 'E') { setTool('eraser'); clearSelection(); }
-      if (e.key === 'c' || e.key === 'C') { useCanvasStore.getState().setIsCommentMode(!useCanvasStore.getState().isCommentMode); clearSelection(); }
-
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
         if (e.shiftKey) redo(); else undo();
+        return;
+      }
+
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.target instanceof HTMLElement && e.target.isContentEditable) return;
+
+      const setToolFromShortcut = (nextTool: Tool) => {
+        if (userRole === 'Viewer' && nextTool !== 'select' && nextTool !== 'pan') {
+          alert('Viewers can only use Select and Pan tools.');
+          return;
+        }
+        setIsCommentMode(false);
+        setTool(nextTool);
+        clearSelection();
+      };
+
+      switch (e.key.toLowerCase()) {
+        case 'v':
+          setToolFromShortcut('select');
+          break;
+        case 'h':
+          setToolFromShortcut('pan');
+          break;
+        case 's':
+          setToolFromShortcut('sticky');
+          break;
+        case 'r':
+          setToolFromShortcut('shape');
+          break;
+        case 't':
+          setToolFromShortcut('text');
+          break;
+        case 'd':
+          setToolFromShortcut('draw');
+          break;
+        case 'e':
+          setToolFromShortcut('eraser');
+          break;
+        case 'c':
+          setIsCommentMode(!useCanvasStore.getState().isCommentMode);
+          clearSelection();
+          break;
+        default:
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setTool, undo, redo, clearSelection]);
+  }, [setTool, undo, redo, clearSelection, userRole, setIsCommentMode]);
 
   const handleTextStyleChange = (updates: Partial<NonNullable<CanvasElement['textStyle']>>) => {
     if (selectedElement?.type === 'text') {

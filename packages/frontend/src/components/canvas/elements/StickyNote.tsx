@@ -143,6 +143,7 @@ export function StickyNote({ element }: StickyNoteProps) {
     if (tool === 'select' || tool === 'sticky') {
       setSelectedId(element.id);
     }
+    if (userRole === 'Viewer') return;
     // Only allow dragging with select or sticky tool
     if (tool !== 'select' && tool !== 'sticky') return;
 

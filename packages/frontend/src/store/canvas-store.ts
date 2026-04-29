@@ -35,6 +35,9 @@ interface CanvasStore extends CanvasState {
 
   addElement: (element: Omit<CanvasElement, 'id' | 'createdAt' | 'updatedAt'>) => CanvasElement;
   addRemoteElement: (element: CanvasElement) => void;
+  updateRemoteElement: (id: string, updates: Partial<CanvasElement>) => void;
+  deleteRemoteElement: (id: string) => void;
+  setRemoteElementLock: (id: string, lockedBy?: string) => void;
   updateElement: (id: string, updates: Partial<CanvasElement>) => void;
   deleteElement: (id: string) => void;
   lockElement: (id: string) => boolean;
@@ -84,6 +87,12 @@ interface CanvasStore extends CanvasState {
 }
 
 const getElementsKey = (roomId?: string) => `ligma-canvas-${roomId || 'default'}`;
+const getCurrentRoomId = (): string | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  const segment = window.location.pathname.split('/').pop();
+  if (!segment || segment === 'undefined') return 'default';
+  return decodeURIComponent(segment);
+};
 
 const saveElementsToStorage = (elements: Map<string, CanvasElement>, roomId?: string) => {
   if (typeof window !== 'undefined') {
@@ -209,7 +218,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.set(element.id, element);
-      saveElementsToStorage(newElements);
+      saveElementsToStorage(newElements, getCurrentRoomId());
       return { elements: newElements, history: newHistory, redoStack: [] };
     });
     return element;
@@ -222,6 +231,45 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       }
       const newElements = new Map(state.elements);
       newElements.set(element.id, element);
+      saveElementsToStorage(newElements, getCurrentRoomId());
+      return { elements: newElements };
+    });
+  },
+
+  updateRemoteElement: (id, updates) => {
+    set((state) => {
+      const element = state.elements.get(id);
+      if (!element) return state;
+      const newElements = new Map(state.elements);
+      newElements.set(id, { ...element, ...updates, updatedAt: Date.now() });
+      saveElementsToStorage(newElements, getCurrentRoomId());
+      return { elements: newElements };
+    });
+  },
+
+  deleteRemoteElement: (id) => {
+    set((state) => {
+      if (!state.elements.has(id)) return state;
+      const newElements = new Map(state.elements);
+      newElements.delete(id);
+      const newSelectedIds = new Set(state.selectedIds);
+      newSelectedIds.delete(id);
+      saveElementsToStorage(newElements, getCurrentRoomId());
+      return { elements: newElements, selectedIds: newSelectedIds };
+    });
+  },
+
+  setRemoteElementLock: (id, lockedBy) => {
+    set((state) => {
+      const element = state.elements.get(id);
+      if (!element) return state;
+      const newElements = new Map(state.elements);
+      newElements.set(id, {
+        ...element,
+        locked: !!lockedBy,
+        lockedBy,
+      });
+      saveElementsToStorage(newElements, getCurrentRoomId());
       return { elements: newElements };
     });
   },
@@ -236,9 +284,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.set(id, { ...element, ...updates, updatedAt: Date.now() });
-      // Use current room from localStorage key if available
-      const roomId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : undefined;
-      saveElementsToStorage(newElements, roomId);
+      saveElementsToStorage(newElements, getCurrentRoomId());
       return { elements: newElements, history: newHistory, redoStack: [] };
     });
   },
@@ -248,7 +294,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const newHistory = [...state.history, { elements: new Map(state.elements), timestamp: Date.now() }].slice(-50);
       const newElements = new Map(state.elements);
       newElements.delete(id);
-      saveElementsToStorage(newElements);
+      saveElementsToStorage(newElements, getCurrentRoomId());
       const newSelectedIds = new Set(state.selectedIds);
       newSelectedIds.delete(id);
       return {
@@ -267,8 +313,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     set((state) => {
       const newElements = new Map(state.elements);
       newElements.set(id, { ...element, locked: true, lockedBy: userId });
-      const roomId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : undefined;
-      saveElementsToStorage(newElements, roomId);
+      saveElementsToStorage(newElements, getCurrentRoomId());
       return { elements: newElements };
     });
     return true;
@@ -280,8 +325,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       if (!element) return state;
       const newElements = new Map(state.elements);
       newElements.set(id, { ...element, locked: false, lockedBy: undefined });
-      const roomId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : undefined;
-      saveElementsToStorage(newElements, roomId);
+      saveElementsToStorage(newElements, getCurrentRoomId());
       return { elements: newElements };
     });
   },
@@ -530,14 +574,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   loadElements: (roomId) => {
     const saved = loadElementsFromStorage(roomId);
-    if (saved.length > 0) {
-      const newElements = new Map<string, CanvasElement>();
-      saved.forEach((el) => {
-        // Preserve lock state from storage
-        newElements.set(el.id, el);
-      });
-      set({ elements: newElements });
-    }
+    const newElements = new Map<string, CanvasElement>();
+    saved.forEach((el) => {
+      // Preserve lock state from storage
+      newElements.set(el.id, el);
+    });
+    set({ elements: newElements, selectedIds: new Set() });
   },
 
   resetCanvas: () => set({

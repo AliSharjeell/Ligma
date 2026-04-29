@@ -13,7 +13,7 @@ interface DrawingProps {
 
 export function Drawing({ element }: DrawingProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const { selectedIds, setSelectedId, updateElement, userId, tool } = useCanvasStore();
+  const { selectedIds, setSelectedId, updateElement, userId, userRole, tool } = useCanvasStore();
   const { emitElementUpdate } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
@@ -63,6 +63,7 @@ export function Drawing({ element }: DrawingProps) {
     if (tool === 'select') {
       setSelectedId(element.id);
     }
+    if (userRole === 'Viewer') return;
     // For other tools, let the event propagate to canvas
 
     const startX = e.clientX;

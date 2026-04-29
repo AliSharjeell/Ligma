@@ -276,9 +276,12 @@ export function InfiniteCanvas() {
       if (!selectedIds.has(clickedElement.id)) {
         setSelectedId(clickedElement.id);
       }
-      // Start dragging (either single or multiple)
-      setIsDragging(true);
-      setDragStart({ x: e.clientX, y: e.clientY });
+      // Viewers can select but not move elements.
+      if (userRole !== 'Viewer') {
+        // Start dragging (either single or multiple)
+        setIsDragging(true);
+        setDragStart({ x: e.clientX, y: e.clientY });
+      }
       return;
     }
 
@@ -402,7 +405,7 @@ export function InfiniteCanvas() {
     }
 
     // Multi-drag: when dragging selected elements
-    if (isDragging && tool === 'select' && selectedIds.size > 0 && dragStart) {
+    if (isDragging && tool === 'select' && userRole !== 'Viewer' && selectedIds.size > 0 && dragStart) {
       suppressClickClearRef.current = true;
       const dx = (e.clientX - dragStart.x) / viewportZoom;
       const dy = (e.clientY - dragStart.y) / viewportZoom;
@@ -514,7 +517,7 @@ export function InfiniteCanvas() {
     }
 
     // Sync moved elements to server (skip locked ones)
-    if (isDragging && tool === 'select' && selectedIds.size > 0) {
+    if (isDragging && tool === 'select' && userRole !== 'Viewer' && selectedIds.size > 0) {
       selectedIds.forEach(id => {
         const element = elements.get(id);
         if (element && !element.locked) {

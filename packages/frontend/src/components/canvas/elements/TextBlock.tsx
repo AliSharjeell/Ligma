@@ -179,6 +179,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     if (tool === 'select') {
       setSelectedId(element.id);
     }
+    if (userRole === 'Viewer') return;
     // For other tools, let the event propagate to canvas
 
     const startX = e.clientX;
