@@ -630,15 +630,15 @@ export function InfiniteCanvas() {
     }
 
     // Handle comment mode - set pending comment
-    if (isCommentMode && e.target === canvasRef.current) {
+    if (isCommentMode || tool === 'comment') {
       clearSelection();
       const canvasRect = canvasRef.current?.getBoundingClientRect();
       if (!canvasRect) return;
 
       const screenX = e.clientX - canvasRect.left;
       const screenY = e.clientY - canvasRect.top;
-      const canvasX = screenX / viewportZoom - viewportPosition.x;
-      const canvasY = screenY / viewportZoom - viewportPosition.y;
+      const canvasX = (screenX - viewportPosition.x) / viewportZoom;
+      const canvasY = (screenY - viewportPosition.y) / viewportZoom;
 
       // Trigger pending comment in CommentsOverlay via store state
       useCanvasStore.setState({
@@ -654,7 +654,7 @@ export function InfiniteCanvas() {
     if (e.target === canvasRef.current) {
       clearSelection();
     }
-  }, [clearSelection, isCommentMode, viewportPosition, viewportZoom]);
+  }, [clearSelection, isCommentMode, tool, viewportPosition, viewportZoom]);
 
   const handleCanvasDoubleClick = useCallback((e: React.MouseEvent) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
