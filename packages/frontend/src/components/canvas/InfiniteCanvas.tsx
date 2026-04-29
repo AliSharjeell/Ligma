@@ -272,20 +272,23 @@ export function InfiniteCanvas() {
 
     // If clicking on an element with select tool
     if (tool === 'select' && clickedElement) {
+      const state = useCanvasStore.getState();
+      const currentElements = state.elements;
+      const currentSelectedIds = state.selectedIds;
+
       // If element is part of a group, select all group members
       let idsToSelect = new Set<string>([clickedElement.id]);
       if (clickedElement.groupId) {
-        elements.forEach((e, id) => {
+        currentElements.forEach((e, id) => {
           if (e.groupId === clickedElement.groupId) {
             idsToSelect.add(id);
           }
         });
-      } else if (selectedIds.size > 0) {
-        // Check if any selected element is part of a group - include all group members
-        selectedIds.forEach(id => {
-          const el = elements.get(id);
+      } else if (currentSelectedIds.size > 0) {
+        currentSelectedIds.forEach(id => {
+          const el = currentElements.get(id);
           if (el?.groupId) {
-            elements.forEach((e, eid) => {
+            currentElements.forEach((e, eid) => {
               if (e.groupId === el.groupId) idsToSelect.add(eid);
             });
           } else {
@@ -426,16 +429,18 @@ export function InfiniteCanvas() {
     // Multi-drag: when dragging selected elements
     if (isDragging && tool === 'select' && userRole !== 'Viewer' && selectedIds.size > 0 && dragStart) {
       suppressClickClearRef.current = true;
+      const currentElements = useCanvasStore.getState().elements;
+      const currentSelectedIds = useCanvasStore.getState().selectedIds;
       const dx = (e.clientX - dragStart.x) / viewportZoom;
       const dy = (e.clientY - dragStart.y) / viewportZoom;
 
       // Get all elements that need to move (selected + their group members)
       const elementsToMove = new Set<string>();
-      selectedIds.forEach(id => {
+      currentSelectedIds.forEach(id => {
         elementsToMove.add(id);
-        const el = elements.get(id);
+        const el = currentElements.get(id);
         if (el?.groupId) {
-          elements.forEach((e, eid) => {
+          currentElements.forEach((e, eid) => {
             if (e.groupId === el.groupId) elementsToMove.add(eid);
           });
         }
@@ -443,9 +448,9 @@ export function InfiniteCanvas() {
 
       // Move all elements (skip locked ones)
       elementsToMove.forEach(id => {
-        const element = elements.get(id);
+        const element = currentElements.get(id);
         if (element && !element.locked) {
-          updateElement(id, {
+          useCanvasStore.getState().updateElement(id, {
             position: {
               x: element.position.x + dx,
               y: element.position.y + dy,
