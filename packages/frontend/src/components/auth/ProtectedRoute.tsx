@@ -26,29 +26,27 @@ function isAuthStored(): boolean {
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
-  const storeAuth = useAuthStore((state) => state.isAuthenticated);
-  const [isAuth, setIsAuth] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Check localStorage directly for auth state
-    const stored = isAuthStored();
-    setIsAuth(stored);
-    setIsLoading(false);
-
-    if (!stored) {
+    // Initial check
+    if (!isAuthStored()) {
       router.replace('/auth');
+    } else {
+      setIsReady(true);
     }
   }, [router]);
 
-  // Also subscribe to store changes
+  // Also watch for store changes
   useEffect(() => {
-    if (!isLoading && !storeAuth) {
+    if (isReady && !isAuthenticated) {
       router.replace('/auth');
     }
-  }, [storeAuth, isLoading, router]);
+  }, [isAuthenticated, isReady, router]);
 
-  if (isLoading || !isAuth) {
+  // Don't render children until auth is verified
+  if (!isReady || !isAuthStored()) {
     return null;
   }
 
