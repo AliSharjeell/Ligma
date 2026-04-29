@@ -306,6 +306,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       className={cn(
         'absolute select-none outline-none',
         isLockedByOther && 'pointer-events-none',
+        isLocked && !isBeingEdited && 'pointer-events-none',
         !isLocked && tool !== 'select' && 'pointer-events-none',
         !isLocked && tool === 'draw' && 'cursor-crosshair',
         !isLocked && tool === 'select' && 'cursor-text'

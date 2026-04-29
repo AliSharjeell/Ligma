@@ -181,12 +181,20 @@ export class SocketHandler {
     });
 
     socket.on('lock_node', (data: { canvasId: string; nodeId: string; durationMs?: number }) => {
-      
+
       this.handleLockNode(socket, data);
     });
 
     socket.on('unlock_node', (data: { canvasId: string; nodeId: string }) => {
       this.handleUnlockNode(socket, data);
+    });
+
+    socket.on('lock_nodes', (data: { canvasId: string; nodeIds: string[]; durationMs?: number }) => {
+      this.handleBulkLock(socket, data);
+    });
+
+    socket.on('unlock_nodes', (data: { canvasId: string; nodeIds: string[] }) => {
+      this.handleBulkUnlock(socket, data);
     });
 
     socket.on('cursor_move', (data: { canvasId: string; position: { x: number; y: number } }) => {
@@ -1046,6 +1054,98 @@ export class SocketHandler {
       timestamp: event.timestamp,
       details: 'Unlocked node'
     });
+  }
+
+  private async handleBulkLock(socket: Socket, data: { canvasId: string; nodeIds: string[]; durationMs?: number }): Promise<void> {
+    const { canvasId, nodeIds, durationMs } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    const { successful, failed } = this.rbac.lockNodes(nodeIds, userId, canvasId, durationMs);
+
+    const clientState = this.clientStates.get(canvasId);
+    const user = clientState?.users.get(userId);
+    const vc = user?.vectorClock || new VectorClock();
+
+    const events: NodeLockedEvent[] = [];
+    for (const nodeId of successful) {
+      const event: NodeLockedEvent = {
+        id: uuidv4(),
+        type: 'NodeLocked',
+        canvasId,
+        userId,
+        nodeId,
+        lockedBy: userId,
+        lockExpiry: durationMs ? Date.now() + durationMs : undefined,
+        timestamp: Date.now(),
+        vectorClock: vc.increment(userId).toJSON()
+      };
+      events.push(event);
+      this.eventStore.append(event);
+      await this.persistence.saveEvent(event);
+    }
+
+    this.io.to(canvasId).emit('nodes_locked', { events, failed });
+    this.io.to(canvasId).emit('bulk_lock_result', { successful, failed });
+
+    const userName = clientState?.users.get(userId)?.userName || 'Unknown';
+    for (const nodeId of successful) {
+      this.pushActivity(canvasId, {
+        id: uuidv4(),
+        type: 'lock',
+        elementId: nodeId,
+        userId,
+        userName,
+        timestamp: Date.now(),
+        details: `Locked node (bulk)`
+      });
+    }
+  }
+
+  private async handleBulkUnlock(socket: Socket, data: { canvasId: string; nodeIds: string[] }): Promise<void> {
+    const { canvasId, nodeIds } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    const { successful, failed } = this.rbac.unlockNodes(nodeIds, userId);
+
+    const clientState = this.clientStates.get(canvasId);
+    const user = clientState?.users.get(userId);
+    const vc = user?.vectorClock || new VectorClock();
+
+    const events: NodeUnlockedEvent[] = [];
+    for (const nodeId of successful) {
+      const event: NodeUnlockedEvent = {
+        id: uuidv4(),
+        type: 'NodeUnlocked',
+        canvasId,
+        userId,
+        nodeId,
+        timestamp: Date.now(),
+        vectorClock: vc.increment(userId).toJSON()
+      };
+      events.push(event);
+      this.eventStore.append(event);
+      await this.persistence.saveEvent(event);
+    }
+
+    this.io.to(canvasId).emit('nodes_unlocked', { events, failed });
+    this.io.to(canvasId).emit('bulk_unlock_result', { successful, failed });
+
+    const userName = clientState?.users.get(userId)?.userName || 'Unknown';
+    for (const nodeId of successful) {
+      this.pushActivity(canvasId, {
+        id: uuidv4(),
+        type: 'unlock',
+        elementId: nodeId,
+        userId,
+        userName,
+        timestamp: Date.now(),
+        details: `Unlocked node (bulk)`
+      });
+    }
   }
 
   private handleCursorMove(socket: Socket, data: { canvasId: string; position: { x: number; y: number } }): void {

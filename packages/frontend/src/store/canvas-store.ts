@@ -72,6 +72,8 @@ interface CanvasStore extends CanvasState {
   setEventLog: (events: CanvasEvent[]) => void;
   setElements: (elements: CanvasElement[]) => void;
   setUsers: (users: User[]) => void;
+  appendSessionSnapshot: (elements?: Map<string, CanvasElement>, timestamp?: number) => void;
+  setReplayFrameElements: (elements: Map<string, CanvasElement> | null) => void;
 
   // Comments
   comments: Comment[];
@@ -158,6 +160,9 @@ const getInitialUserName = () => {
   return 'User';
 };
 
+const MAX_SESSION_TIMELINE = 500;
+const SESSION_SNAPSHOT_MIN_INTERVAL_MS = 80;
+
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   elements: new Map(),
   selectedIds: new Set(),
@@ -185,6 +190,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   userName: getInitialUserName(),
   history: [],
   redoStack: [],
+  sessionTimeline: [],
+  replayFrameElements: null,
   comments: [],
   isCommentMode: false,
   activeCommentId: null,
@@ -213,7 +220,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setTextAlign: (align) => set({ textAlign: align }),
   setPresenceHeatmapEnabled: (enabled) => set({ presenceHeatmapEnabled: enabled }),
   setPresenceZonesEnabled: (enabled) => set({ presenceZonesEnabled: enabled }),
-  setTimeTravelEnabled: (enabled) => set({ timeTravelEnabled: enabled }),
+  setTimeTravelEnabled: (enabled) =>
+    set((state) => ({
+      timeTravelEnabled: enabled,
+      replayFrameElements: enabled ? state.replayFrameElements : null,
+    })),
   setSelectedId: (id) => set({ selectedIds: id ? new Set([id]) : new Set() }),
   setSelectedIds: (ids) => set({ selectedIds: ids }),
   addToSelection: (id) => set((state) => {
@@ -566,6 +577,33 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     set({ users: newUsers });
   },
 
+  appendSessionSnapshot: (elements, timestamp) => {
+    const snapTimestamp = timestamp ?? Date.now();
+    const sourceElements = elements ?? get().elements;
+
+    set((state) => {
+      const previous = state.sessionTimeline[state.sessionTimeline.length - 1];
+      const nextSnapshot = { elements: new Map(sourceElements), timestamp: snapTimestamp };
+
+      if (!previous) {
+        return { sessionTimeline: [nextSnapshot] };
+      }
+
+      if (snapTimestamp - previous.timestamp < SESSION_SNAPSHOT_MIN_INTERVAL_MS) {
+        const compacted = [...state.sessionTimeline];
+        compacted[compacted.length - 1] = nextSnapshot;
+        return { sessionTimeline: compacted };
+      }
+
+      const nextTimeline = [...state.sessionTimeline, nextSnapshot].slice(-MAX_SESSION_TIMELINE);
+      return { sessionTimeline: nextTimeline };
+    });
+  },
+
+  setReplayFrameElements: (elements) => {
+    set({ replayFrameElements: elements ? new Map(elements) : null });
+  },
+
   setIsCommentMode: (enabled) => set({ isCommentMode: enabled }),
   setActiveCommentId: (id) => set({ activeCommentId: id }),
   setHoveredCommentId: (id) => set({ hoveredCommentId: id }),
@@ -714,6 +752,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     history: [],
     redoStack: [],
     mentionNotifications: [],
+    sessionTimeline: [],
+    replayFrameElements: null,
   }),
 
   // Mention notifications

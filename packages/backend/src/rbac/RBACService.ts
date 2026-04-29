@@ -190,6 +190,36 @@ export class RBACService {
     return true;
   }
 
+  lockNodes(nodeIds: string[], userId: string, canvasId: string, durationMs?: number): { successful: string[], failed: string[] } {
+    const successful: string[] = [];
+    const failed: string[] = [];
+
+    for (const nodeId of nodeIds) {
+      if (this.lockNode(nodeId, userId, canvasId, durationMs)) {
+        successful.push(nodeId);
+      } else {
+        failed.push(nodeId);
+      }
+    }
+
+    return { successful, failed };
+  }
+
+  unlockNodes(nodeIds: string[], userId: string): { successful: string[], failed: string[] } {
+    const successful: string[] = [];
+    const failed: string[] = [];
+
+    for (const nodeId of nodeIds) {
+      if (this.unlockNode(nodeId, userId)) {
+        successful.push(nodeId);
+      } else {
+        failed.push(nodeId);
+      }
+    }
+
+    return { successful, failed };
+  }
+
   isNodeLocked(nodeId: string): { locked: boolean; lockedBy?: string; expired?: boolean } {
     const lock = this.lockedNodes.get(nodeId);
     if (!lock) return { locked: false };
