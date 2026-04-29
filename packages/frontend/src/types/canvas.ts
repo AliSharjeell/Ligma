@@ -92,6 +92,8 @@ export interface CanvasState {
   userName: string;
   history: { elements: Map<string, CanvasElement>; timestamp: number }[];
   redoStack: { elements: Map<string, CanvasElement>; timestamp: number }[];
+  sessionTimeline: { elements: Map<string, CanvasElement>; timestamp: number }[];
+  replayFrameElements: Map<string, CanvasElement> | null;
   comments: Comment[];
   isCommentMode: boolean;
   activeCommentId: string | null;
