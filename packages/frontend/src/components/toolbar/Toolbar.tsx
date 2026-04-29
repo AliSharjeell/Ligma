@@ -290,11 +290,11 @@ export function Toolbar() {
       if (e.target instanceof HTMLElement && e.target.isContentEditable) return;
 
       const setToolFromShortcut = (nextTool: Tool) => {
-        if (userRole === 'Viewer' && nextTool !== 'select' && nextTool !== 'pan') {
-          alert('Viewers can only use Select and Pan tools.');
+        if (userRole === 'Viewer' && nextTool !== 'select' && nextTool !== 'pan' && nextTool !== 'comment') {
+          alert('Viewers can only use Select, Pan and Comment tools.');
           return;
         }
-        setIsCommentMode(false);
+        setIsCommentMode(nextTool === 'comment');
         setTool(nextTool);
         clearSelection();
       };
@@ -322,8 +322,7 @@ export function Toolbar() {
           setToolFromShortcut('eraser');
           break;
         case 'c':
-          setIsCommentMode(!useCanvasStore.getState().isCommentMode);
-          clearSelection();
+          setToolFromShortcut(useCanvasStore.getState().isCommentMode ? 'select' : 'comment');
           break;
         default:
           break;
@@ -442,7 +441,16 @@ export function Toolbar() {
         <Button
           variant={isCommentMode ? 'default' : 'ghost'}
           size="icon"
-          onClick={() => setIsCommentMode(!isCommentMode)}
+          onClick={() => {
+            if (isCommentMode) {
+              setIsCommentMode(false);
+              setTool('select');
+            } else {
+              setIsCommentMode(true);
+              setTool('comment');
+              clearSelection();
+            }
+          }}
           title="Comment (C)"
           className={cn(
             'h-10 w-10 rounded-xl transition-all',

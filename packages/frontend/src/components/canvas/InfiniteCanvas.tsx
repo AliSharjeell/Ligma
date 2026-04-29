@@ -644,7 +644,8 @@ export function InfiniteCanvas() {
       useCanvasStore.setState({
         pendingCommentX: canvasX,
         pendingCommentY: canvasY,
-        isCommentMode: false
+        isCommentMode: false,
+        tool: 'select'
       });
       return;
     }
