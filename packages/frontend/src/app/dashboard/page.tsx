@@ -171,7 +171,7 @@ export default function DashboardPage() {
     setUserName('');
     setIsSignedIn(false);
     setShowUserDropdown(false);
-    router.push('/auth');
+    window.location.href = '/auth';
   };
 
   const handleSignIn = () => {
