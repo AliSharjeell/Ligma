@@ -254,7 +254,7 @@ export function InfiniteCanvas() {
 
     // Check if clicking on an element
     const allElements = useCanvasStore.getState().elements;
-    const clickedElement = Array.from(allElements.values()).find(el => isPointInElement(x, y, el));
+    const clickedElement = Array.from(allElements.values()).reverse().find(el => isPointInElement(x, y, el));
 
     // If clicking on background with select tool
     if (tool === 'select' && !clickedElement) {
@@ -475,6 +475,9 @@ export function InfiniteCanvas() {
               x: element.position.x + dx,
               y: element.position.y + dy,
             },
+            ...(element.type === 'drawing' && element.points
+              ? { points: element.points.map(p => ({ x: p.x + dx, y: p.y + dy })) }
+              : {})
           };
         }
       });
@@ -661,7 +664,7 @@ export function InfiniteCanvas() {
 
     // Check if double clicked an element
     const elementsArray = Array.from(elements.values());
-    const clickedElement = elementsArray.find((element) => isPointInElement(x, y, element));
+    const clickedElement = elementsArray.reverse().find((element) => isPointInElement(x, y, element));
 
     if (clickedElement && tool === 'select') {
       setSelectedId(clickedElement.id);

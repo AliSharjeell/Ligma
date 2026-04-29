@@ -170,43 +170,6 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     document.addEventListener('mouseup', handleMouseUp);
   }, [currentFontSize, element.textStyle, element.id, element.position, element.size, updateElement, emitElementUpdate, userRole]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Locked by anyone = can't move
-    if (element.locked) return;
-    if (isResizing) return;
-    if (isEditing) return;
-    if (tool === 'select') {
-      setSelectedId(element.id);
-    }
-    if (userRole === 'Viewer') return;
-    // For other tools, let the event propagate to canvas
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startPos = { ...element.position };
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const state = useCanvasStore.getState();
-      const dx = (moveEvent.clientX - startX) / state.viewportZoom;
-      const dy = (moveEvent.clientY - startY) / state.viewportZoom;
-      updateElement(element.id, {
-        position: { x: startPos.x + dx, y: startPos.y + dy },
-      });
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      const updatedElement = useCanvasStore.getState().getElement(element.id);
-      if (updatedElement) {
-        emitElementUpdate(updatedElement);
-      }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -272,7 +235,6 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
         minWidth: '10px',
         zIndex: isEditing ? 100 : 1,
       }}
-      onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

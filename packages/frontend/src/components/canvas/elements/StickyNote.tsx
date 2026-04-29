@@ -132,45 +132,6 @@ export function StickyNote({ element }: StickyNoteProps) {
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Locked by anyone = can't move
-    if (element.locked) return;
-    const lockedByMe = Array.from(useCanvasStore.getState().elements.values()).find(
-      (item) => item.locked && item.lockedBy === userId && item.id !== element.id
-    );
-    if (lockedByMe) return;
-    if (tool === 'select' || tool === 'sticky') {
-      setSelectedId(element.id);
-    }
-    if (userRole === 'Viewer') return;
-    // Only allow dragging with select or sticky tool
-    if (tool !== 'select' && tool !== 'sticky') return;
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startPos = { ...element.position };
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const dx = (moveEvent.clientX - startX) / (useCanvasStore.getState().viewportZoom);
-      const dy = (moveEvent.clientY - startY) / (useCanvasStore.getState().viewportZoom);
-      updateElement(element.id, {
-        position: { x: startPos.x + dx, y: startPos.y + dy },
-      });
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      const updatedElement = useCanvasStore.getState().getElement(element.id);
-      if (updatedElement) {
-        emitElementUpdate(updatedElement);
-      }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -217,7 +178,6 @@ export function StickyNote({ element }: StickyNoteProps) {
         height: element.size.height,
         backgroundColor: element.color || COLORS[0],
       }}
-      onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
