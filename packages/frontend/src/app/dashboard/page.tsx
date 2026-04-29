@@ -49,32 +49,32 @@ export default function DashboardPage() {
 
     const rooms: RecentRoom[] = [];
 
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('ligma-canvas-')) {
-        const roomId = key.replace('ligma-canvas-', '');
-        if (roomId === 'default') continue;
+    // Only show rooms from the user's recent rooms list
+    const recentKey = 'ligma-recent-rooms';
+    const recentRoomIds = JSON.parse(localStorage.getItem(recentKey) || '[]');
 
-        try {
-          const elements = JSON.parse(localStorage.getItem(key) || '[]');
-          const metaKey = `ligma-room-meta-${roomId}`;
-          const meta = localStorage.getItem(metaKey);
-          const lastAccessed = meta ? JSON.parse(meta).lastAccessed : Date.now();
+    for (const roomId of recentRoomIds) {
+      const key = `ligma-canvas-${roomId}`;
+      const metaKey = `ligma-room-meta-${roomId}`;
 
-          rooms.push({
-            id: roomId,
-            name: meta ? JSON.parse(meta).name : roomId,
-            lastAccessed,
-            elementCount: elements.length,
-          });
-        } catch {
-          rooms.push({
-            id: roomId,
-            name: roomId,
-            lastAccessed: Date.now(),
-            elementCount: 0,
-          });
-        }
+      try {
+        const elements = JSON.parse(localStorage.getItem(key) || '[]');
+        const meta = localStorage.getItem(metaKey);
+        const lastAccessed = meta ? JSON.parse(meta).lastAccessed : Date.now();
+
+        rooms.push({
+          id: roomId,
+          name: meta ? JSON.parse(meta).name : roomId,
+          lastAccessed,
+          elementCount: elements.length,
+        });
+      } catch {
+        rooms.push({
+          id: roomId,
+          name: roomId,
+          lastAccessed: Date.now(),
+          elementCount: 0,
+        });
       }
     }
 
