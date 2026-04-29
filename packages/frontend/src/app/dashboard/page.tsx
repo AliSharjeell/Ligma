@@ -6,7 +6,7 @@ import { useCanvasStore } from '@/store/canvas-store';
 import { generateRoomCode } from '@/lib/utils';
 import * as Dialog from '@radix-ui/react-dialog';
 import { LogOut, Plus, Users, Clock, Layers } from 'lucide-react';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 const BRAND_COLOR = '#50B5FF';
 
