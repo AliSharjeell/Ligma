@@ -255,7 +255,7 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Recent Canvases Grid */}
         <section>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Canvases</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Sessions</h2>
           {recentRooms.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
               <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
