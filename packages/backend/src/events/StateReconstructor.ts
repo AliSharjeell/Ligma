@@ -97,6 +97,9 @@ export class StateReconstructor {
       if (event.changes.points !== undefined) {
         node.points = event.changes.points;
       }
+      if (event.changes.groupId !== undefined) {
+        node.groupId = event.changes.groupId === null ? undefined : event.changes.groupId;
+      }
       node.version = event.version;
       node.updatedAt = event.timestamp;
     }
@@ -163,6 +166,9 @@ export class StateReconstructor {
           }
           if (updateEvent.changes.points !== undefined) {
             result.points = updateEvent.changes.points;
+          }
+          if (updateEvent.changes.groupId !== undefined) {
+            result.groupId = updateEvent.changes.groupId === null ? undefined : updateEvent.changes.groupId;
           }
           result.version = updateEvent.version;
           result.updatedAt = updateEvent.timestamp;

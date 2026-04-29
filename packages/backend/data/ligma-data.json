@@ -17294,6 +17294,17 @@
         "vectorClock": {
           "311f0243-2a68-4d52-9c2f-c7bfa197f7f6": 675
         }
+      },
+      {
+        "id": "57de0298-261b-428b-b4e8-7f4dd866729c",
+        "type": "NodeUnlocked",
+        "canvasId": "0JD5SE",
+        "userId": "ff6d70f2-3d60-424b-96b4-0ac920ec19e0",
+        "nodeId": "cdacb18a-a0b8-4efa-86ec-0fabc81b28de",
+        "timestamp": 1777454105586,
+        "vectorClock": {
+          "ff6d70f2-3d60-424b-96b4-0ac920ec19e0": 512
+        }
       }
     ]
   },

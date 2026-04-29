@@ -38,7 +38,7 @@ type NodeUpdatedEvent = {
     color: string;
     shapeType: ShapeType;
     points: Position[];
-    groupId?: string;
+    groupId?: string | null;
   }>;
   timestamp: number;
 };
@@ -259,6 +259,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       createdBy: event.userId,
       createdAt: now,
       updatedAt: now,
+      groupId: event.metadata?.groupId as string | undefined,
     };
   }, []);
 
@@ -505,6 +506,9 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       if (event.changes.style) {
         nextChanges.textStyle = event.changes.style as CanvasElement['textStyle'];
       }
+      if (event.changes.groupId === null) {
+        nextChanges.groupId = undefined;
+      }
       updateRemoteElement(event.nodeId, nextChanges);
       console.log('Node updated:', event);
     });
@@ -635,7 +639,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         shapeType: element.shapeType,
         points: element.points,
         style: element.textStyle,
-        groupId: element.groupId,
+        groupId: element.groupId ?? null,
       },
       vectorClock: {},
     };
