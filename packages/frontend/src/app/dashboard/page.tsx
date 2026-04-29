@@ -167,7 +167,7 @@ export default function DashboardPage() {
             <div className="relative">
               <button
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 px-3 py-2 bg-white/20 backdrop-blur-sm text-white rounded-lg hover:bg-white/30 transition border border-white/30"
+                className="flex items-center gap-2 px-3 py-2 bg-white/80 backdrop-blur-sm text-gray-800 rounded-lg hover:bg-white transition border border-gray-200"
               >
                 <User className="w-5 h-5" />
                 <ChevronDown className={`w-4 h-4 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} />
