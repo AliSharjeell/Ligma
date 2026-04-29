@@ -1,6 +1,7 @@
 export type ElementType = 'sticky' | 'shape' | 'text' | 'drawing' | 'image' | 'comment';
 export type ShapeType = 'rectangle' | 'circle' | 'arrow' | 'line' | 'triangle' | 'diamond' | 'hexagon' | 'star';
 export type Tool = 'select' | 'sticky' | 'shape' | 'text' | 'draw' | 'pan' | 'eraser' | 'comment';
+export type IntentType = 'action_item' | 'decision' | 'open_question' | 'reference';
 
 export interface Position {
   x: number;
@@ -10,6 +11,12 @@ export interface Position {
 export interface Size {
   width: number;
   height: number;
+}
+
+export interface IntentTag {
+  type: IntentType;
+  confidence: number;
+  keywords: string[];
 }
 
 export interface CanvasElement {
@@ -32,6 +39,7 @@ export interface CanvasElement {
   createdBy: string;
   createdAt: number;
   updatedAt: number;
+  intentTag?: IntentTag;
 }
 
 export interface User {
@@ -48,7 +56,11 @@ export interface Task {
   description?: string;
   status: 'pending' | 'in-progress' | 'completed';
   assignee?: string;
+  authorId?: string;  // ID of user who created the task
+  authorName?: string; // Display name of creator
   priority: 'low' | 'medium' | 'high';
+  nodeId?: string; // Link back to canvas node
+  createdAt: number;
 }
 
 export interface CanvasState {

@@ -93,6 +93,9 @@ type TaskDto = {
   status: 'pending' | 'in_progress' | 'completed';
   assignee?: string;
   priority?: 'low' | 'medium' | 'high';
+  nodeId?: string; // Link back to canvas node
+  authorId?: string; // ID of user who created the task
+  authorName?: string; // Display name of creator
 };
 
 type TasksListPayload = {
@@ -231,6 +234,10 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       status: task.status === 'in_progress' ? 'in-progress' : task.status,
       assignee: task.assignee,
       priority: task.priority || 'medium',
+      nodeId: task.nodeId, // Link back to canvas node
+      authorId: task.authorId,
+      authorName: task.authorName,
+      createdAt: Date.now(),
     };
   }, []);
 
@@ -547,6 +554,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     });
 
     newSocket.on('task_created', (task: TaskDto) => {
+      console.log('Task created event received:', task);
       addRemoteTask(toTask(task));
     });
 
@@ -556,6 +564,11 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
 
     newSocket.on('task_deleted', ({ taskId }: { taskId: string }) => {
       deleteTask(taskId);
+    });
+
+    newSocket.on('intent_classified', ({ nodeId, intent }: { nodeId: string; intent: any }) => {
+      updateRemoteElement(nodeId, { intentTag: intent });
+      console.log('Intent classified for node:', nodeId, intent);
     });
 
     setSocket(newSocket);
