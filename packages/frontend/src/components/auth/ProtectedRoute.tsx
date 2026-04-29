@@ -32,7 +32,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   useEffect(() => {
     // Initial check
     if (!isAuthStored()) {
-      router.replace('/auth');
+      router.replace('/auth?error=unauthorized');
     } else {
       setIsReady(true);
     }

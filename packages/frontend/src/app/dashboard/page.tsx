@@ -34,14 +34,12 @@ function formatTimeAgo(timestamp: number): string {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const userName = useCanvasStore((s) => s.userName);
-  const setUserName = useCanvasStore((s) => s.setUserName);
+  const { username: authUserName, isAuthenticated } = useAuthStore();
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [isSignedIn, setIsSignedIn] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -49,9 +47,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadRecentRooms();
-    // Check if user is signed in from localStorage
-    const storedUsername = localStorage.getItem('ligma-username');
-    setIsSignedIn(!!storedUsername && storedUsername !== '');
   }, []);
 
   // Close dropdown when clicking outside
@@ -168,10 +163,9 @@ export default function DashboardPage() {
 
   const handleSignOut = () => {
     useAuthStore.getState().signOut();
-    setUserName('');
-    setIsSignedIn(false);
+    useCanvasStore.getState().setUserName('');
     setShowUserDropdown(false);
-    window.location.href = '/auth';
+    router.replace('/auth');
   };
 
   const handleSignIn = () => {
@@ -192,7 +186,7 @@ export default function DashboardPage() {
         >
           {/* User dropdown - top right corner */}
           <div className="absolute top-4 right-4 z-10" ref={dropdownRef}>
-            {isSignedIn ? (
+            {isAuthenticated ? (
               <div className="relative">
                 <button
                   onClick={() => setShowUserDropdown(!showUserDropdown)}
@@ -205,7 +199,7 @@ export default function DashboardPage() {
                 {showUserDropdown && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-20">
                     <div className="px-4 py-2 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
+                      <p className="text-sm font-medium text-gray-900 truncate">{authUserName}</p>
                     </div>
                     <button
                       onClick={handleSignOut}
