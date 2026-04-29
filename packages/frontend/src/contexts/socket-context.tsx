@@ -134,6 +134,8 @@ interface SocketContextType {
   emitElementDelete: (elementId: string) => void;
   emitElementLock: (elementId: string) => void;
   emitElementUnlock: (elementId: string) => void;
+  emitBulkLock: (elementIds: string[], durationMs?: number) => void;
+  emitBulkUnlock: (elementIds: string[]) => void;
   emitCursorMove: (position: Position) => void;
   emitTaskCreate: (task: { title: string; description?: string; priority: 'low' | 'medium' | 'high' }) => void;
   emitTaskUpdate: (taskId: string, status: 'pending' | 'in-progress' | 'completed') => void;
@@ -156,6 +158,8 @@ const SocketContext = createContext<SocketContextType>({
   emitElementDelete: () => {},
   emitElementLock: () => {},
   emitElementUnlock: () => {},
+  emitBulkLock: () => {},
+  emitBulkUnlock: () => {},
   emitCursorMove: () => {},
   emitTaskCreate: () => {},
   emitTaskUpdate: () => {},
@@ -338,6 +342,12 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
             break;
           case 'unlock_node':
             socketInstance.emit('unlock_node', event.payload);
+            break;
+          case 'lock_nodes':
+            socketInstance.emit('lock_nodes', event.payload);
+            break;
+          case 'unlock_nodes':
+            socketInstance.emit('unlock_nodes', event.payload);
             break;
           // Role-related events
           case 'role_request':
@@ -546,6 +556,24 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       setRemoteElementLock(event.nodeId, undefined);
     });
 
+    newSocket.on('nodes_locked', ({ events, failed }: { events: NodeLockedEvent[]; failed: string[] }) => {
+      events.forEach(event => {
+        setRemoteElementLock(event.nodeId, event.lockedBy);
+      });
+      if (failed.length > 0) {
+        console.warn('Some nodes failed to lock:', failed);
+      }
+    });
+
+    newSocket.on('nodes_unlocked', ({ events, failed }: { events: NodeUnlockedEvent[]; failed: string[] }) => {
+      events.forEach(event => {
+        setRemoteElementLock(event.nodeId, undefined);
+      });
+      if (failed.length > 0) {
+        console.warn('Some nodes failed to unlock:', failed);
+      }
+    });
+
     newSocket.on('cursor_moved', ({ userId: cursorUserId, position }: { userId: string; position: Position }) => {
       if (cursorUserId !== userId) {
         updateUserCursor(cursorUserId, position);
@@ -721,6 +749,24 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     }
   }, [socket, canvasId, connected, addToQueue]);
 
+  const emitBulkLock = useCallback((elementIds: string[], durationMs?: number) => {
+    const payload = { canvasId, nodeIds: elementIds, durationMs };
+    if (connected) {
+      socket?.emit('lock_nodes', payload);
+    } else {
+      addToQueue({ type: 'lock', eventType: 'lock_nodes', canvasId, payload });
+    }
+  }, [socket, canvasId, connected, addToQueue]);
+
+  const emitBulkUnlock = useCallback((elementIds: string[]) => {
+    const payload = { canvasId, nodeIds: elementIds };
+    if (connected) {
+      socket?.emit('unlock_nodes', payload);
+    } else {
+      addToQueue({ type: 'unlock', eventType: 'unlock_nodes', canvasId, payload });
+    }
+  }, [socket, canvasId, connected, addToQueue]);
+
   const emitCursorMove = useCallback((position: Position) => {
     socket?.emit('cursor_move', { canvasId, position });
   }, [socket, canvasId]);
@@ -799,6 +845,8 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         emitElementDelete,
         emitElementLock,
         emitElementUnlock,
+        emitBulkLock,
+        emitBulkUnlock,
         emitCursorMove,
         emitTaskCreate,
         emitTaskUpdate,

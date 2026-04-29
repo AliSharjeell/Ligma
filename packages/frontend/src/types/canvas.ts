@@ -139,6 +139,12 @@ export interface SocketEvents {
   delete_node: string;
   lock_node: { elementId: string; userId: string };
   unlock_node: string;
+  lock_nodes: { nodeIds: string[]; userId: string };
+  unlock_nodes: { nodeIds: string[]; userId: string };
+  nodes_locked: { events: any[]; failed: string[] };
+  nodes_unlocked: { events: any[]; failed: string[] };
+  bulk_lock_result: { successful: string[]; failed: string[] };
+  bulk_unlock_result: { successful: string[]; failed: string[] };
   cursor_move: { userId: string; position: Position };
   user_joined: User;
   user_left: string;
