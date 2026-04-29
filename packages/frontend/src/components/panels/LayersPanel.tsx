@@ -6,7 +6,7 @@ import { useSocket } from '@/contexts/socket-context';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image, MessageCircle } from 'lucide-react';
+import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image, MessageCircle, Folder } from 'lucide-react';
 import type { CanvasElement, ElementType } from '@/types/canvas';
 
 const LAYER_ICONS: Record<ElementType, React.ReactNode> = {
@@ -18,20 +18,34 @@ const LAYER_ICONS: Record<ElementType, React.ReactNode> = {
   comment: <MessageCircle className="size-3" />,
 };
 
+interface GroupedLayer {
+  groupId: string;
+  children: CanvasElement[];
+}
+
 export function LayersList() {
-  const { elements, selectedIds, setSelectedId, setSelectedIds, deleteElement, lockElement, unlockElement } = useCanvasStore();
+  const { elements, selectedIds, setSelectedId, setSelectedIds, deleteElement, lockElement, unlockElement, ungroupElements } = useCanvasStore();
   const { emitElementDelete, emitElementLock, emitElementUnlock } = useSocket();
   const [lastSelectedId, setLastSelectedId] = React.useState<string | null>(null);
 
-  const layers = Array.from(elements.values()).reverse();
-  const counts: Record<ElementType, number> = {
-    drawing: 0,
-    shape: 0,
-    sticky: 0,
-    text: 0,
-    image: 0,
-    comment: 0,
-  };
+  const organizedLayers = React.useMemo(() => {
+    const elementsArray = Array.from(elements.values()).reverse();
+    const groupMap = new Map<string, GroupedLayer>();
+    const ungrouped: CanvasElement[] = [];
+
+    elementsArray.forEach((el) => {
+      if (el.groupId) {
+        if (!groupMap.has(el.groupId)) {
+          groupMap.set(el.groupId, { groupId: el.groupId, children: [] });
+        }
+        groupMap.get(el.groupId)!.children.push(el);
+      } else {
+        ungrouped.push(el);
+      }
+    });
+
+    return { groups: Array.from(groupMap.values()), ungrouped };
+  }, [elements]);
 
   const handleLayerClick = (elementId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -46,7 +60,7 @@ export function LayersList() {
       setSelectedIds(newSelection);
       setLastSelectedId(elementId);
     } else if (e.shiftKey && lastSelectedId) {
-      const layerIds = layers.map(l => l.id);
+      const layerIds = organizedLayers.ungrouped.map(l => l.id);
       const startIdx = layerIds.indexOf(lastSelectedId);
       const endIdx = layerIds.indexOf(elementId);
 
@@ -62,7 +76,24 @@ export function LayersList() {
     }
   };
 
-  if (layers.length === 0) {
+  const handleGroupClick = (groupId: string, children: CanvasElement[], e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (e.ctrlKey || e.metaKey) {
+      const newSelection = new Set(selectedIds);
+      children.forEach(c => {
+        if (newSelection.has(c.id)) {
+          newSelection.delete(c.id);
+        } else {
+          newSelection.add(c.id);
+        }
+      });
+      setSelectedIds(newSelection);
+    } else {
+      setSelectedIds(new Set(children.map(c => c.id)));
+    }
+  };
+
+  if (elements.size === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         <Layers className="size-8 mx-auto mb-2 opacity-50" />
@@ -74,7 +105,93 @@ export function LayersList() {
   return (
     <ScrollArea className="h-[600px]">
       <div className="space-y-1">
-        {layers.map((element) => {
+        {organizedLayers.groups.map((group) => {
+          const isGroupSelected = group.children.some(c => selectedIds.has(c.id));
+          return (
+            <div key={group.groupId} className="space-y-1">
+              <div
+                className={cn(
+                  'flex items-center justify-between gap-2 px-2 py-2 rounded border cursor-pointer transition-colors bg-muted/50',
+                  isGroupSelected ? 'border-primary bg-primary/10' : 'border-primary/30'
+                )}
+                onClick={(e) => handleGroupClick(group.groupId, group.children, e)}
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Folder className="size-3 text-primary" />
+                  <span className="text-xs font-medium text-primary">Group ({group.children.length})</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      ungroupElements(group.groupId);
+                    }}
+                    title="Ungroup"
+                  >
+                    <Folder className="size-3 text-muted-foreground" />
+                  </Button>
+                </div>
+              </div>
+              {group.children.map((element) => {
+                const isSelected = selectedIds.has(element.id);
+                return (
+                  <div
+                    key={element.id}
+                    className={cn(
+                      'flex items-center justify-between gap-2 px-2 py-2 rounded border cursor-pointer transition-colors ml-4',
+                      isSelected ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'
+                    )}
+                    onClick={(e) => handleLayerClick(element.id, e)}
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {LAYER_ICONS[element.type]}
+                      <span className="text-xs text-muted-foreground capitalize shrink-0">
+                        {element.type}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (element.locked) {
+                            unlockElement(element.id);
+                            emitElementUnlock(element.id);
+                          } else {
+                            lockElement(element.id);
+                            emitElementLock(element.id);
+                          }
+                        }}
+                        title={element.locked ? 'Unlock' : 'Lock'}
+                      >
+                        {element.locked ? <Lock className="size-3" /> : <Unlock className="size-3 text-muted-foreground" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          emitElementDelete(element.id);
+                          deleteElement(element.id);
+                        }}
+                        title="Delete"
+                      >
+                        <Trash2 className="size-3" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        {organizedLayers.ungrouped.map((element) => {
           const isSelected = selectedIds.has(element.id);
           return (
             <div
