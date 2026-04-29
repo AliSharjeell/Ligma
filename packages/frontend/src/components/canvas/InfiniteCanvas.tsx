@@ -252,7 +252,8 @@ export function InfiniteCanvas() {
     const y = (e.clientY - canvasRect.top - viewportPosition.y) / viewportZoom;
 
     // Check if clicking on an element
-    const clickedElement = Array.from(elements.values()).find(el => isPointInElement(x, y, el));
+    const allElements = useCanvasStore.getState().elements;
+    const clickedElement = Array.from(allElements.values()).find(el => isPointInElement(x, y, el));
 
     // If clicking on background with select tool
     if (tool === 'select' && !clickedElement) {
