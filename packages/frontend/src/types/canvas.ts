@@ -32,6 +32,7 @@ export interface CanvasElement {
   createdBy: string;
   createdAt: number;
   updatedAt: number;
+  groupId?: string;
 }
 
 export interface User {
