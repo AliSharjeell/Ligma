@@ -67,7 +67,6 @@ export default function AuthPage() {
           <h1
             className="text-6xl font-bold mb-4 tracking-tight"
             style={{
-              textShadow: '0 1px 2px rgba(0,0,0,0.2)',
               fontFamily: 'var(--font-lora), serif'
             }}
           >
@@ -75,7 +74,6 @@ export default function AuthPage() {
           </h1>
           <p
             className="text-xl text-white"
-            style={{ textShadow: '1px 1px 4px rgba(0,0,0,0.5)' }}
           >
             Real-time Collaborative Canvas
           </p>
