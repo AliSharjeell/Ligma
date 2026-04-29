@@ -97,6 +97,7 @@ type TaskDto = {
   nodeId?: string; // Link back to canvas node
   authorId?: string; // ID of user who created the task
   authorName?: string; // Display name of creator
+  intentType?: 'action_item' | 'decision' | 'open_question' | 'reference';
 };
 
 type TasksListPayload = {
@@ -239,6 +240,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       authorId: task.authorId,
       authorName: task.authorName,
       createdAt: Date.now(),
+      intentType: task.intentType,
     };
   }, []);
 

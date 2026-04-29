@@ -63,6 +63,7 @@ export interface Task {
   priority: 'low' | 'medium' | 'high';
   nodeId?: string; // Link back to canvas node
   createdAt: number;
+  intentType?: 'action_item' | 'decision' | 'open_question' | 'reference';
 }
 
 export interface CanvasState {

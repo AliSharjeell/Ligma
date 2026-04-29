@@ -650,6 +650,16 @@ export class SocketHandler {
 
     // Classify intent using Groq LLM (async)
     try {
+      // Only classify text/sticky content (not drawing/shape/image)
+      if (nodeType !== 'text' && nodeType !== 'sticky') {
+        return;
+      }
+
+      // Only classify if content has meaningful text (min 3 chars)
+      if (!content || content.trim().length < 3) {
+        return;
+      }
+
       const intent = await this.intentClassifier.classify(content);
 
       // Emit intent classification event
@@ -660,27 +670,36 @@ export class SocketHandler {
         });
       }
 
-      if (intent.type === 'action_item' && intent.suggestedTask) {
-        const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
-        const task = this.taskBoard.addTask({
-          nodeId,
-          ...intent.suggestedTask,
-          status: 'pending',
-          canvasId,
-          priority: 'medium',
-          authorId: userId,
-          authorName: userName
-        });
-        this.io.to(canvasId).emit('task_created', {
-          id: task.id,
-          title: task.title,
-          description: task.description,
-          status: task.status,
-          priority: task.priority,
-          nodeId: task.nodeId,
-          authorId: task.authorId,
-          authorName: task.authorName
-        });
+      // Create task only for action_item, decision, open_question (NOT reference)
+      if (intent && intent.type && intent.type !== 'reference') {
+        // Only create if confidence is reasonable (>= 0.5) or has suggestedTask
+        if (intent.confidence >= 0.5 || intent.suggestedTask) {
+          const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
+          const title = intent.suggestedTask?.title || content.slice(0, 100).trim();
+
+          const task = this.taskBoard.addTask({
+            nodeId,
+            title,
+            description: intent.suggestedTask?.description || content.slice(0, 500),
+            status: 'pending',
+            canvasId,
+            priority: 'medium',
+            authorId: userId,
+            authorName: userName,
+            intentType: intent.type
+          });
+          this.io.to(canvasId).emit('task_created', {
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            priority: task.priority,
+            nodeId: task.nodeId,
+            authorId: task.authorId,
+            authorName: task.authorName,
+            intentType: task.intentType
+          });
+        }
       }
     } catch (error) {
       console.error('Intent classification error:', error);
@@ -795,7 +814,13 @@ export class SocketHandler {
     if (changes.content) {
       // Classify intent using Groq LLM (async)
       try {
-        const intent = await this.intentClassifier.classify(changes.content as string);
+        // Only classify if content has meaningful text (min 3 chars)
+        const contentStr = changes.content as string;
+        if (!contentStr || contentStr.trim().length < 3) {
+          return;
+        }
+
+        const intent = await this.intentClassifier.classify(contentStr);
 
         // Include intentTag in the changes so it gets saved to the node
         (changes as any).intentTag = intent;
@@ -806,29 +831,38 @@ export class SocketHandler {
           intent
         });
 
-        if (intent.type === 'action_item' && intent.suggestedTask) {
-          const existingTasks = this.taskBoard.getPendingTasks(canvasId);
-          const linkedTask = existingTasks.find(t => t.nodeId === nodeId);
-          if (!linkedTask) {
-            const task = this.taskBoard.addTask({
-              nodeId,
-              ...intent.suggestedTask,
-              status: 'pending',
-              canvasId,
-              authorId: userId,
-              authorName: userName
-            });
-            // Emit task_created event
-            this.io.to(canvasId).emit('task_created', {
-              id: task.id,
-              title: task.title,
-              description: task.description,
-              status: task.status,
-              priority: task.priority,
-              nodeId: task.nodeId,
-              authorId: task.authorId,
-              authorName: task.authorName
-            });
+        // Create task only for action_item, decision, open_question (NOT reference)
+        if (intent && intent.type && intent.type !== 'reference') {
+          // Only create if confidence is reasonable (>= 0.5) or has suggestedTask
+          if (intent.confidence >= 0.5 || intent.suggestedTask) {
+            const existingTasks = this.taskBoard.getPendingTasks(canvasId);
+            const linkedTask = existingTasks.find(t => t.nodeId === nodeId);
+            if (!linkedTask) {
+              const title = intent.suggestedTask?.title || contentStr.slice(0, 100).trim();
+
+              const task = this.taskBoard.addTask({
+                nodeId,
+                title,
+                description: intent.suggestedTask?.description || contentStr.slice(0, 500),
+                status: 'pending',
+                canvasId,
+                authorId: userId,
+                authorName: userName,
+                intentType: intent.type
+              });
+              // Emit task_created event
+              this.io.to(canvasId).emit('task_created', {
+                id: task.id,
+                title: task.title,
+                description: task.description,
+                status: task.status,
+                priority: task.priority,
+                nodeId: task.nodeId,
+                authorId: task.authorId,
+                authorName: task.authorName,
+                intentType: task.intentType
+              });
+            }
           }
         }
       } catch (error) {

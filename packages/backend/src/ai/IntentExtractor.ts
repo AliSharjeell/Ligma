@@ -197,7 +197,7 @@ export interface TaskBoardEntry {
   id: string;
   nodeId: string;
   title: string;
-  description: string | undefined;
+  description?: string;
   status: 'pending' | 'in_progress' | 'completed';
   assignee?: string;
   authorId?: string;
@@ -206,6 +206,7 @@ export interface TaskBoardEntry {
   priority?: 'low' | 'medium' | 'high';
   createdAt: number;
   canvasId: string;
+  intentType?: IntentType;
 }
 
 export class TaskBoard {
