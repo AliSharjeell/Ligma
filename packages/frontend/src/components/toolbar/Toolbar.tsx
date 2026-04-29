@@ -40,6 +40,10 @@ import {
   CheckSquare,
   MessageCircle,
   Share2,
+  Sparkles,
+  CheckCircle2,
+  ListTodo,
+  HelpCircle,
 } from 'lucide-react';
 import type { CanvasElement, Tool, ShapeType } from '@/types/canvas';
 import { TasksPanel } from '@/components/panels/TaskBoard';
@@ -92,13 +96,17 @@ export function Toolbar() {
   const [hasRequested, setHasRequested] = useState(false);
   const [rightPanelView, setRightPanelView] = useState<'main' | 'tasks' | 'activity' | 'comments'>('main');
   const [newTaskCount, setNewTaskCount] = useState(0);
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const router = useRouter();
-  const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership, connectionStatus } = useSocket();
+  const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership, emitGenerateSummary, connectionStatus } = useSocket();
 
   const {
     tool,
     shapeType,
     drawColor,
+    drawSize,
     shapeColor,
     stickyColor,
     textColor,
@@ -116,6 +124,7 @@ export function Toolbar() {
     setShapeType,
     clearSelection,
     setDrawColor,
+    setDrawSize,
     setShapeColor,
     setStickyColor,
     setTextColor,
@@ -205,12 +214,26 @@ export function Toolbar() {
       }
     });
 
+    socket.on('summary_result', ({ summary }: { summary: any }) => {
+      setSummaryData(summary);
+      setIsGeneratingSummary(false);
+      setIsSummaryDialogOpen(true);
+    });
+
+    socket.on('summary_error', ({ message }: { message: string }) => {
+      console.error('Summary error:', message);
+      setIsGeneratingSummary(false);
+      alert('Failed to generate summary: ' + message);
+    });
+
     return () => {
       socket.off('role_request', handleRoleRequest);
       socket.off('role_changed', handleRoleChanged);
       socket.off('role_request_cleared', handleRoleRequestCleared);
       socket.off('role_request_denied', handleRoleRequestDenied);
       socket.off('task_created');
+      socket.off('summary_result');
+      socket.off('summary_error');
     };
   }, [socket, userId, rightPanelView]);
 
@@ -544,10 +567,13 @@ export function Toolbar() {
               <input
                 type="range"
                 min="1"
-                max="10"
-                value={2}
-                className="w-16 h-1"
+                max="20"
+                value={drawSize}
+                onChange={(e) => setDrawSize(Number(e.target.value))}
+                className="w-20 h-1 accent-primary"
+                title={`Size: ${drawSize}px`}
               />
+              <span className="text-xs text-slate-500 w-5">{drawSize}</span>
             </div>
           )}
         </div>
@@ -950,6 +976,30 @@ export function Toolbar() {
                       {feature.label}
                     </Button>
                   ))}
+
+                  {/* Generate AI Summary Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="justify-start gap-3 h-10 text-xs rounded-lg px-3 bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 hover:bg-purple-100"
+                    onClick={() => {
+                      setIsGeneratingSummary(true);
+                      emitGenerateSummary();
+                    }}
+                    disabled={isGeneratingSummary}
+                  >
+                    {isGeneratingSummary ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="size-4 text-purple-500" />
+                        Generate AI Summary
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>
@@ -983,6 +1033,107 @@ export function Toolbar() {
           </div>
           <DialogFooter>
             <Button onClick={handleUpdateName}>Start Collaborating</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Summary Dialog */}
+      <Dialog open={isSummaryDialogOpen} onOpenChange={setIsSummaryDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="size-5 text-purple-500" />
+              AI Canvas Summary
+            </DialogTitle>
+            <DialogDescription>
+              Generated on {summaryData?.generatedAt ? new Date(summaryData.generatedAt).toLocaleString() : '...'}
+            </DialogDescription>
+          </DialogHeader>
+          {summaryData && (
+            <div className="space-y-6 py-4">
+              {/* Overview */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4">
+                <h4 className="font-semibold text-sm mb-2">Overview</h4>
+                <p className="text-sm text-slate-700">{summaryData.overview}</p>
+              </div>
+
+              {/* Participants */}
+              {summaryData.participants?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-2">Participants</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {summaryData.participants.map((p: string, i: number) => (
+                      <span key={i} className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded-full">{p}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Decisions */}
+              {summaryData.decisions?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                    <CheckCircle2 className="size-4 text-blue-500" />
+                    Decisions
+                  </h4>
+                  <ul className="space-y-1">
+                    {summaryData.decisions.map((d: string, i: number) => (
+                      <li key={i} className="text-sm bg-blue-50 px-3 py-2 rounded-lg">{d}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Action Items */}
+              {summaryData.actionItems?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                    <ListTodo className="size-4 text-red-500" />
+                    Action Items
+                  </h4>
+                  <ul className="space-y-1">
+                    {summaryData.actionItems.map((a: string, i: number) => (
+                      <li key={i} className="text-sm bg-red-50 px-3 py-2 rounded-lg">{a}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Open Questions */}
+              {summaryData.openQuestions?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                    <HelpCircle className="size-4 text-yellow-600" />
+                    Open Questions
+                  </h4>
+                  <ul className="space-y-1">
+                    {summaryData.openQuestions.map((q: string, i: number) => (
+                      <li key={i} className="text-sm bg-yellow-50 px-3 py-2 rounded-lg">{q}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Next Steps */}
+              {summaryData.nextSteps?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-2">Next Steps</h4>
+                  <ul className="space-y-1">
+                    {summaryData.nextSteps.map((n: string, i: number) => (
+                      <li key={i} className="text-sm bg-green-50 px-3 py-2 rounded-lg">{n}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSummaryDialogOpen(false)}>Close</Button>
+            <Button onClick={() => {
+              if (summaryData) {
+                navigator.clipboard.writeText(JSON.stringify(summaryData, null, 2));
+              }
+            }}>Copy JSON</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

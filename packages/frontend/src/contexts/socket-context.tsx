@@ -97,6 +97,7 @@ type TaskDto = {
   nodeId?: string; // Link back to canvas node
   authorId?: string; // ID of user who created the task
   authorName?: string; // Display name of creator
+  intentType?: 'action_item' | 'decision' | 'open_question' | 'reference';
 };
 
 type TasksListPayload = {
@@ -142,6 +143,7 @@ interface SocketContextType {
   emitApproveRoleRequest: (targetUserId: string) => void;
   emitDenyRoleRequest: (targetUserId: string) => void;
   emitTransferOwnership: (targetUserId: string) => void;
+  emitGenerateSummary: () => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -163,6 +165,7 @@ const SocketContext = createContext<SocketContextType>({
   emitApproveRoleRequest: () => {},
   emitDenyRoleRequest: () => {},
   emitTransferOwnership: () => {},
+  emitGenerateSummary: () => {},
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -239,6 +242,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       authorId: task.authorId,
       authorName: task.authorName,
       createdAt: Date.now(),
+      intentType: task.intentType,
     };
   }, []);
 
@@ -259,6 +263,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       size: event.metadata?.size || fallbackSize,
       content: event.content || '',
       color: event.metadata?.color || '#1f2937',
+      strokeWidth: event.metadata?.style?.strokeWidth as number | undefined,
       shapeType: event.metadata?.shapeType,
       points: event.metadata?.points,
       textStyle: event.metadata?.style as CanvasElement['textStyle'] | undefined,
@@ -286,6 +291,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       size: node.size || fallbackSize,
       content: node.content || '',
       color: node.color || '#1f2937',
+      strokeWidth: node.style?.strokeWidth as number | undefined,
       shapeType: node.shapeType,
       points: node.points,
       textStyle: node.style as CanvasElement['textStyle'] | undefined,
@@ -584,6 +590,21 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       console.log('Intent classified for node:', nodeId, intent);
     });
 
+    // Summary generation events
+    newSocket.on('summary_generating', ({ canvasId }: { canvasId: string }) => {
+      console.log('Generating summary for canvas:', canvasId);
+      // Could add loading state here
+    });
+
+    newSocket.on('summary_result', ({ canvasId, summary }: { canvasId: string; summary: any }) => {
+      console.log('Summary generated for canvas:', canvasId, summary);
+      // Store summary or trigger callback
+    });
+
+    newSocket.on('summary_error', ({ message }: { message: string }) => {
+      console.error('Summary generation error:', message);
+    });
+
     setSocket(newSocket);
 
     if (typeof window !== 'undefined') {
@@ -617,6 +638,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         size: element.size,
         points: element.points,
         color: element.color,
+        style: { strokeWidth: element.strokeWidth },
       };
       if (connected) {
         socket?.emit('create_node', payload);
@@ -759,6 +781,12 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     }
   }, [socket, canvasId, connected, addToQueue]);
 
+  const emitGenerateSummary = useCallback(() => {
+    if (connected && socket) {
+      socket.emit('generate_summary', { canvasId });
+    }
+  }, [socket, canvasId, connected]);
+
   return (
     <SocketContext.Provider
       value={{
@@ -780,6 +808,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         emitApproveRoleRequest,
         emitDenyRoleRequest,
         emitTransferOwnership,
+        emitGenerateSummary,
       }}
     >
       {children}

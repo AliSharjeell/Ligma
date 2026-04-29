@@ -26,6 +26,7 @@ export interface CanvasElement {
   size: Size;
   content: string;
   color?: string;
+  strokeWidth?: number;
   shapeType?: ShapeType;
   points?: Position[];
   textStyle?: {
@@ -62,6 +63,7 @@ export interface Task {
   priority: 'low' | 'medium' | 'high';
   nodeId?: string; // Link back to canvas node
   createdAt: number;
+  intentType?: 'action_item' | 'decision' | 'open_question' | 'reference';
 }
 
 export interface CanvasState {
@@ -70,6 +72,7 @@ export interface CanvasState {
   tool: Tool;
   shapeType: ShapeType;
   drawColor: string;
+  drawSize: number;
   shapeColor: string;
   stickyColor: string;
   textColor: string;

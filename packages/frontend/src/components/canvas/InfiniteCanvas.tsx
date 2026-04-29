@@ -41,6 +41,7 @@ export function InfiniteCanvas() {
     tool,
     shapeType,
     drawColor,
+    drawSize,
     shapeColor,
     stickyColor,
     textColor,
@@ -191,10 +192,10 @@ export function InfiniteCanvas() {
 
     if (isDragging && tool === 'draw' && drawPoints.length > 1) {
       const points: [number, number][] = drawPoints.map(p => [p.x, p.y]);
-      const node = rc.curve(points, { stroke: drawColor, strokeWidth: 2, roughness: 1 });
+      const node = rc.curve(points, { stroke: drawColor, strokeWidth: drawSize, roughness: 1 });
       previewSvgRef.current.appendChild(node);
     }
-  }, [isDrawingShape, shapePreview, shapeType, shapeColor, isDragging, tool, drawPoints, drawColor]);
+  }, [isDrawingShape, shapePreview, shapeType, shapeColor, isDragging, tool, drawPoints, drawColor, drawSize]);
 
   // Use native listener for wheel to ensure we can preventDefault (React synthetic events are often passive)
   useEffect(() => {
@@ -526,6 +527,7 @@ export function InfiniteCanvas() {
         content: '',
         points: drawPoints,
         color: drawColor,
+        strokeWidth: drawSize,
         locked: false,
         createdBy: userId,
       });

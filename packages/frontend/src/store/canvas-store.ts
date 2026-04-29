@@ -14,6 +14,7 @@ interface CanvasStore extends CanvasState {
   setTool: (tool: Tool) => void;
   setShapeType: (shapeType: ShapeType) => void;
   setDrawColor: (color: string) => void;
+  setDrawSize: (size: number) => void;
   setShapeColor: (color: string) => void;
   setStickyColor: (color: string) => void;
   setTextColor: (color: string) => void;
@@ -137,6 +138,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   tool: 'select',
   shapeType: 'rectangle',
   drawColor: '#1f2937',
+  drawSize: 3,
   shapeColor: '#374151',
   stickyColor: '#fef08a',
   textColor: '#1f2937',
@@ -174,6 +176,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setTool: (tool) => set({ tool }),
   setShapeType: (shapeType) => set({ shapeType }),
   setDrawColor: (color) => set({ drawColor: color }),
+  setDrawSize: (size) => set({ drawSize: size }),
   setShapeColor: (color) => set({ shapeColor: color }),
   setStickyColor: (color) => set({ stickyColor: color }),
   setTextColor: (color) => set({ textColor: color }),

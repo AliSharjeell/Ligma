@@ -12,12 +12,33 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { Task } from '@/types/canvas';
-import { ChevronLeft, Plus, Check, Circle, Clock } from 'lucide-react';
+import { ChevronLeft, Plus, Check, Circle, Clock, CheckCircle2, HelpCircle, FileText, ListTodo } from 'lucide-react';
 
 const priorityColors = {
   low: 'bg-green-100 text-green-800',
   medium: 'bg-yellow-100 text-yellow-800',
   high: 'bg-red-100 text-red-800',
+};
+
+const intentColors = {
+  action_item: 'bg-red-50 border-red-200',
+  decision: 'bg-blue-50 border-blue-200',
+  open_question: 'bg-yellow-50 border-yellow-200',
+  reference: 'bg-gray-50 border-gray-200',
+};
+
+const intentIcons = {
+  action_item: <ListTodo className="size-4 text-red-500" />,
+  decision: <CheckCircle2 className="size-4 text-blue-500" />,
+  open_question: <HelpCircle className="size-4 text-yellow-600" />,
+  reference: <FileText className="size-4 text-gray-500" />,
+};
+
+const intentLabels = {
+  action_item: 'Action Items',
+  decision: 'Decisions',
+  open_question: 'Open Questions',
+  reference: 'References',
 };
 
 const statusIcons = {
@@ -61,6 +82,16 @@ export function TasksPanel({ onBack }: TasksPanelProps) {
     emitTaskDelete(taskId);
     deleteTask(taskId);
   };
+
+  // Group tasks by intent type, default to 'action_item' for undefined
+  const groupedTasks = tasks.reduce((acc, task) => {
+    const group = task.intentType || 'action_item';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(task);
+    return acc;
+  }, {} as Record<string, Task[]>);
+
+  const intentOrder: Array<'action_item' | 'decision' | 'open_question' | 'reference'> = ['action_item', 'decision', 'open_question', 'reference'];
 
   return (
     <div className="flex flex-col h-full">
@@ -109,47 +140,61 @@ export function TasksPanel({ onBack }: TasksPanelProps) {
       </Dialog>
 
       <ScrollArea className="flex-1">
-        <div className="space-y-3 pr-2">
-          {tasks.map((task) => (
-            <Card key={task.id} className="transition-colors hover:bg-accent/50">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => handleStatusChange(task.id, task.status === 'completed' ? 'pending' : 'completed')} className={cn('flex items-center justify-center w-5 h-5 rounded border transition-colors', task.status === 'completed' ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-green-500')}>
-                      {statusIcons[task.status]}
-                    </button>
-                    <CardTitle className={cn('text-sm font-medium', task.status === 'completed' && 'line-through text-muted-foreground')}>{task.title}</CardTitle>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => handleDeleteTask(task.id)} className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">×</Button>
+        <div className="space-y-4 pr-2">
+          {intentOrder.map((intentType) => {
+            const groupTasks = groupedTasks[intentType] || [];
+            if (groupTasks.length === 0) return null;
+
+            return (
+              <div key={intentType} className={cn('rounded-lg border p-3', intentColors[intentType])}>
+                <div className="flex items-center gap-2 mb-3">
+                  {intentIcons[intentType]}
+                  <h4 className="text-sm font-medium">{intentLabels[intentType]}</h4>
+                  <Badge variant="secondary" className="ml-auto text-xs">{groupTasks.length}</Badge>
                 </div>
-              </CardHeader>
-              {task.description && <CardContent className="pb-2"><CardDescription className="text-xs">{task.description}</CardDescription></CardContent>}
-              {task.authorName && (
-                <div className="px-4 pb-2 flex items-center gap-1 text-xs text-muted-foreground">
-                  <span>by</span>
-                  <span className="font-medium text-foreground">{task.authorName}</span>
+                <div className="space-y-2">
+                  {groupTasks.map((task) => (
+                    <Card key={task.id} className="transition-colors hover:bg-accent/50 bg-white">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleStatusChange(task.id, task.status === 'completed' ? 'pending' : 'completed')} className={cn('flex items-center justify-center w-5 h-5 rounded border transition-colors', task.status === 'completed' ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-green-500')}>
+                              {statusIcons[task.status]}
+                            </button>
+                            <CardTitle className={cn('text-sm font-medium', task.status === 'completed' && 'line-through text-muted-foreground')}>{task.title}</CardTitle>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteTask(task.id)} className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">×</Button>
+                        </div>
+                      </CardHeader>
+                      {task.description && <CardContent className="pb-2"><CardDescription className="text-xs">{task.description}</CardDescription></CardContent>}
+                      {task.authorName && (
+                        <div className="px-4 pb-2 flex items-center gap-1 text-xs text-muted-foreground">
+                          <span>by</span>
+                          <span className="font-medium text-foreground">{task.authorName}</span>
+                        </div>
+                      )}
+                      <div className="px-4 pb-3 flex items-center justify-between">
+                        <Badge variant="outline" className={cn('text-xs', priorityColors[task.priority])}>{task.priority}</Badge>
+                        {task.nodeId && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs text-blue-500 hover:text-blue-600"
+                            onClick={() => {
+                              const { setSelectedId } = useCanvasStore.getState();
+                              setSelectedId(task.nodeId!);
+                            }}
+                          >
+                            Go to element
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
                 </div>
-              )}
-              <div className="px-4 pb-3 flex items-center justify-between">
-                <Badge variant="outline" className={cn('text-xs', priorityColors[task.priority])}>{task.priority}</Badge>
-                {task.nodeId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs text-blue-500 hover:text-blue-600"
-                    onClick={() => {
-                      const { setSelectedId, elements, viewportPosition, viewportZoom } = useCanvasStore.getState();
-                      setSelectedId(task.nodeId!);
-                      // Could add pan to element logic here
-                    }}
-                  >
-                    Go to element
-                  </Button>
-                )}
-                {task.assignee && !task.nodeId && <span className="text-xs text-muted-foreground">{task.assignee}</span>}
               </div>
-            </Card>
-          ))}
+            );
+          })}
           {tasks.length === 0 && <div className="text-center py-8 text-muted-foreground"><p>No tasks yet</p></div>}
         </div>
       </ScrollArea>
