@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCanvasStore } from '@/store/canvas-store';
 import { generateRoomCode } from '@/lib/utils';
 import * as Dialog from '@radix-ui/react-dialog';
-import { LogOut, Plus, Users, Clock, Layers, User, ChevronDown, MoreVertical, Share2, Trash2 } from 'lucide-react';
+import { LogOut, Plus, Users, Clock, Layers, User, ChevronDown, MoreVertical, Share2, Trash2, Check } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 const BRAND_COLOR = '#50B5FF';
@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -67,7 +68,11 @@ export default function DashboardPage() {
   }, []);
 
   const handleShareRoom = (roomId: string) => {
-    navigator.clipboard.writeText(`${window.location.origin}/room/${roomId}`);
+    const shareUrl = `${window.location.origin}/room/${roomId}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopiedId(roomId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
     setOpenMenuId(null);
   };
 
@@ -276,7 +281,7 @@ export default function DashboardPage() {
                     <h3 className="font-semibold text-gray-900 truncate pr-2 group-hover:text-blue-600 transition">
                       {room.name}
                     </h3>
-                    <div className="relative" ref={openMenuId === room.id ? menuRef : null}>
+                    <div className="relative" ref={menuRef}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -296,8 +301,17 @@ export default function DashboardPage() {
                             }}
                             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
                           >
-                            <Share2 className="w-4 h-4" />
-                            Share
+                            {copiedId === room.id ? (
+                              <>
+                                <Check className="w-4 h-4 text-green-500" />
+                                <span className="text-green-500">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Share2 className="w-4 h-4" />
+                                Share
+                              </>
+                            )}
                           </button>
                           <button
                             onClick={(e) => {
