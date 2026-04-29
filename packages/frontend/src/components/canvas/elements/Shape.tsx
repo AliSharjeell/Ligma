@@ -25,6 +25,7 @@ const STROKE_COLORS = [
 export function Shape({ element }: ShapeProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const { selectedIds, setSelectedId, updateElement, lockElement, unlockElement, userId, userRole, tool } = useCanvasStore();
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
@@ -132,6 +133,7 @@ export function Shape({ element }: ShapeProps) {
       return;
     }
 
+    setIsResizing(true);
     const startX = e.clientX;
     const startY = e.clientY;
     const startPos = { ...element.position };
@@ -193,6 +195,7 @@ export function Shape({ element }: ShapeProps) {
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      setIsResizing(false);
       const updatedElement = useCanvasStore.getState().getElement(element.id);
       if (updatedElement) {
         emitElementUpdate(updatedElement);
@@ -246,6 +249,7 @@ export function Shape({ element }: ShapeProps) {
   const handleSize = 8;
 
   const isLockedByOther = element.locked && element.lockedBy !== userId;
+  const passThroughPointerEvents = tool === 'select' && !isEditing && !isResizing && !isLockedByOther && !isSelected;
 
   return (
     <div
@@ -261,8 +265,9 @@ export function Shape({ element }: ShapeProps) {
         top: element.position.y,
         width: element.size.width,
         height: element.size.height,
+        pointerEvents: passThroughPointerEvents ? 'none' : 'auto',
       }}
-      onDoubleClick={handleDoubleClick}
+      onDoubleClick={passThroughPointerEvents ? undefined : handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       tabIndex={0}

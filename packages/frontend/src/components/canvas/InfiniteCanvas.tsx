@@ -942,11 +942,14 @@ function isPointInElement(x: number, y: number, element: CanvasElement): boolean
   }
 
   const { position, size } = element;
+  // Use minimum hitbox size for text elements (they often have tiny initial sizes)
+  const minWidth = element.type === 'text' ? Math.max(size.width, 100) : size.width;
+  const minHeight = element.type === 'text' ? Math.max(size.height, 24) : size.height;
   return (
     x >= position.x &&
-    x <= position.x + size.width &&
+    x <= position.x + minWidth &&
     y >= position.y &&
-    y <= position.y + size.height
+    y <= position.y + minHeight
   );
 }
 

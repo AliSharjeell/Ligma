@@ -100,6 +100,20 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
     }
   }, [element.content, currentFontSize, fontFamily, fontWeight, fontColor]);
 
+  // Update element size in store to match measured text bounds (for proper hit detection)
+  useEffect(() => {
+    if (!element.content || isEditing || isBeingEdited) return;
+    if (textBounds.width <= 0 || textBounds.height <= 0) return;
+
+    // Only update if bounds are significantly different
+    const sizeDiff = Math.abs(element.size.width - textBounds.width) + Math.abs(element.size.height - textBounds.height);
+    if (sizeDiff > 5) {
+      updateElement(element.id, {
+        size: { width: textBounds.width, height: textBounds.height }
+      });
+    }
+  }, [textBounds, element.id, element.size, isEditing, isBeingEdited]);
+
   useEffect(() => {
     if ((isEditing || isBeingEdited) && inputRef.current) {
       inputRef.current.focus();
@@ -301,6 +315,9 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
 
   const handleSize = 8;
 
+  // For select tool: pass pointer events through to canvas drag handler unless editing or resizing
+  const passThroughPointerEvents = tool === 'select' && !isEditing && !isBeingEdited && !isResizing;
+
   return (
     <div
       className={cn(
@@ -316,8 +333,9 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
         top: element.position.y,
         minWidth: '10px',
         zIndex: isEditing ? 100 : 1,
+        pointerEvents: passThroughPointerEvents ? 'none' : 'auto',
       }}
-      onDoubleClick={handleDoubleClick}
+      onDoubleClick={passThroughPointerEvents ? undefined : handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

@@ -24,6 +24,7 @@ const COLORS = [
 export function StickyNote({ element }: StickyNoteProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [localContent, setLocalContent] = useState(element.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -61,6 +62,7 @@ export function StickyNote({ element }: StickyNoteProps) {
       return;
     }
 
+    setIsResizing(true);
     const startX = e.clientX;
     const startY = e.clientY;
     const startPos = { ...element.position };
@@ -122,6 +124,7 @@ export function StickyNote({ element }: StickyNoteProps) {
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      setIsResizing(false);
       const updatedElement = useCanvasStore.getState().getElement(element.id);
       if (updatedElement) {
         emitElementUpdate(updatedElement);
@@ -163,6 +166,9 @@ export function StickyNote({ element }: StickyNoteProps) {
 
   const handleSize = 8;
 
+  // For select tool: pass pointer events through to canvas drag handler unless editing or resizing
+  const passThroughPointerEvents = tool === 'select' && !isEditing && !isResizing && !isLocked && !isSelected;
+
   return (
     <div
       className={cn(
@@ -177,8 +183,9 @@ export function StickyNote({ element }: StickyNoteProps) {
         width: element.size.width,
         height: element.size.height,
         backgroundColor: element.color || COLORS[0],
+        pointerEvents: passThroughPointerEvents ? 'none' : 'auto',
       }}
-      onDoubleClick={handleDoubleClick}
+      onDoubleClick={passThroughPointerEvents ? undefined : handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
