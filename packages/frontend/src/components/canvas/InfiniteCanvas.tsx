@@ -434,6 +434,9 @@ export function InfiniteCanvas() {
           });
         }
       });
+
+      // Reset dragStart so delta doesn't accumulate
+      setDragStart({ x: e.clientX, y: e.clientY });
       return;
     }
 
