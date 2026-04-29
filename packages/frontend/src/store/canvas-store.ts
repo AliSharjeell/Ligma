@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { CanvasElement, Position, Tool, ShapeType, Task, CanvasEvent, User, CanvasState, Comment } from '@/types/canvas';
+import type { CanvasElement, Position, Tool, ShapeType, Task, CanvasEvent, User, CanvasState, Comment, Mention, CommentAttachment } from '@/types/canvas';
 
 interface HistoryEntry {
   elements: Map<string, CanvasElement>;
@@ -33,7 +33,8 @@ interface CanvasStore extends CanvasState {
   toggleSelection: (id: string) => void;
   setViewportPosition: (position: Position) => void;
   setViewportZoom: (zoom: number) => void;
-
+  parseMentions: (content: string) => Mention[];
+  fileToDataUrl: (file: File) => Promise<string>;
   addElement: (element: Omit<CanvasElement, 'id' | 'createdAt' | 'updatedAt'>) => CanvasElement;
   addRemoteElement: (element: CanvasElement) => void;
   updateRemoteElement: (id: string, updates: Partial<CanvasElement>) => void;
@@ -77,8 +78,8 @@ interface CanvasStore extends CanvasState {
   setIsCommentMode: (enabled: boolean) => void;
   setActiveCommentId: (id: string | null) => void;
   setHoveredCommentId: (id: string | null) => void;
-  addComment: (x: number, y: number, content: string) => void;
-  addReply: (commentId: string, content: string) => void;
+  addComment: (x: number, y: number, content: string, mentions?: Mention[], attachments?: CommentAttachment[]) => void;
+  addReply: (commentId: string, content: string, mentions?: Mention[], attachments?: CommentAttachment[]) => void;
   resolveComment: (commentId: string) => void;
   deleteComment: (commentId: string) => void;
   markRepliesAsRead: (commentId: string) => void;
@@ -92,6 +93,35 @@ interface CanvasStore extends CanvasState {
 }
 
 const getElementsKey = (roomId?: string) => `ligma-canvas-${roomId || 'default'}`;
+
+// Helper to parse @mentions from text
+const parseMentions = (content: string, users: Map<string, User>): Mention[] => {
+  const mentions: Mention[] = [];
+  const regex = /@(\w+)/g;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    const username = match[1].toLowerCase();
+    const user = Array.from(users.values()).find(u =>
+      u.name.toLowerCase().startsWith(username) ||
+      u.name.toLowerCase().replace(/\s+/g, '') === username
+    );
+    if (user) {
+      mentions.push({ userId: user.id, userName: user.name });
+    }
+  }
+  return mentions;
+};
+
+// Helper to convert file to base64 data URL
+const fileToDataUrl = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
 const getCurrentRoomId = (): string | undefined => {
   if (typeof window === 'undefined') return undefined;
   const segment = window.location.pathname.split('/').pop();
@@ -211,6 +241,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   }),
   setViewportPosition: (viewportPosition) => set({ viewportPosition }),
   setViewportZoom: (viewportZoom) => set({ viewportZoom }),
+
+  parseMentions: (content: string) => {
+    const { users } = get();
+    return parseMentions(content, users);
+  },
+
+  fileToDataUrl: (file: File) => {
+    return fileToDataUrl(file);
+  },
 
   addElement: (elementData) => {
     const { userId, userName } = get();
@@ -538,7 +577,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setActiveCommentId: (id) => set({ activeCommentId: id }),
   setHoveredCommentId: (id) => set({ hoveredCommentId: id }),
 
-  addComment: (x, y, content) => {
+  addComment: (x, y, content, mentions = [], attachments = []) => {
     const { userId, userName, users } = get();
     const user = users.get(userId);
     const comment: Comment = {
@@ -549,6 +588,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       authorName: userName,
       authorColor: user?.color || '#6366f1',
       content,
+      mentions,
+      attachments,
       timestamp: Date.now(),
       resolved: false,
       replies: [],
@@ -558,7 +599,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     get().saveComments();
   },
 
-  addReply: (commentId, content) => {
+  addReply: (commentId, content, mentions = [], attachments = []) => {
     const { userId, userName, users } = get();
     const user = users.get(userId);
     set((state) => ({
@@ -569,6 +610,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
           authorId: userId,
           authorName: userName,
           content,
+          mentions,
+          attachments,
           timestamp: Date.now(),
           isRead: false,
         };

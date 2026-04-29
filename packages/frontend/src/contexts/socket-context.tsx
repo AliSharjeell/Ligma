@@ -146,6 +146,9 @@ interface SocketContextType {
   emitDenyRoleRequest: (targetUserId: string) => void;
   emitTransferOwnership: (targetUserId: string) => void;
   emitGenerateSummary: () => void;
+  emitChatMessage: (message: string) => void;
+  emitClearChat: () => void;
+  emitCanvasScreenshot: (screenshot: string) => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -170,6 +173,9 @@ const SocketContext = createContext<SocketContextType>({
   emitDenyRoleRequest: () => {},
   emitTransferOwnership: () => {},
   emitGenerateSummary: () => {},
+  emitChatMessage: () => {},
+  emitClearChat: () => {},
+  emitCanvasScreenshot: () => {},
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -633,6 +639,16 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       console.error('Summary generation error:', message);
     });
 
+    // Chat events
+    newSocket.on('chat_response', ({ message, sources }: { message: string; sources?: string[] }) => {
+      console.log('Chat response received:', message);
+      // Could dispatch to a chat store or callback
+    });
+
+    newSocket.on('chat_error', ({ message }: { message: string }) => {
+      console.error('Chat error:', message);
+    });
+
     setSocket(newSocket);
 
     if (typeof window !== 'undefined') {
@@ -833,6 +849,24 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     }
   }, [socket, canvasId, connected]);
 
+  const emitChatMessage = useCallback((message: string) => {
+    if (connected && socket) {
+      socket.emit('chat_message', { canvasId, message });
+    }
+  }, [socket, canvasId, connected]);
+
+  const emitClearChat = useCallback(() => {
+    if (connected && socket) {
+      socket.emit('clear_chat', { canvasId });
+    }
+  }, [socket, canvasId, connected]);
+
+  const emitCanvasScreenshot = useCallback((screenshot: string) => {
+    if (connected && socket) {
+      socket.emit('canvas_screenshot', { canvasId, screenshot });
+    }
+  }, [socket, canvasId, connected]);
+
   return (
     <SocketContext.Provider
       value={{
@@ -857,6 +891,9 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         emitDenyRoleRequest,
         emitTransferOwnership,
         emitGenerateSummary,
+        emitChatMessage,
+        emitClearChat,
+        emitCanvasScreenshot,
       }}
     >
       {children}

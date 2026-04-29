@@ -257,6 +257,19 @@ export function StickyNote({ element }: StickyNoteProps) {
           Editing
         </div>
       )}
+
+      {/* Intent Tag Badge */}
+      {element.intentTag && (
+        <div className={cn(
+          'absolute -top-6 left-0 px-2 py-1 text-xs rounded whitespace-nowrap',
+          element.intentTag.type === 'action_item' && 'bg-red-100 text-red-700 border border-red-200',
+          element.intentTag.type === 'decision' && 'bg-blue-100 text-blue-700 border border-blue-200',
+          element.intentTag.type === 'open_question' && 'bg-yellow-100 text-yellow-700 border border-yellow-200',
+          element.intentTag.type === 'reference' && 'bg-gray-100 text-gray-600 border border-gray-200'
+        )}>
+          {element.intentTag.type.replace('_', ' ')} {Math.round(element.intentTag.confidence * 100)}%
+        </div>
+      )}
     </div>
   );
 }
