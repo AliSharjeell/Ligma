@@ -276,12 +276,17 @@ export function InfiniteCanvas() {
       const currentElements = state.elements;
       const currentSelectedIds = state.selectedIds;
 
+      console.log('Clicked element:', clickedElement.id, 'groupId:', clickedElement.groupId);
+      console.log('Current selected:', Array.from(currentSelectedIds));
+
       // If element is part of a group, select all group members
       let idsToSelect = new Set<string>([clickedElement.id]);
       if (clickedElement.groupId) {
+        console.log('Element has groupId:', clickedElement.groupId);
         currentElements.forEach((e, id) => {
           if (e.groupId === clickedElement.groupId) {
             idsToSelect.add(id);
+            console.log('Adding group member:', id);
           }
         });
       } else if (currentSelectedIds.size > 0) {
@@ -297,6 +302,7 @@ export function InfiniteCanvas() {
         });
       }
 
+      console.log('Selecting:', Array.from(idsToSelect));
       setSelectedIds(idsToSelect);
 
       // Viewers can select but not move elements.
