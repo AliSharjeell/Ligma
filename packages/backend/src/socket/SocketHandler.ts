@@ -5,7 +5,7 @@ import { EventStore } from '../events/EventStore';
 import { EventBus } from '../events/EventBus';
 import { StateReconstructor } from '../events/StateReconstructor';
 import { RBACService } from '../rbac/RBACService';
-import { IntentExtractor, TaskBoard } from '../ai/IntentExtractor';
+import { IntentClassifier, TaskBoard } from '../ai/IntentExtractor';
 import {
   CanvasEvent,
   NodeCreatedEvent,
@@ -58,7 +58,7 @@ export class SocketHandler {
   private eventBus: EventBus;
   private stateReconstructor: StateReconstructor;
   private rbac: RBACService;
-  private intentExtractor: IntentExtractor;
+  private intentClassifier: IntentClassifier;
   private taskBoard: TaskBoard;
   private persistence: PersistenceService;
   private clientStates: Map<string, ClientState> = new Map();
@@ -73,7 +73,7 @@ export class SocketHandler {
     this.canvasStore = canvasStore;
     this.eventBus = new EventBus();
     this.stateReconstructor = new StateReconstructor();
-    this.intentExtractor = new IntentExtractor();
+    this.intentClassifier = new IntentClassifier();
     this.taskBoard = new TaskBoard();
     this.persistence = new PersistenceService();
     this.setupEventHandlers();
@@ -81,7 +81,7 @@ export class SocketHandler {
 
   private setupEventHandlers(): void {
     this.eventBus.subscribe('NodeCreated', async (event) => {
-      const intent = this.intentExtractor.analyze((event as NodeCreatedEvent).content);
+      const intent = this.intentClassifier.analyze((event as NodeCreatedEvent).content);
       if (intent.type === 'action_item' && intent.suggestedTask) {
         const task = this.taskBoard.addTask({
           nodeId: (event as NodeCreatedEvent).nodeId,
@@ -640,16 +640,42 @@ export class SocketHandler {
       details: `Created ${nodeType}`
     });
 
-    const intent = this.intentExtractor.analyze(content);
-    if (intent.type === 'action_item' && intent.suggestedTask) {
-      const task = this.taskBoard.addTask({
-        nodeId,
-        ...intent.suggestedTask,
-        status: 'pending',
-        canvasId,
-        priority: 'medium'
-      });
-      this.io.to(canvasId).emit('task_created', task);
+    // Classify intent using Groq LLM (async)
+    try {
+      const intent = await this.intentClassifier.classify(content);
+
+      // Emit intent classification event
+      if (intent) {
+        this.io.to(canvasId).emit('intent_classified', {
+          nodeId,
+          intent
+        });
+      }
+
+      if (intent.type === 'action_item' && intent.suggestedTask) {
+        const userName = this.clientStates.get(canvasId)?.users.get(userId)?.userName || 'Unknown';
+        const task = this.taskBoard.addTask({
+          nodeId,
+          ...intent.suggestedTask,
+          status: 'pending',
+          canvasId,
+          priority: 'medium',
+          authorId: userId,
+          authorName: userName
+        });
+        this.io.to(canvasId).emit('task_created', {
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          status: task.status,
+          priority: task.priority,
+          nodeId: task.nodeId,
+          authorId: task.authorId,
+          authorName: task.authorName
+        });
+      }
+    } catch (error) {
+      console.error('Intent classification error:', error);
     }
   }
 
@@ -709,18 +735,46 @@ export class SocketHandler {
     });
 
     if (changes.content) {
-      const intent = this.intentExtractor.analyze(changes.content);
-      if (intent.type === 'action_item' && intent.suggestedTask) {
-        const existingTasks = this.taskBoard.getPendingTasks(canvasId);
-        const linkedTask = existingTasks.find(t => t.nodeId === nodeId);
-        if (!linkedTask) {
-          this.taskBoard.addTask({
-            nodeId,
-            ...intent.suggestedTask,
-            status: 'pending',
-            canvasId
-          });
+      // Classify intent using Groq LLM (async)
+      try {
+        const intent = await this.intentClassifier.classify(changes.content as string);
+
+        // Include intentTag in the changes so it gets saved to the node
+        (changes as any).intentTag = intent;
+
+        // Emit intent_classified event to all clients
+        this.io.to(canvasId).emit('intent_classified', {
+          nodeId,
+          intent
+        });
+
+        if (intent.type === 'action_item' && intent.suggestedTask) {
+          const existingTasks = this.taskBoard.getPendingTasks(canvasId);
+          const linkedTask = existingTasks.find(t => t.nodeId === nodeId);
+          if (!linkedTask) {
+            const task = this.taskBoard.addTask({
+              nodeId,
+              ...intent.suggestedTask,
+              status: 'pending',
+              canvasId,
+              authorId: userId,
+              authorName: userName
+            });
+            // Emit task_created event
+            this.io.to(canvasId).emit('task_created', {
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              status: task.status,
+              priority: task.priority,
+              nodeId: task.nodeId,
+              authorId: task.authorId,
+              authorName: task.authorName
+            });
+          }
         }
+      } catch (error) {
+        console.error('Intent classification error:', error);
       }
     }
   }

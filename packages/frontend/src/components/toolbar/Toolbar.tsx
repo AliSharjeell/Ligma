@@ -91,6 +91,7 @@ export function Toolbar() {
   const [pendingRequests, setPendingRequests] = useState<{ userId: string; userName: string }[]>([]);
   const [hasRequested, setHasRequested] = useState(false);
   const [rightPanelView, setRightPanelView] = useState<'main' | 'tasks' | 'activity' | 'comments'>('main');
+  const [newTaskCount, setNewTaskCount] = useState(0);
   const router = useRouter();
   const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership, connectionStatus } = useSocket();
 
@@ -110,6 +111,7 @@ export function Toolbar() {
     timeTravelEnabled,
     isCommentMode,
     selectedIds,
+    tasks,
     setTool,
     setShapeType,
     clearSelection,
@@ -196,14 +198,28 @@ export function Toolbar() {
     socket.on('role_changed', handleRoleChanged);
     socket.on('role_request_cleared', handleRoleRequestCleared);
     socket.on('role_request_denied', handleRoleRequestDenied);
+    socket.on('task_created', () => {
+      // Only increment badge if not currently viewing tasks panel
+      if (rightPanelView !== 'tasks') {
+        setNewTaskCount(prev => prev + 1);
+      }
+    });
 
     return () => {
       socket.off('role_request', handleRoleRequest);
       socket.off('role_changed', handleRoleChanged);
       socket.off('role_request_cleared', handleRoleRequestCleared);
       socket.off('role_request_denied', handleRoleRequestDenied);
+      socket.off('task_created');
     };
-  }, [socket, userId]);
+  }, [socket, userId, rightPanelView]);
+
+  // Reset new task count when viewing tasks panel
+  useEffect(() => {
+    if (rightPanelView === 'tasks') {
+      setNewTaskCount(0);
+    }
+  }, [rightPanelView]);
 
   const handleJoinRoom = () => {
     const trimmed = roomInput.trim();
@@ -678,12 +694,17 @@ export function Toolbar() {
           size="icon"
           onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
           className={cn(
-            "h-10 w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
+            "h-10 w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200 relative",
             isRightPanelOpen && "bg-slate-50 ring-2 ring-primary/10"
           )}
           title="Workspace & Settings"
         >
           <Settings className="size-5 text-slate-600" />
+          {newTaskCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+              {newTaskCount}
+            </span>
+          )}
         </Button>
       </div>
 
@@ -871,11 +892,16 @@ export function Toolbar() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-2 justify-start"
+                      className="gap-2 justify-start relative"
                       onClick={() => setRightPanelView('tasks')}
                     >
                       <CheckSquare className="size-4" />
                       Tasks
+                      {newTaskCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                          {newTaskCount}
+                        </span>
+                      )}
                     </Button>
                     <Button
                       variant="outline"

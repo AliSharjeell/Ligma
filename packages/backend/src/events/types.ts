@@ -29,6 +29,14 @@ export interface NodeCreatedEvent extends BaseEvent {
   metadata?: Record<string, unknown>;
 }
 
+export type IntentType = 'action_item' | 'decision' | 'open_question' | 'reference';
+
+export interface IntentTag {
+  type: IntentType;
+  confidence: number;
+  keywords: string[];
+}
+
 export interface NodeUpdatedEvent extends BaseEvent {
   type: 'NodeUpdated';
   nodeId: string;
@@ -41,6 +49,7 @@ export interface NodeUpdatedEvent extends BaseEvent {
     shapeType: 'rectangle' | 'circle';
     points: { x: number; y: number }[];
     groupId?: string | null;
+    intentTag: IntentTag;
   }>;
   version: number;
   causallyDependsOn: string[];

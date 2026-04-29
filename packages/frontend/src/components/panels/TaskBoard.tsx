@@ -124,9 +124,29 @@ export function TasksPanel({ onBack }: TasksPanelProps) {
                 </div>
               </CardHeader>
               {task.description && <CardContent className="pb-2"><CardDescription className="text-xs">{task.description}</CardDescription></CardContent>}
+              {task.authorName && (
+                <div className="px-4 pb-2 flex items-center gap-1 text-xs text-muted-foreground">
+                  <span>by</span>
+                  <span className="font-medium text-foreground">{task.authorName}</span>
+                </div>
+              )}
               <div className="px-4 pb-3 flex items-center justify-between">
                 <Badge variant="outline" className={cn('text-xs', priorityColors[task.priority])}>{task.priority}</Badge>
-                {task.assignee && <span className="text-xs text-muted-foreground">{task.assignee}</span>}
+                {task.nodeId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-blue-500 hover:text-blue-600"
+                    onClick={() => {
+                      const { setSelectedId, elements, viewportPosition, viewportZoom } = useCanvasStore.getState();
+                      setSelectedId(task.nodeId!);
+                      // Could add pan to element logic here
+                    }}
+                  >
+                    Go to element
+                  </Button>
+                )}
+                {task.assignee && !task.nodeId && <span className="text-xs text-muted-foreground">{task.assignee}</span>}
               </div>
             </Card>
           ))}
