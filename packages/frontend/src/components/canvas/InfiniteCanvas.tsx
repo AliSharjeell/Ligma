@@ -368,8 +368,8 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Create sticky note on click
-    if (tool === 'sticky') {
+    // Create sticky note on click (if not clicking an existing element)
+    if (tool === 'sticky' && !clickedElement) {
       if (userRole === 'Viewer') {
         alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
         return;
@@ -390,8 +390,8 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Create text on click
-    if (tool === 'text') {
+    // Create text on click (if not clicking an existing element)
+    if (tool === 'text' && !clickedElement) {
       if (userRole === 'Viewer') {
         alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
         return;
