@@ -629,7 +629,22 @@ export function InfiniteCanvas() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't delete when typing in an input/textarea (like text editing)
+      if (e.ctrlKey && e.key === 'g' && !e.shiftKey && selectedIds.size >= 2) {
+        e.preventDefault();
+        const groupId = useCanvasStore.getState().groupElements(selectedIds);
+        if (groupId) {
+          clearSelection();
+        }
+      }
+      if (e.ctrlKey && e.key === 'G' && selectedIds.size > 0) {
+        e.preventDefault();
+        const element = elements.get(Array.from(selectedIds)[0]);
+        if (element?.groupId) {
+          useCanvasStore.getState().ungroupElements(element.groupId);
+          clearSelection();
+        }
+      }
+
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size > 0) {
         const activeElement = document.activeElement;
         const isEditingText = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
@@ -645,7 +660,7 @@ export function InfiniteCanvas() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedIds, deleteElement, emitElementDelete, clearSelection]);
+  }, [selectedIds, deleteElement, emitElementDelete, clearSelection, elements]);
 
   return (
     <div
