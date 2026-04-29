@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn, generateRoomCode } from '@/lib/utils';
 import {
   MousePointer2,
   StickyNote,
@@ -227,8 +227,8 @@ export function Toolbar() {
       router.push(`/room/${encodeURIComponent(trimmed)}`);
     } else {
       // Otherwise generate a random one
-      const generated = `room-${Math.random().toString(36).slice(2, 8)}`;
-      router.push(`/room/${generated}`);
+      const generated = generateRoomCode();
+      router.push(`/room/${encodeURIComponent(generated)}`);
     }
   };
 

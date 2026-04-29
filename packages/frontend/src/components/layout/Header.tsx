@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, generateRoomCode } from '@/lib/utils';
 import { Wifi, WifiOff, Users } from 'lucide-react';
 
 interface HeaderProps {
@@ -39,8 +39,8 @@ export function Header({ className, currentRoom = 'default' }: HeaderProps) {
     if (trimmed && trimmed !== normalizedRoom && trimmed !== 'default') {
       router.push(`/room/${encodeURIComponent(trimmed)}`);
     } else {
-      const generated = `room-${Math.random().toString(36).slice(2, 8)}`;
-      router.push(`/room/${generated}`);
+      const generated = generateRoomCode();
+      router.push(`/room/${encodeURIComponent(generated)}`);
     }
   };
 

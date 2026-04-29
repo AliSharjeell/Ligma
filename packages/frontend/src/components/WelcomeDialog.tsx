@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCanvasStore } from '@/store/canvas-store';
+import { generateRoomCode } from '@/lib/utils';
 
 const BRAND_COLOR = '#50B5FF';
 
@@ -29,7 +30,7 @@ export function WelcomeDialog() {
       return;
     }
     setUserName(name.trim());
-    const newRoomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const newRoomCode = generateRoomCode();
     router.push(`/room/${encodeURIComponent(newRoomCode)}`);
   };
 
