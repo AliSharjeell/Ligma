@@ -155,7 +155,7 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Action Buttons */}
-        <div className="flex items-center justify-center gap-4 mb-8">
+        <div className="flex items-start gap-4 mb-8">
           <button
             onClick={handleCreateRoom}
             className="flex items-center justify-center gap-2 px-4 py-3 text-white rounded-lg transition hover:opacity-90 shadow-sm text-sm font-medium"
