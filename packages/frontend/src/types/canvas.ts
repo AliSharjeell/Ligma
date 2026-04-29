@@ -44,6 +44,12 @@ export interface CanvasElement {
   intentTag?: IntentTag;
 }
 
+export interface AuthUser {
+  id: string;
+  username: string;
+  createdAt: number;
+}
+
 export interface User {
   id: string;
   name: string;

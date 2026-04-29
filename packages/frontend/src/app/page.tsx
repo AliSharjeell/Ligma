@@ -1,7 +1,20 @@
 'use client';
 
-import { WelcomeDialog } from '@/components/WelcomeDialog';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/auth-store';
 
 export default function Home() {
-  return <WelcomeDialog />;
+  const router = useRouter();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/dashboard');
+    } else {
+      router.push('/auth');
+    }
+  }, [isAuthenticated, router]);
+
+  return null;
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import html2canvas from 'html2canvas';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
+import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
 import { cn, generateRoomCode } from '@/lib/utils';
 import {
@@ -182,17 +183,28 @@ export function Toolbar() {
   const normalizedRoom = currentRoom && currentRoom !== 'undefined' ? currentRoom : 'default';
   const [roomInput, setRoomInput] = useState(normalizedRoom);
 
+  const { isAuthenticated, username: authUserName, userId: authUserId } = useAuthStore();
+
   useEffect(() => {
     setRoomInput(normalizedRoom);
 
-    // Check if name is set, if not, open join modal
+    // If authenticated, automatically use auth details and skip modal
+    if (isAuthenticated && authUserName && authUserId) {
+      setUserName(authUserName);
+      // Sync userId to canvas store so backend recognizes us
+      useCanvasStore.setState({ userId: authUserId });
+      setIsJoinModalOpen(false);
+      return;
+    }
+
+    // Otherwise check for legacy stored name
     const storedName = localStorage.getItem('ligma-username');
     if (!storedName) {
       setIsJoinModalOpen(true);
     } else {
       setNameInput(storedName);
     }
-  }, [normalizedRoom]);
+  }, [normalizedRoom, isAuthenticated, authUserName, authUserId, setUserName]);
 
   // B: Listen for role request events
   useEffect(() => {
@@ -587,15 +599,32 @@ export function Toolbar() {
 
   return (
     <>
-      {/* Top Left Branding + Export */}
+      {/* Top Left - Layers Button (Separate, matches bar height) */}
       <div className="absolute top-4 left-4 z-20">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+          className={cn(
+            "h-[53px] w-[53px] rounded-xl bg-white shadow-excalidraw border border-slate-200",
+            isLeftPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
+          )}
+          title="Layers"
+        >
+          <Layers className="size-5 text-slate-600" />
+        </Button>
+      </div>
+
+      {/* Top Left - Branding + Export */}
+      <div className="absolute top-4 left-[80px] z-20">
         <div className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 shadow-excalidraw px-3 py-2">
-          <h1
-            className="text-2xl font-bold tracking-tight text-primary leading-none select-none"
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="text-2xl font-bold tracking-tight text-primary leading-none select-none hover:opacity-80 transition-opacity"
             style={{ fontFamily: 'var(--font-lora), serif' }}
           >
             Ligma
-          </h1>
+          </button>
           <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
             <DialogTrigger asChild>
               <Button
@@ -702,22 +731,6 @@ export function Toolbar() {
             </DialogContent>
           </Dialog>
         </div>
-      </div>
-
-      {/* Middle Left Layers Button */}
-      <div className="absolute top-1/2 -translate-y-1/2 left-4 z-20">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
-          className={cn(
-            "h-10 w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
-            isLeftPanelOpen && "bg-slate-50 ring-2 ring-primary/10"
-          )}
-          title="Layers"
-        >
-          <Layers className="size-5 text-slate-600" />
-        </Button>
       </div>
 
       {/* Bottom Center Toolbar - COMPACT */}
@@ -987,17 +1000,12 @@ export function Toolbar() {
           size="icon"
           onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
           className={cn(
-            "h-10 w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200 relative",
-            isRightPanelOpen && "bg-slate-50 ring-2 ring-primary/10"
+            "h-[53px] w-[53px] rounded-xl bg-white shadow-excalidraw border border-slate-200",
+            isRightPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
           )}
           title="Workspace & Settings"
         >
           <Settings className="size-5 text-slate-600" />
-          {(newTaskCount > 0 || mentionNotificationCount > 0) && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-              {newTaskCount + mentionNotificationCount}
-            </span>
-          )}
         </Button>
       </div>
 

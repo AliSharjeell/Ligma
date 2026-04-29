@@ -470,14 +470,26 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     newSocket.on('sync_response', (payload: { state: { nodes: any[] } }) => {
       if (payload.state && payload.state.nodes) {
         const serverElements = payload.state.nodes.map(nodeStateToCanvasElement);
+        
         // On join, backend may stream historical node events first and then send an empty
         // snapshot from in-memory state; do not wipe already-received nodes in that case.
         if (isInitialLoad) {
-          if (serverElements.length > 0 || !receivedInitialNodeEvents) {
+          const localElements = useCanvasStore.getState().elements;
+          
+          // CRITICAL FIX: If server is empty but we have local elements, 
+          // DON'T wipe them. This happens when the backend restarts.
+          if (serverElements.length === 0 && localElements.size > 0) {
+            console.log('Server state is empty, but local state has', localElements.size, 'elements. Keeping local state.');
+            // We will push these elements to the server once we confirm our Lead role
+          } else if (serverElements.length > 0 || !receivedInitialNodeEvents) {
             setElements(serverElements);
           }
           isInitialLoad = false;
+        } else {
+          // Normal sync after initial load
+          setElements(serverElements);
         }
+        
         // Always persist whatever we have
         setTimeout(() => persistElements(canvasId), 100);
         console.log('Sync response - server has', serverElements.length, 'elements');
@@ -494,6 +506,30 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       setUsers(formattedUsers);
       setUserRole(payload.yourRole);
       console.log('Initial users synced. Your role:', payload.yourRole);
+
+      // If we are the Lead and the server has no nodes, push our local state to seed the room
+      if (payload.yourRole === 'Lead') {
+        const state = useCanvasStore.getState();
+        if (state.elements.size > 0) {
+          console.log('Seeding server with', state.elements.size, 'local elements as Lead');
+          state.elements.forEach(element => {
+            // Re-emit each element to the server
+            const payload = {
+              canvasId,
+              nodeId: element.id,
+              nodeType: element.type,
+              position: element.position,
+              content: element.content,
+              size: element.size,
+              color: element.color,
+              shapeType: element.shapeType,
+              points: element.points,
+              style: element.textStyle,
+            };
+            newSocket.emit('create_node', payload);
+          });
+        }
+      }
     });
 
     newSocket.on('role_changed', (payload: { userId: string, newRole: 'Lead' | 'Contributor' | 'Viewer' }) => {

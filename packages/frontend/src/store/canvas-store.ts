@@ -122,9 +122,11 @@ const parseMentions = (content: string, users: Map<string, User>): Mention[] => 
 
 const getCurrentRoomId = (): string | undefined => {
   if (typeof window === 'undefined') return undefined;
-  const segment = window.location.pathname.split('/').pop();
-  if (!segment || segment === 'undefined') return 'default';
-  return decodeURIComponent(segment);
+  // Filter out empty segments to handle trailing slashes (e.g. /room/abc/ -> abc)
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const lastSegment = segments[segments.length - 1];
+  if (!lastSegment || lastSegment === 'undefined' || lastSegment === 'room') return 'default';
+  return decodeURIComponent(lastSegment);
 };
 
 const saveElementsToStorage = (elements: Map<string, CanvasElement>, roomId?: string) => {
