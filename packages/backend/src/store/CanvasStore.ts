@@ -65,6 +65,18 @@ export class CanvasStore {
     return state?.nodes.get(nodeId);
   }
 
+  updateNode(canvasId: string, nodeId: string, updates: Partial<NodeState>): void {
+    // In event-sourced architecture, this updates the in-memory reconstructed state
+    // Real persistence happens through events
+    const state = this.getCanvas(canvasId);
+    if (state) {
+      const node = state.nodes.get(nodeId);
+      if (node) {
+        Object.assign(node, updates);
+      }
+    }
+  }
+
   validatePermission(userId: string, canvasId: string, action: 'create' | 'read' | 'update' | 'delete'): boolean {
     return this.rbac.canPerformAction(userId, canvasId, `can${action.charAt(0).toUpperCase() + action.slice(1)}` as any);
   }

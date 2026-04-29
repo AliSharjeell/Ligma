@@ -35,14 +35,15 @@ export function StickyNote({ element }: StickyNoteProps) {
   // Only faded when locked by ANOTHER user, not yourself
   const isLockedByOther = element.locked && element.lockedBy !== userId;
   const isLocked = element.locked;
+  const isBeingEdited = element.locked && element.lockedBy === userId;
   const showSelection = isSelected || isHovered;
 
   useEffect(() => {
-    if (isEditing && textareaRef.current) {
+    if ((isEditing || isBeingEdited) && textareaRef.current) {
       textareaRef.current.focus();
       textareaRef.current.select();
     }
-  }, [isEditing]);
+  }, [isEditing, isBeingEdited]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -143,10 +144,22 @@ export function StickyNote({ element }: StickyNoteProps) {
       alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
       return;
     }
+    enterEditMode();
+  };
+
+  const enterEditMode = () => {
     setSelectedId(element.id);
     setIsEditing(true);
     lockElement(element.id);
     emitElementLock(element.id);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    // If sticky tool is active and we click an existing sticky, enter edit mode
+    if (tool === 'sticky' && !isEditing && !isLocked) {
+      e.stopPropagation();
+      enterEditMode();
+    }
   };
 
   const handleBlur = () => {
@@ -167,7 +180,9 @@ export function StickyNote({ element }: StickyNoteProps) {
   const handleSize = 8;
 
   // For select tool: pass pointer events through to canvas drag handler unless editing or resizing
-  const passThroughPointerEvents = tool === 'select' && !isEditing && !isResizing && !isLocked && !isSelected;
+  // We no longer use pointer-events: none for the select tool because we need to catch double-clicks.
+  // Instead, we just don't stopPropagation on mousedown so InfiniteCanvas can still handle dragging.
+  const passThroughPointerEvents = !isEditing && !isBeingEdited && !isResizing && tool !== 'select' && tool !== 'sticky';
 
   return (
     <div
@@ -185,11 +200,12 @@ export function StickyNote({ element }: StickyNoteProps) {
         backgroundColor: element.color || COLORS[0],
         pointerEvents: passThroughPointerEvents ? 'none' : 'auto',
       }}
-      onDoubleClick={passThroughPointerEvents ? undefined : handleDoubleClick}
+      onDoubleClick={handleDoubleClick}
+      onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {isEditing ? (
+      {isEditing || isBeingEdited ? (
         <textarea
           ref={textareaRef}
           value={localContent}

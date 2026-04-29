@@ -149,6 +149,12 @@ interface SocketContextType {
   emitChatMessage: (message: string) => void;
   emitClearChat: () => void;
   emitCanvasScreenshot: (screenshot: string) => void;
+  // Group management
+  emitCreateGroup: (nodeIds: string[]) => void;
+  emitDeleteGroup: (groupId: string) => void;
+  emitAddGroupOwner: (groupId: string, targetUserId: string) => void;
+  emitRemoveGroupOwner: (groupId: string, targetUserId: string) => void;
+  setGroupStates: (groups: any[]) => void;
   emitCommentCreate: (comment: any) => void;
   emitCommentReply: (commentId: string, reply: any) => void;
   emitCommentDelete: (commentId: string) => void;
@@ -181,6 +187,11 @@ const SocketContext = createContext<SocketContextType>({
   emitChatMessage: () => {},
   emitClearChat: () => {},
   emitCanvasScreenshot: () => {},
+  emitCreateGroup: () => {},
+  emitDeleteGroup: () => {},
+  emitAddGroupOwner: () => {},
+  emitRemoveGroupOwner: () => {},
+  setGroupStates: () => {},
   emitCommentCreate: () => {},
   emitCommentReply: () => {},
   emitCommentDelete: () => {},
@@ -451,6 +462,9 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         userId,
         userName,
       });
+
+      // Request group states after joining
+      newSocket.emit('get_groups', { canvasId });
     });
 
     newSocket.on('disconnect', () => {
@@ -630,6 +644,39 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       if (cursorUserId !== userId) {
         updateUserCursor(cursorUserId, position);
       }
+    });
+
+    // Group events
+    newSocket.on('group_created', ({ group }: { group: any }) => {
+      setGroupStates([group]);
+      // Update nodes with groupId
+      if (group.nodeIds && group.nodeIds.length > 0) {
+        group.nodeIds.forEach((nodeId: string) => {
+          updateRemoteElement(nodeId, { groupId: group.id });
+        });
+      }
+    });
+
+    newSocket.on('group_deleted', ({ groupId }: { groupId: string }) => {
+      // Remove groupId from nodes when group is deleted
+    });
+
+    newSocket.on('nodes_updated', ({ nodeIds, changes }: { nodeIds: string[]; changes: any }) => {
+      nodeIds.forEach((nodeId: string) => {
+        updateRemoteElement(nodeId, changes);
+      });
+    });
+
+    newSocket.on('group_owner_added', ({ group }: { group: any }) => {
+      setGroupStates([group]);
+    });
+
+    newSocket.on('group_owner_removed', ({ group }: { group: any }) => {
+      setGroupStates([group]);
+    });
+
+    newSocket.on('groups_sync', ({ groups }: { groups: any[] }) => {
+      setGroupStates(groups);
     });
 
     newSocket.on('user_joined', (event: UserJoinedEvent) => {
@@ -884,6 +931,36 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     }
   }, [socket, canvasId, connected, addToQueue]);
 
+  // Group management
+  const emitCreateGroup = useCallback((nodeIds: string[]) => {
+    if (connected) {
+      socket?.emit('create_group', { canvasId, nodeIds });
+    }
+  }, [socket, canvasId, connected]);
+
+  const emitDeleteGroup = useCallback((groupId: string) => {
+    if (connected) {
+      socket?.emit('delete_group', { canvasId, groupId });
+    }
+  }, [socket, canvasId, connected]);
+
+  const emitAddGroupOwner = useCallback((groupId: string, targetUserId: string) => {
+    if (connected) {
+      socket?.emit('add_group_owner', { canvasId, groupId, targetUserId });
+    }
+  }, [socket, canvasId, connected]);
+
+  const emitRemoveGroupOwner = useCallback((groupId: string, targetUserId: string) => {
+    if (connected) {
+      socket?.emit('remove_group_owner', { canvasId, groupId, targetUserId });
+    }
+  }, [socket, canvasId, connected]);
+
+  const setGroupStates = useCallback((groups: any[]) => {
+    // Delegate to canvas store's setGroupStates
+    useCanvasStore.getState().setGroupStates(groups);
+  }, []);
+
   const emitCursorMove = useCallback((position: Position) => {
     socket?.emit('cursor_move', { canvasId, position });
   }, [socket, canvasId]);
@@ -1025,6 +1102,11 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         emitChatMessage,
         emitClearChat,
         emitCanvasScreenshot,
+        emitCreateGroup,
+        emitDeleteGroup,
+        emitAddGroupOwner,
+        emitRemoveGroupOwner,
+        setGroupStates,
         emitCommentCreate,
         emitCommentReply,
         emitCommentDelete,

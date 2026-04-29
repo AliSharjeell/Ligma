@@ -43,7 +43,7 @@ export function Drawing({ element }: DrawingProps) {
     const node = rc.curve(relativePoints, {
       stroke: element.color || '#1f2937',
       strokeWidth: isSelected ? strokeWidth + 0.5 : strokeWidth,
-      roughness: 1,
+      roughness: 0,
     });
 
     svgRef.current.appendChild(node);

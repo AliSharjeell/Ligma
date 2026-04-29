@@ -54,6 +54,7 @@ export function InfiniteCanvas() {
     viewportZoom,
     userId,
     userRole,
+    groupStates,
     isCommentMode,
     setSelectedId,
     setSelectedIds,
@@ -76,6 +77,31 @@ export function InfiniteCanvas() {
 
   const { emitCursorMove, emitElementCreate, emitElementUpdate, emitElementDelete, emitElementLock, connectionStatus } = useSocket();
   const connectionStatusLabel = connectionStatus === 'connected' ? 'Synced' : connectionStatus === 'connecting' ? 'Syncing' : 'Offline';
+
+  // Check if user can move an element (considering group permissions)
+  const canMoveElement = useCallback((element: CanvasElement): boolean => {
+    // Can't move locked elements
+    if (element.locked) return false;
+
+    // Only Leads and Contributors can move
+    if (userRole === 'Viewer') return false;
+
+    // If element is in a group, check group permissions
+    if (element.groupId && element.groupId.length > 0) {
+      const groupState = groupStates.get(element.groupId);
+      if (groupState) {
+        const isOwner = groupState.ownerId === userId;
+        const isCoOwner = groupState.coOwners.includes(userId);
+        return isOwner || isCoOwner || userRole === 'Lead';
+      }
+      // No group state synced yet - allow moving (will be blocked server-side if needed)
+      return true;
+    }
+
+    // Not in a group - can move if Contributor or Lead
+    return true;
+  }, [userId, userRole, groupStates]);
+
   const updateZoom = (direction: 'in' | 'out') => {
     const step = direction === 'in' ? 1.1 : 0.9;
     setViewportZoom(Math.min(Math.max(viewportZoom * step, 0.1), 5));
@@ -132,7 +158,7 @@ export function InfiniteCanvas() {
       const padding = 5;
 
       if (w > 2 && h > 2) {
-        const options = { stroke: shapeColor, strokeWidth: 2, roughness: 1.5 };
+        const options = { stroke: shapeColor, strokeWidth: 2, roughness: 0 };
         let node;
         if (shapeType === 'circle') {
           node = rc.ellipse(x + w / 2, y + h / 2, w, h, options);
@@ -201,7 +227,7 @@ export function InfiniteCanvas() {
 
     if (isDragging && tool === 'draw' && drawPoints.length > 1) {
       const points: [number, number][] = drawPoints.map(p => [p.x, p.y]);
-      const node = rc.curve(points, { stroke: drawColor, strokeWidth: drawSize, roughness: 1 });
+      const node = rc.curve(points, { stroke: drawColor, strokeWidth: drawSize, roughness: 0 });
       previewSvgRef.current.appendChild(node);
     }
   }, [isDrawingShape, shapePreview, shapeType, shapeColor, isDragging, tool, drawPoints, drawColor, drawSize]);
@@ -368,8 +394,8 @@ export function InfiniteCanvas() {
       return;
     }
 
-    // Create sticky note on click
-    if (tool === 'sticky') {
+    // Create sticky note on click (if not clicking an existing element)
+    if (tool === 'sticky' && !clickedElement) {
       if (userRole === 'Viewer') {
         alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
         return;
@@ -380,16 +406,18 @@ export function InfiniteCanvas() {
         size: { width: 200, height: 150 },
         content: '',
         color: stickyColor,
-        locked: false,
+        locked: true,
+        lockedBy: userId,
         createdBy: userId,
       });
       emitElementCreate(element);
+      emitElementLock(element.id);
       setSelectedId(element.id);
       return;
     }
 
-    // Create text on click
-    if (tool === 'text') {
+    // Create text on click (if not clicking an existing element)
+    if (tool === 'text' && !clickedElement) {
       if (userRole === 'Viewer') {
         alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
         return;
@@ -406,10 +434,13 @@ export function InfiniteCanvas() {
           fontWeight: textFontWeight,
           textAlign: textAlign || 'left',
         },
-        locked: false,
+        locked: true,
+        lockedBy: userId,
         createdBy: userId,
       });
       emitElementCreate(element);
+      emitElementLock(element.id);
+      setSelectedId(element.id);
       return;
     }
 
@@ -480,10 +511,10 @@ export function InfiniteCanvas() {
       }
 
       const updates: Record<string, Partial<CanvasElement>> = {};
-      // Move all elements (skip locked ones)
+      // Move all elements (skip locked ones and group-restricted elements)
       elementsToMove.forEach(id => {
         const element = currentElements.get(id);
-        if (element && !element.locked) {
+        if (element && canMoveElement(element)) {
           updates[id] = {
             position: {
               x: element.position.x + dx,

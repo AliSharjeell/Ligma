@@ -174,6 +174,24 @@ export interface CanvasExportData {
   };
 }
 
+export interface GroupState {
+  id: string;
+  canvasId: string;
+  nodeIds: string[];
+  ownerId: string;
+  coOwners: string[];
+  createdAt: number;
+  createdBy: string;
+}
+
+export interface GroupPermission {
+  canMove: boolean;
+  canResize: boolean;
+  canEditContent: boolean;
+  canDelete: boolean;
+  canManageOwners: boolean;
+}
+
 export interface MentionNotification {
   id: string;
   commentId: string;
@@ -184,6 +202,7 @@ export interface MentionNotification {
   mentionedUserId: string;
   timestamp: number;
   read: boolean;
+}
 }
 
 export interface SocketEvents {
@@ -201,4 +220,10 @@ export interface SocketEvents {
   cursor_move: { userId: string; position: Position };
   user_joined: User;
   user_left: string;
+// Group events
+  group_created: { group: GroupState; event: any };
+  group_deleted: { groupId: string; event: any };
+  group_owner_added: { group: GroupState; event: any };
+  group_owner_removed: { group: GroupState; event: any };
+  group_permissions: { permissions: GroupPermission };
 }

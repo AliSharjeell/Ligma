@@ -5,6 +5,7 @@ import { EventStore } from '../events/EventStore';
 import { EventBus } from '../events/EventBus';
 import { StateReconstructor } from '../events/StateReconstructor';
 import { RBACService } from '../rbac/RBACService';
+import { GroupACLService } from '../rbac/GroupACL';
 import { IntentClassifier, TaskBoard } from '../ai/IntentExtractor';
 import { SummaryGenerator } from '../ai/SummaryGenerator';
 import { RagChatService } from '../ai/RagChatService';
@@ -19,6 +20,10 @@ import {
   UserJoinedEvent,
   UserLeftEvent,
   RoleChangedEvent,
+  GroupCreatedEvent,
+  GroupDeletedEvent,
+  GroupOwnerAddedEvent,
+  GroupOwnerRemovedEvent,
   BaseEvent
 } from '../events/types';
 import { VectorClock } from '../crdt/VectorClock';
@@ -61,6 +66,7 @@ export class SocketHandler {
   private eventBus: EventBus;
   private stateReconstructor: StateReconstructor;
   private rbac: RBACService;
+  private groupACL: GroupACLService;
   private intentClassifier: IntentClassifier;
   private taskBoard: TaskBoard;
   private summaryGenerator: SummaryGenerator;
@@ -80,6 +86,7 @@ export class SocketHandler {
     this.eventStore = eventStore;
     this.rbac = rbac;
     this.canvasStore = canvasStore;
+    this.groupACL = new GroupACLService();
     this.eventBus = new EventBus();
     this.stateReconstructor = new StateReconstructor();
     this.intentClassifier = new IntentClassifier();
@@ -195,6 +202,31 @@ export class SocketHandler {
 
     socket.on('unlock_nodes', (data: { canvasId: string; nodeIds: string[] }) => {
       this.handleBulkUnlock(socket, data);
+    });
+
+    // Group management events
+    socket.on('create_group', (data: { canvasId: string; nodeIds: string[] }) => {
+      this.handleCreateGroup(socket, data);
+    });
+
+    socket.on('delete_group', (data: { canvasId: string; groupId: string }) => {
+      this.handleDeleteGroup(socket, data);
+    });
+
+    socket.on('add_group_owner', (data: { canvasId: string; groupId: string; targetUserId: string }) => {
+      this.handleAddGroupOwner(socket, data);
+    });
+
+    socket.on('remove_group_owner', (data: { canvasId: string; groupId: string; targetUserId: string }) => {
+      this.handleRemoveGroupOwner(socket, data);
+    });
+
+    socket.on('get_group_permissions', (data: { canvasId: string; groupId: string }, callback) => {
+      this.handleGetGroupPermissions(socket, data, callback);
+    });
+
+    socket.on('get_groups', (data: { canvasId: string }) => {
+      this.handleGetGroups(socket, data);
     });
 
     socket.on('cursor_move', (data: { canvasId: string; position: { x: number; y: number } }) => {
@@ -764,6 +796,7 @@ export class SocketHandler {
   private async handleUpdateNode(socket: Socket, data: { canvasId: string; nodeId: string; changes: any; vectorClock: Record<string, number> }): Promise<void> {
     const { canvasId, nodeId, changes, vectorClock } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
+    const userRole = this.getUserRoleFromSocket(socket.id, canvasId);
 
     if (!userId) return;
 
@@ -776,6 +809,28 @@ export class SocketHandler {
     if (!this.rbac.canModifyNode(userId, canvasId, nodeId)) {
       socket.emit('error', { message: 'Permission denied' });
       return;
+    }
+
+    // Check group permissions for position/size changes
+    const isPositionChange = changes.position !== undefined;
+    const isSizeChange = changes.size !== undefined;
+    const isContentChange = changes.content !== undefined;
+
+    if (isPositionChange || isSizeChange || isContentChange) {
+      const node = this.canvasStore.getNode(canvasId, nodeId);
+      if (node?.groupId) {
+        const perms = this.groupACL.getGroupPermissions(canvasId, node.groupId, userId, userRole);
+        if (isPositionChange || isSizeChange) {
+          if (!perms.canMove) {
+            socket.emit('error', { message: 'Cannot move nodes inside locked group. Contact group owner.' });
+            return;
+          }
+        }
+        if (isContentChange && !perms.canEditContent) {
+          socket.emit('error', { message: 'Cannot edit content inside locked group. Contact group owner.' });
+          return;
+        }
+      }
     }
 
     const clientState = this.clientStates.get(canvasId);
@@ -1146,6 +1201,271 @@ export class SocketHandler {
         details: `Unlocked node (bulk)`
       });
     }
+  }
+
+  private async handleCreateGroup(socket: Socket, data: { canvasId: string; nodeIds: string[] }): Promise<void> {
+    const { canvasId, nodeIds } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+    const userRole = this.getUserRoleFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    // Only Leads and Contributors can create groups
+    if (userRole === 'Viewer') {
+      socket.emit('error', { message: 'Viewers cannot create groups' });
+      return;
+    }
+
+    if (nodeIds.length < 2) {
+      socket.emit('error', { message: 'Need at least 2 elements to create a group' });
+      return;
+    }
+
+    const groupId = uuidv4();
+    const group = this.groupACL.createGroup(canvasId, groupId, nodeIds, userId);
+
+    const clientState = this.clientStates.get(canvasId);
+    const user = clientState?.users.get(userId);
+    const vc = user?.vectorClock || new VectorClock();
+
+    const event: GroupCreatedEvent = {
+      id: uuidv4(),
+      type: 'GroupCreated',
+      canvasId,
+      userId,
+      groupId,
+      nodeIds,
+      timestamp: Date.now(),
+      vectorClock: vc.increment(userId).toJSON()
+    };
+
+    this.eventStore.append(event);
+    await this.persistence.saveEvent(event);
+
+    // Update nodes with groupId
+    for (const nodeId of nodeIds) {
+      this.canvasStore.updateNode(canvasId, nodeId, { groupId });
+    }
+
+    this.io.to(canvasId).emit('group_created', { group, event });
+    this.io.to(canvasId).emit('nodes_updated', { nodeIds, changes: { groupId } });
+
+    const userName = clientState?.users.get(userId)?.userName || 'Unknown';
+    this.pushActivity(canvasId, {
+      id: event.id,
+      type: 'create',
+      elementId: groupId,
+      userId,
+      userName,
+      timestamp: event.timestamp,
+      details: `Created group with ${nodeIds.length} elements`
+    });
+  }
+
+  private async handleDeleteGroup(socket: Socket, data: { canvasId: string; groupId: string }): Promise<void> {
+    const { canvasId, groupId } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+    const userRole = this.getUserRoleFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    const group = this.groupACL.getGroup(canvasId, groupId);
+    if (!group) {
+      socket.emit('error', { message: 'Group not found' });
+      return;
+    }
+
+    // Check permissions
+    if (!this.groupACL.isGroupOwner(canvasId, groupId, userId, userRole)) {
+      socket.emit('error', { message: 'Only group owners can delete the group' });
+      return;
+    }
+
+    const clientState = this.clientStates.get(canvasId);
+    const user = clientState?.users.get(userId);
+    const vc = user?.vectorClock || new VectorClock();
+
+    const event: GroupDeletedEvent = {
+      id: uuidv4(),
+      type: 'GroupDeleted',
+      canvasId,
+      userId,
+      groupId,
+      timestamp: Date.now(),
+      vectorClock: vc.increment(userId).toJSON()
+    };
+
+    // Remove groupId from nodes
+    for (const nodeId of group.nodeIds) {
+      this.canvasStore.updateNode(canvasId, nodeId, { groupId: undefined });
+    }
+
+    this.groupACL.deleteGroup(canvasId, groupId);
+    this.eventStore.append(event);
+    await this.persistence.saveEvent(event);
+
+    this.io.to(canvasId).emit('group_deleted', { groupId, event });
+    this.io.to(canvasId).emit('nodes_updated', { nodeIds: group.nodeIds, changes: { groupId: null } });
+
+    const userName = clientState?.users.get(userId)?.userName || 'Unknown';
+    this.pushActivity(canvasId, {
+      id: event.id,
+      type: 'delete',
+      elementId: groupId,
+      userId,
+      userName,
+      timestamp: event.timestamp,
+      details: `Deleted group`
+    });
+  }
+
+  private async handleAddGroupOwner(socket: Socket, data: { canvasId: string; groupId: string; targetUserId: string }): Promise<void> {
+    const { canvasId, groupId, targetUserId } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+    const userRole = this.getUserRoleFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    const group = this.groupACL.getGroup(canvasId, groupId);
+    if (!group) {
+      socket.emit('error', { message: 'Group not found' });
+      return;
+    }
+
+    // Check if requester has permission
+    if (!this.groupACL.isGroupOwner(canvasId, groupId, userId, userRole)) {
+      socket.emit('error', { message: 'Only group owners can add co-owners' });
+      return;
+    }
+
+    // Check if target user is at least Contributor globally
+    const targetUser = this.clientStates.get(canvasId)?.users.get(targetUserId);
+    if (!targetUser) {
+      socket.emit('error', { message: 'Target user not found' });
+      return;
+    }
+
+    if (targetUser.role === 'Viewer') {
+      socket.emit('error', { message: 'Target must be at least a Contributor' });
+      return;
+    }
+
+    const success = this.groupACL.addCoOwner(canvasId, groupId, userId, targetUserId, userRole);
+    if (!success) {
+      socket.emit('error', { message: 'Failed to add co-owner' });
+      return;
+    }
+
+    const clientState = this.clientStates.get(canvasId);
+    const user = clientState?.users.get(userId);
+    const vc = user?.vectorClock || new VectorClock();
+
+    const event: GroupOwnerAddedEvent = {
+      id: uuidv4(),
+      type: 'GroupOwnerAdded',
+      canvasId,
+      userId,
+      groupId,
+      targetUserId,
+      timestamp: Date.now(),
+      vectorClock: vc.increment(userId).toJSON()
+    };
+
+    this.eventStore.append(event);
+    await this.persistence.saveEvent(event);
+
+    const updatedGroup = this.groupACL.getGroup(canvasId, groupId);
+    this.io.to(canvasId).emit('group_owner_added', { group: updatedGroup, event });
+
+    const userName = clientState?.users.get(userId)?.userName || 'Unknown';
+    const targetName = targetUser.userName;
+    this.pushActivity(canvasId, {
+      id: event.id,
+      type: 'update',
+      elementId: groupId,
+      userId,
+      userName,
+      timestamp: event.timestamp,
+      details: `Promoted ${targetName} to group co-owner`
+    });
+  }
+
+  private async handleRemoveGroupOwner(socket: Socket, data: { canvasId: string; groupId: string; targetUserId: string }): Promise<void> {
+    const { canvasId, groupId, targetUserId } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+    const userRole = this.getUserRoleFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    const group = this.groupACL.getGroup(canvasId, groupId);
+    if (!group) {
+      socket.emit('error', { message: 'Group not found' });
+      return;
+    }
+
+    if (!this.groupACL.isGroupOwner(canvasId, groupId, userId, userRole)) {
+      socket.emit('error', { message: 'Only group owners can remove co-owners' });
+      return;
+    }
+
+    const success = this.groupACL.removeCoOwner(canvasId, groupId, userId, targetUserId, userRole);
+    if (!success) {
+      socket.emit('error', { message: 'Failed to remove co-owner' });
+      return;
+    }
+
+    const clientState = this.clientStates.get(canvasId);
+    const user = clientState?.users.get(userId);
+    const vc = user?.vectorClock || new VectorClock();
+
+    const event: GroupOwnerRemovedEvent = {
+      id: uuidv4(),
+      type: 'GroupOwnerRemoved',
+      canvasId,
+      userId,
+      groupId,
+      targetUserId,
+      timestamp: Date.now(),
+      vectorClock: vc.increment(userId).toJSON()
+    };
+
+    this.eventStore.append(event);
+    await this.persistence.saveEvent(event);
+
+    const updatedGroup = this.groupACL.getGroup(canvasId, groupId);
+    this.io.to(canvasId).emit('group_owner_removed', { group: updatedGroup, event });
+
+    const userName = clientState?.users.get(userId)?.userName || 'Unknown';
+    const targetName = this.clientStates.get(canvasId)?.users.get(targetUserId)?.userName || targetUserId;
+    this.pushActivity(canvasId, {
+      id: event.id,
+      type: 'update',
+      elementId: groupId,
+      userId,
+      userName,
+      timestamp: event.timestamp,
+      details: `Removed ${targetName} from group co-owners`
+    });
+  }
+
+  private handleGetGroups(socket: Socket, data: { canvasId: string }): void {
+    const { canvasId } = data;
+    const groups = this.groupACL.getCanvasGroupStates(canvasId);
+    socket.emit('groups_sync', { groups });
+  }
+
+  private handleGetGroupPermissions(socket: Socket, data: { canvasId: string; groupId: string }, callback: Function): void {
+    const { canvasId, groupId } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+    const userRole = this.getUserRoleFromSocket(socket.id, canvasId);
+
+    if (!userId) {
+      callback({ error: 'Not authenticated' });
+      return;
+    }
+
+    const permissions = this.groupACL.getGroupPermissions(canvasId, groupId, userId, userRole);
+    callback({ permissions });
   }
 
   private handleCursorMove(socket: Socket, data: { canvasId: string; position: { x: number; y: number } }): void {
@@ -1616,6 +1936,18 @@ export class SocketHandler {
       }
     }
     return undefined;
+  }
+
+  private getUserRoleFromSocket(socketId: string, canvasId: string): 'Lead' | 'Contributor' | 'Viewer' {
+    const clientState = this.clientStates.get(canvasId);
+    if (!clientState) return 'Viewer';
+
+    for (const user of clientState.users.values()) {
+      if (user.socketId === socketId) {
+        return user.role;
+      }
+    }
+    return 'Viewer';
   }
 
   getConnectedUsers(canvasId: string): ConnectedUser[] {

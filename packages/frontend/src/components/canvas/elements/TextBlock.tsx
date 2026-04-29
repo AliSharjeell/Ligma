@@ -234,10 +234,22 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
       return;
     }
+    enterEditMode();
+  };
+
+  const enterEditMode = () => {
     setSelectedId(element.id);
     setIsEditing(true);
     lockElement(element.id);
     emitElementLock(element.id);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    // If text tool is active and we click an existing text box, enter edit mode
+    if (tool === 'text' && !isEditing && !isBeingEdited && !isLocked) {
+      e.stopPropagation();
+      enterEditMode();
+    }
   };
 
   const handleBlur = () => {
@@ -316,7 +328,9 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
   const handleSize = 8;
 
   // For select tool: pass pointer events through to canvas drag handler unless editing or resizing
-  const passThroughPointerEvents = tool === 'select' && !isEditing && !isBeingEdited && !isResizing;
+  // We no longer use pointer-events: none for the select tool because we need to catch double-clicks.
+  // Instead, we just don't stopPropagation on mousedown so InfiniteCanvas can still handle dragging.
+  const passThroughPointerEvents = !isEditing && !isBeingEdited && !isResizing && tool !== 'select' && tool !== 'text';
 
   return (
     <div
@@ -335,7 +349,8 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
         zIndex: isEditing ? 100 : 1,
         pointerEvents: passThroughPointerEvents ? 'none' : 'auto',
       }}
-      onDoubleClick={passThroughPointerEvents ? undefined : handleDoubleClick}
+      onDoubleClick={handleDoubleClick}
+      onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -469,15 +484,18 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       ) : (
         <span
           ref={textRef}
-          className="px-0 py-0 whitespace-nowrap relative z-10"
+          className={cn(
+            "px-0 py-0 whitespace-nowrap relative z-10",
+            !element.content && "text-slate-400 italic opacity-50"
+          )}
           style={{
-            color: fontColor,
+            color: element.content ? fontColor : undefined,
             fontSize: currentFontSize,
             fontFamily,
             fontWeight,
           }}
         >
-          {element.content}
+          {element.content || 'Type something...'}
         </span>
       )}
 

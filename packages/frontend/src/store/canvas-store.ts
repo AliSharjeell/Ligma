@@ -54,6 +54,10 @@ interface CanvasStore extends CanvasState {
   groupElements: (ids: Set<string>) => string | null;
   ungroupElements: (groupId: string) => string[];
 
+  // Group state management
+  groupStates: Map<string, { id: string; ownerId: string; coOwners: string[] }>;
+  setGroupStates: (groups: any[]) => void;
+
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -200,6 +204,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   hoveredCommentId: null,
   pendingCommentX: null,
   pendingCommentY: null,
+  groupStates: new Map(),
   mentionNotifications: [],
 
   setUserRole: (userRole) => set({ userRole }),
@@ -446,6 +451,20 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       return { elements: newElements, history: newHistory, redoStack: [] };
     });
     return affectedIds;
+  },
+
+  setGroupStates: (groups) => {
+    set((state) => {
+      const newGroupStates = new Map(state.groupStates);
+      groups.forEach((group: any) => {
+        newGroupStates.set(group.id, {
+          id: group.id,
+          ownerId: group.ownerId,
+          coOwners: group.coOwners || []
+        });
+      });
+      return { groupStates: newGroupStates };
+    });
   },
 
   undo: () => {
