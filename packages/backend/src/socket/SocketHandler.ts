@@ -20,6 +20,7 @@ import {
   BaseEvent
 } from '../events/types';
 import { VectorClock } from '../crdt/VectorClock';
+import { OTManager, DocumentOT } from '../crdt/DocumentOT';
 import { v4 as uuidv4 } from 'uuid';
 import { PersistenceService } from '../store/PersistenceService';
 import { CanvasStore } from '../store/CanvasStore';
@@ -65,6 +66,8 @@ export class SocketHandler {
   private lastEventPerClient: Map<string, string> = new Map();
   private activityByCanvas: Map<string, ActivityEvent[]> = new Map();
   private activityLimit = 200;
+  private otManager: OTManager = new OTManager();
+  private nodeContentCache: Map<string, string> = new Map(); // Cache content for OT
 
   constructor(io: Server, eventStore: EventStore, rbac: RBACService, canvasStore: CanvasStore) {
     this.io = io;
@@ -204,6 +207,11 @@ export class SocketHandler {
 
     socket.on('delete_task', (data: { taskId: string }) => {
       this.handleDeleteTask(socket, data);
+    });
+
+    // OT Text Operations
+    socket.on('text_operation', (data: { canvasId: string; nodeId: string; opType: 'insert' | 'delete'; position: number; text?: string; length?: number; baseVersion: number }) => {
+      this.handleTextOperation(socket, data);
     });
 
     socket.on('disconnect', () => {
@@ -700,6 +708,56 @@ export class SocketHandler {
     const user = clientState?.users.get(userId);
     const vc = user?.vectorClock || new VectorClock();
 
+    // Apply OT for content changes - transform against concurrent operations
+    let finalChanges = { ...changes };
+    if (changes.content !== undefined) {
+      const cachedContent = this.nodeContentCache.get(nodeId) || '';
+      let docOT = this.otManager.getDocument(nodeId);
+
+      if (!docOT) {
+        docOT = this.otManager.createDocument(nodeId, 'server', cachedContent);
+      }
+
+      // Transform the incoming content against any concurrent operations
+      const pendingOps = docOT.getPending();
+      if (pendingOps.length > 0) {
+        // Apply pending ops to get the current "base" content
+        const currentContent = docOT.getContent();
+
+        // If the client is sending full content replacement, we need to transform it
+        // This is a simplified approach - for character-by-character OT, we'd use more granular ops
+        // For now, we use last-writer-wins with vector clock ordering
+        const clientVC = vectorClock || {};
+        const serverVC = docOT.getVectorClock();
+
+        // Compare vector clocks to determine if transformation is needed
+        let clientIsNewer = false;
+        let serverIsNewer = false;
+        const allKeys = new Set([...Object.keys(clientVC), ...Object.keys(serverVC)]);
+        for (const key of allKeys) {
+          const cVal = clientVC[key] || 0;
+          const sVal = serverVC[key] || 0;
+          if (cVal > sVal) clientIsNewer = true;
+          if (sVal > cVal) serverIsNewer = true;
+        }
+
+        if (serverIsNewer && !clientIsNewer) {
+          // Server has newer changes - client changes need to be merged
+          // For simplicity, we'll keep server content and discard client content
+          // In a full implementation, you'd do character-level OT
+          finalChanges.content = currentContent;
+        } else {
+          // Client is newer or concurrent - apply client changes
+          docOT.insert(0, changes.content); // Replace content
+          this.nodeContentCache.set(nodeId, docOT.getContent());
+        }
+      } else {
+        // No pending ops - direct apply
+        docOT.insert(0, changes.content);
+        this.nodeContentCache.set(nodeId, docOT.getContent());
+      }
+    }
+
     const events = this.eventStore.getEvents(canvasId);
     const nodeVersion = events.filter(e => e.type === 'NodeUpdated' && (e as NodeUpdatedEvent).nodeId === nodeId).length + 1;
 
@@ -709,7 +767,7 @@ export class SocketHandler {
       canvasId,
       userId,
       nodeId,
-      changes,
+      changes: finalChanges,
       version: nodeVersion + 1,
       causallyDependsOn: [],
       timestamp: Date.now(),
@@ -1024,6 +1082,40 @@ export class SocketHandler {
       await this.persistence.deleteTask(taskId);
       const canvasId = task.canvasId;
       this.io.to(canvasId).emit('task_deleted', { taskId });
+    }
+  }
+
+  private handleTextOperation(socket: Socket, data: { canvasId: string; nodeId: string; opType: 'insert' | 'delete'; position: number; text?: string; length?: number; baseVersion: number }): void {
+    const { canvasId, nodeId, opType, position, text, length, baseVersion } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    // Get or create OT document for this node
+    let docOT = this.otManager.getDocument(nodeId);
+    if (!docOT) {
+      // Initialize from cache or empty
+      const cachedContent = this.nodeContentCache.get(nodeId) || '';
+      docOT = this.otManager.createDocument(nodeId, 'server', cachedContent);
+    }
+
+    let resultOp: any;
+    if (opType === 'insert' && text) {
+      resultOp = docOT.insert(position, text);
+    } else if (opType === 'delete' && length) {
+      resultOp = docOT.delete(position, length);
+    }
+
+    if (resultOp) {
+      // Update cache
+      this.nodeContentCache.set(nodeId, docOT.getContent());
+
+      // Emit to all clients (including sender for acknowledgment)
+      this.io.to(canvasId).emit('text_operation', {
+        nodeId,
+        operation: resultOp,
+        mergedContent: docOT.getContent()
+      });
     }
   }
 
