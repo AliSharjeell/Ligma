@@ -259,6 +259,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       size: event.metadata?.size || fallbackSize,
       content: event.content || '',
       color: event.metadata?.color || '#1f2937',
+      strokeWidth: event.metadata?.style?.strokeWidth as number | undefined,
       shapeType: event.metadata?.shapeType,
       points: event.metadata?.points,
       textStyle: event.metadata?.style as CanvasElement['textStyle'] | undefined,
@@ -286,6 +287,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       size: node.size || fallbackSize,
       content: node.content || '',
       color: node.color || '#1f2937',
+      strokeWidth: node.style?.strokeWidth as number | undefined,
       shapeType: node.shapeType,
       points: node.points,
       textStyle: node.style as CanvasElement['textStyle'] | undefined,
@@ -617,6 +619,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         size: element.size,
         points: element.points,
         color: element.color,
+        style: { strokeWidth: element.strokeWidth },
       };
       if (connected) {
         socket?.emit('create_node', payload);

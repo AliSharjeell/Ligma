@@ -99,6 +99,7 @@ export function Toolbar() {
     tool,
     shapeType,
     drawColor,
+    drawSize,
     shapeColor,
     stickyColor,
     textColor,
@@ -116,6 +117,7 @@ export function Toolbar() {
     setShapeType,
     clearSelection,
     setDrawColor,
+    setDrawSize,
     setShapeColor,
     setStickyColor,
     setTextColor,
@@ -544,10 +546,13 @@ export function Toolbar() {
               <input
                 type="range"
                 min="1"
-                max="10"
-                value={2}
-                className="w-16 h-1"
+                max="20"
+                value={drawSize}
+                onChange={(e) => setDrawSize(Number(e.target.value))}
+                className="w-20 h-1 accent-primary"
+                title={`Size: ${drawSize}px`}
               />
+              <span className="text-xs text-slate-500 w-5">{drawSize}</span>
             </div>
           )}
         </div>

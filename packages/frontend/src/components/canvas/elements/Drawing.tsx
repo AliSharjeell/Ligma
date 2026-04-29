@@ -13,13 +13,16 @@ interface DrawingProps {
 
 export function Drawing({ element }: DrawingProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const { selectedIds, setSelectedId, updateElement, userId, userRole, tool } = useCanvasStore();
+  const { selectedIds, setSelectedId, updateElement, userId, userRole, tool, drawSize } = useCanvasStore();
   const { emitElementUpdate } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
-  // Only faded when locked by ANOTHER user, not yourself
   const isLockedByOther = element.locked && element.lockedBy !== userId;
   const isLocked = element.locked;
+
+  // Use element's strokeWidth if explicitly set, otherwise use default 3 (not drawSize)
+  // This ensures existing drawings don't change when slider moves
+  const strokeWidth = element.strokeWidth ?? 3;
 
   useEffect(() => {
     if (!svgRef.current || !element.points || element.points.length < 2) return;
@@ -39,12 +42,12 @@ export function Drawing({ element }: DrawingProps) {
 
     const node = rc.curve(relativePoints, {
       stroke: element.color || '#1f2937',
-      strokeWidth: isSelected ? 2.5 : 2,
+      strokeWidth: isSelected ? strokeWidth + 0.5 : strokeWidth,
       roughness: 1,
     });
 
     svgRef.current.appendChild(node);
-  }, [element.points, element.color, isSelected]);
+  }, [element.points, element.color, isSelected, strokeWidth]);
 
   if (!element.points || element.points.length < 2) return null;
 
