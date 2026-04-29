@@ -396,15 +396,28 @@ export function Toolbar() {
 
   return (
     <>
-      {/* Top Left Branding + Export */}
+      {/* Top Left Branding + Layers + Export */}
       <div className="absolute top-4 left-4 z-20">
         <div className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 shadow-excalidraw px-3 py-2">
-          <h1
-            className="text-2xl font-bold tracking-tight text-primary leading-none select-none"
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="text-2xl font-bold tracking-tight text-primary leading-none select-none hover:opacity-80 transition-opacity"
             style={{ fontFamily: 'var(--font-lora), serif' }}
           >
             Ligma
-          </h1>
+          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+            className={cn(
+              "h-9 w-9 rounded-lg",
+              isLeftPanelOpen && "bg-slate-100 ring-2 ring-primary/10"
+            )}
+            title="Layers"
+          >
+            <Layers className="size-4" />
+          </Button>
           <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
             <DialogTrigger asChild>
               <Button
@@ -435,22 +448,6 @@ export function Toolbar() {
             </DialogContent>
           </Dialog>
         </div>
-      </div>
-
-      {/* Middle Left Layers Button */}
-      <div className="absolute top-1/2 -translate-y-1/2 left-4 z-20">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
-          className={cn(
-            "h-10 w-10 rounded-xl bg-white shadow-excalidraw border border-slate-200",
-            isLeftPanelOpen && "bg-slate-50 ring-2 ring-primary/10"
-          )}
-          title="Layers"
-        >
-          <Layers className="size-5 text-slate-600" />
-        </Button>
       </div>
 
       {/* Bottom Center Toolbar - COMPACT */}
