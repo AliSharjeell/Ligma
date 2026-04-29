@@ -161,6 +161,8 @@ export function InfiniteCanvas() {
 
     const handleNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
+      const canvas = e.currentTarget as HTMLElement;
+      const rect = canvas.getBoundingClientRect();
       const state = useCanvasStore.getState();
       const { viewportPosition, viewportZoom } = state;
 
@@ -177,11 +179,23 @@ export function InfiniteCanvas() {
         });
       }
 
-      // Zoom only with Ctrl (pinch or ctrl+scroll)
+      // Zoom toward cursor (like Excalidraw)
       if (e.ctrlKey) {
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
         const newZoom = Math.min(Math.max(viewportZoom * delta, 0.1), 5);
+
+        // Where is the mouse in world coordinates?
+        const worldX = (mouseX - viewportPosition.x) / viewportZoom;
+        const worldY = (mouseY - viewportPosition.y) / viewportZoom;
+
+        // New viewport position so world point stays under mouse
+        const newX = mouseX - worldX * newZoom;
+        const newY = mouseY - worldY * newZoom;
+
         state.setViewportZoom(newZoom);
+        state.setViewportPosition({ x: newX, y: newY });
       }
     };
 
