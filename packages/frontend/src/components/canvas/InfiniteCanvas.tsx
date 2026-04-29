@@ -513,6 +513,8 @@ export function InfiniteCanvas() {
       });
       if (selectedElementIds.size > 0) {
         setSelectedIds(selectedElementIds);
+      } else {
+        clearSelection();
       }
     }
 
@@ -534,7 +536,7 @@ export function InfiniteCanvas() {
     setBoxStart(null);
     setBoxEnd(null);
     setDragStart(null);
-  }, [isPanning, isDragging, isDrawingShape, isBoxSelecting, tool, drawPoints, shapePreview, shapeType, shapeColor, drawColor, boxStart, boxEnd, elements, addElement, userId, emitElementCreate, emitElementUpdate, setSelectedId, setSelectedIds]);
+  }, [isPanning, isDragging, isDrawingShape, isBoxSelecting, tool, drawPoints, shapePreview, shapeType, shapeColor, drawColor, boxStart, boxEnd, elements, addElement, userId, emitElementCreate, emitElementUpdate, setSelectedId, setSelectedIds, clearSelection]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (suppressClickClearRef.current) {
@@ -585,8 +587,18 @@ export function InfiniteCanvas() {
       return;
     }
 
+    // Only text tool should create text on double click.
+    if (tool !== 'text') {
+      return;
+    }
+
+    if (userRole === 'Viewer') {
+      alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
+      return;
+    }
+
     // Text tool always creates new text, even on top of existing elements
-    if (tool === 'text' && userRole !== 'Viewer') {
+    if (tool === 'text') {
       setEnteringEditId('');
       const element = addElement({
         type: 'text',
@@ -613,31 +625,6 @@ export function InfiniteCanvas() {
       }, 50);
       return;
     }
-    // Viewer mode check for background double click
-    if (userRole === 'Viewer') {
-      alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
-      return;
-    }
-    // Default: create text on double click (for select tool)
-    setEnteringEditId('');
-    const element = addElement({
-      type: 'text',
-      position: { x, y: y - 10 },
-      size: { width: 10, height: 24 },
-      content: '',
-      color: textColor,
-      textStyle: {
-        fontSize: textFontSize,
-        fontFamily: textFontFamily,
-        fontWeight: textFontWeight,
-        textAlign,
-      },
-      locked: false,
-      createdBy: userId,
-    });
-    emitElementCreate(element);
-    setSelectedId(element.id);
-    setEnteringEditId(element.id);
   }, [viewportPosition, viewportZoom, elements, addElement, textColor, textFontSize, textFontFamily, textFontWeight, textAlign, userId, emitElementCreate, setSelectedId]);
 
   useEffect(() => {
