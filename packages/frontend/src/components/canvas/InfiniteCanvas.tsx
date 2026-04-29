@@ -132,7 +132,7 @@ export function InfiniteCanvas() {
       const padding = 5;
 
       if (w > 2 && h > 2) {
-        const options = { stroke: shapeColor, strokeWidth: 2, roughness: 1.5 };
+        const options = { stroke: shapeColor, strokeWidth: 2, roughness: 0 };
         let node;
         if (shapeType === 'circle') {
           node = rc.ellipse(x + w / 2, y + h / 2, w, h, options);
@@ -201,7 +201,7 @@ export function InfiniteCanvas() {
 
     if (isDragging && tool === 'draw' && drawPoints.length > 1) {
       const points: [number, number][] = drawPoints.map(p => [p.x, p.y]);
-      const node = rc.curve(points, { stroke: drawColor, strokeWidth: drawSize, roughness: 1 });
+      const node = rc.curve(points, { stroke: drawColor, strokeWidth: drawSize, roughness: 0 });
       previewSvgRef.current.appendChild(node);
     }
   }, [isDrawingShape, shapePreview, shapeType, shapeColor, isDragging, tool, drawPoints, drawColor, drawSize]);

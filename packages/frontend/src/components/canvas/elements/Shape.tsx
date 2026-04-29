@@ -48,8 +48,8 @@ export function Shape({ element }: ShapeProps) {
     const options = {
       stroke: strokeColor,
       strokeWidth: isSelected ? 2.5 : 2,
-      roughness: 1.5,
-      bowing: 1.5,
+      roughness: 0,
+      bowing: 0,
       seed: element.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0),
     };
 
