@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-29T08:51:00.301Z",
+  "updatedAt": "2026-04-29T12:10:39.929Z",
   "missions": [
     {
       "id": "session:5340c1b7-e45f-407d-85cd-bba65efc849c:none",
@@ -176,6 +176,62 @@
           "agent": "Explore:a7ab896",
           "detail": "completed",
           "sourceKey": "session-stop:a1cb4520dd24ec00f"
+        }
+      ]
+    },
+    {
+      "id": "session:e7b4f3f8-f614-4014-aa5b-936438405c4a:none",
+      "source": "session",
+      "name": "none",
+      "objective": "Session mission",
+      "createdAt": "2026-04-29T12:04:34.947Z",
+      "updatedAt": "2026-04-29T12:10:39.929Z",
+      "status": "done",
+      "workerCount": 1,
+      "taskCounts": {
+        "total": 1,
+        "pending": 0,
+        "blocked": 0,
+        "inProgress": 0,
+        "completed": 1,
+        "failed": 0
+      },
+      "agents": [
+        {
+          "name": "Explore:adea330",
+          "role": "Explore",
+          "ownership": "adea3307635b8840a",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-29T12:10:39.929Z"
+        }
+      ],
+      "timeline": [
+        {
+          "id": "session-start:adea3307635b8840a:2026-04-29T12:04:34.947Z",
+          "at": "2026-04-29T12:04:34.947Z",
+          "kind": "update",
+          "agent": "Explore:adea330",
+          "detail": "started Explore:adea330",
+          "sourceKey": "session-start:adea3307635b8840a"
+        },
+        {
+          "id": "session-stop:adea3307635b8840a:2026-04-29T12:07:07.586Z",
+          "at": "2026-04-29T12:07:07.586Z",
+          "kind": "completion",
+          "agent": "Explore:adea330",
+          "detail": "completed",
+          "sourceKey": "session-stop:adea3307635b8840a"
+        },
+        {
+          "id": "session-stop:affb69f8abc603d01:2026-04-29T12:10:39.929Z",
+          "at": "2026-04-29T12:10:39.929Z",
+          "kind": "completion",
+          "agent": "Explore:adea330",
+          "detail": "completed",
+          "sourceKey": "session-stop:affb69f8abc603d01"
         }
       ]
     }

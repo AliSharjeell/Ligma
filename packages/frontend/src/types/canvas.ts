@@ -98,6 +98,8 @@ export interface CanvasState {
   userName: string;
   history: { elements: Map<string, CanvasElement>; timestamp: number }[];
   redoStack: { elements: Map<string, CanvasElement>; timestamp: number }[];
+  sessionTimeline: { elements: Map<string, CanvasElement>; timestamp: number }[];
+  replayFrameElements: Map<string, CanvasElement> | null;
   comments: Comment[];
   isCommentMode: boolean;
   activeCommentId: string | null;
@@ -123,6 +125,21 @@ export interface CommentReply {
   content: string;
   timestamp: number;
   isRead: boolean;
+  mentions: Mention[];
+  attachments?: CommentAttachment[];
+}
+
+export interface Mention {
+  userId: string;
+  userName: string;
+}
+
+export interface CommentAttachment {
+  id: string;
+  name: string;
+  url: string; // base64 data URL
+  type: string; // MIME type
+  size: number;
 }
 
 export interface Comment {
@@ -133,10 +150,40 @@ export interface Comment {
   authorName: string;
   authorColor: string;
   content: string;
+  mentions: Mention[];
+  attachments: CommentAttachment[];
   timestamp: number;
   resolved: boolean;
   replies: CommentReply[];
   unreadCount: number;
+}
+
+export interface CanvasExportData {
+  exportedAt: string;
+  version: string;
+  viewport: {
+    position: Position;
+    zoom: number;
+  };
+  elements: CanvasElement[];
+  stats: {
+    stickyNotes: number;
+    textBlocks: number;
+    shapes: number;
+    drawings: number;
+  };
+}
+
+export interface MentionNotification {
+  id: string;
+  commentId: string;
+  authorId: string;
+  authorName: string;
+  authorColor: string;
+  content: string;
+  mentionedUserId: string;
+  timestamp: number;
+  read: boolean;
 }
 
 export interface SocketEvents {
@@ -145,6 +192,12 @@ export interface SocketEvents {
   delete_node: string;
   lock_node: { elementId: string; userId: string };
   unlock_node: string;
+  lock_nodes: { nodeIds: string[]; userId: string };
+  unlock_nodes: { nodeIds: string[]; userId: string };
+  nodes_locked: { events: any[]; failed: string[] };
+  nodes_unlocked: { events: any[]; failed: string[] };
+  bulk_lock_result: { successful: string[]; failed: string[] };
+  bulk_unlock_result: { successful: string[]; failed: string[] };
   cursor_move: { userId: string; position: Position };
   user_joined: User;
   user_left: string;

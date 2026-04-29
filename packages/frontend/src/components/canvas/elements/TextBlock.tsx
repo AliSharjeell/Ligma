@@ -6,6 +6,7 @@ import { useSocket } from '@/contexts/socket-context';
 import { cn } from '@/lib/utils';
 import type { CanvasElement } from '@/types/canvas';
 import { ClientOTManager, Operation } from '@/crdt/ClientOT';
+import { AlertCircle, CheckCircle2, HelpCircle, Link } from 'lucide-react';
 
 interface TextBlockProps {
   element: CanvasElement;
@@ -305,6 +306,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       className={cn(
         'absolute select-none outline-none',
         isLockedByOther && 'pointer-events-none',
+        isLocked && !isBeingEdited && 'pointer-events-none',
         !isLocked && tool !== 'select' && 'pointer-events-none',
         !isLocked && tool === 'draw' && 'cursor-crosshair',
         !isLocked && tool === 'select' && 'cursor-text'
@@ -459,6 +461,19 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
         >
           {element.content}
         </span>
+      )}
+
+      {/* Intent Tag Badge */}
+      {element.intentTag && !isEditing && !isBeingEdited && (
+        <div className={cn(
+          'absolute -top-6 left-0 px-2 py-1 text-xs rounded whitespace-nowrap',
+          element.intentTag.type === 'action_item' && 'bg-red-100 text-red-700 border border-red-200',
+          element.intentTag.type === 'decision' && 'bg-blue-100 text-blue-700 border border-blue-200',
+          element.intentTag.type === 'open_question' && 'bg-yellow-100 text-yellow-700 border border-yellow-200',
+          element.intentTag.type === 'reference' && 'bg-gray-100 text-gray-600 border border-gray-200'
+        )}>
+          {element.intentTag.type.replace('_', ' ')} {Math.round(element.intentTag.confidence * 100)}%
+        </div>
       )}
     </div>
   );

@@ -84,8 +84,14 @@
   "hotPaths": [
     {
       "path": "src\\socket\\SocketHandler.ts",
-      "accessCount": 21,
-      "lastAccessed": 1777395657606,
+      "accessCount": 27,
+      "lastAccessed": 1777465405644,
+      "type": "file"
+    },
+    {
+      "path": "src\\rbac\\RBACService.ts",
+      "accessCount": 3,
+      "lastAccessed": 1777465344263,
       "type": "file"
     },
     {
@@ -104,6 +110,24 @@
       "path": "src\\events\\StateReconstructor.ts",
       "accessCount": 1,
       "lastAccessed": 1777392020167,
+      "type": "file"
+    },
+    {
+      "path": ".env",
+      "accessCount": 1,
+      "lastAccessed": 1777464703364,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 1,
+      "lastAccessed": 1777464715113,
+      "type": "directory"
+    },
+    {
+      "path": "src\\rbac\\NodeACL.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777464931584,
       "type": "file"
     }
   ],

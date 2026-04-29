@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import html2canvas from 'html2canvas';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { useAuthStore } from '@/store/auth-store';
@@ -51,6 +52,7 @@ import { TasksPanel } from '@/components/panels/TaskBoard';
 import { ActivityPanel } from '@/components/panels/EventLog';
 import { LayersList } from '@/components/panels/LayersPanel';
 import { CommentsPanel } from '@/components/panels/CommentsPanel';
+import { ChatPanel } from '@/components/panels/ChatPanel';
 import {
   Dialog,
   DialogContent,
@@ -64,6 +66,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Download, FileJson, FileText, Image, AtSign } from 'lucide-react';
 
 const tools: { id: Tool; icon: React.ReactNode; label: string }[] = [
   { id: 'select', icon: <MousePointer2 className="size-4" />, label: 'Select (V)' },
@@ -86,6 +89,14 @@ const shapes: { id: ShapeType; icon: React.ReactNode; label: string }[] = [
   { id: 'arrow', icon: <ArrowRight className="size-4" />, label: 'Arrow' },
 ];
 
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return `${Math.floor(diff / 86400000)}d ago`;
+}
+
 export function Toolbar() {
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
@@ -95,13 +106,20 @@ export function Toolbar() {
   const [nameInput, setNameInput] = useState('');
   const [pendingRequests, setPendingRequests] = useState<{ userId: string; userName: string }[]>([]);
   const [hasRequested, setHasRequested] = useState(false);
-  const [rightPanelView, setRightPanelView] = useState<'main' | 'tasks' | 'activity' | 'comments'>('main');
+  const [rightPanelView, setRightPanelView] = useState<'main' | 'tasks' | 'activity' | 'comments' | 'notifications'>('main');
   const [newTaskCount, setNewTaskCount] = useState(0);
+  const [mentionNotificationCount, setMentionNotificationCount] = useState(0);
   const [summaryData, setSummaryData] = useState<any>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership, emitGenerateSummary, connectionStatus } = useSocket();
+
+  // Subscribe to mention notifications count
+  const mentionNotifications = useCanvasStore((state) => state.mentionNotifications);
 
   const {
     tool,
@@ -120,6 +138,9 @@ export function Toolbar() {
     timeTravelEnabled,
     isCommentMode,
     selectedIds,
+    elements,
+    viewportPosition,
+    viewportZoom,
     tasks,
     setTool,
     setShapeType,
@@ -151,10 +172,11 @@ export function Toolbar() {
     canUndo,
     canRedo,
     users,
-    viewportPosition,
-    viewportZoom,
+    comments,
+    setActiveCommentId,
+    setHoveredCommentId,
   } = useCanvasStore();
-  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate, emitElementLock: emitLock } = useSocket();
+  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate, emitElementLock: emitLock, emitCanvasScreenshot } = useSocket();
 
   // Room Management Logic
   const currentRoom = (typeof window !== 'undefined' && window.location.pathname.split('/').pop()) || 'default';
@@ -254,7 +276,15 @@ export function Toolbar() {
     if (rightPanelView === 'tasks') {
       setNewTaskCount(0);
     }
+    if (rightPanelView === 'notifications') {
+      setMentionNotificationCount(0);
+    }
   }, [rightPanelView]);
+
+  // Update mention notification count
+  useEffect(() => {
+    setMentionNotificationCount(mentionNotifications.filter(n => !n.read).length);
+  }, [mentionNotifications]);
 
   const handleJoinRoom = () => {
     const trimmed = roomInput.trim();
@@ -327,7 +357,168 @@ export function Toolbar() {
   }, [selectedElement, viewportPosition.x, viewportPosition.y, viewportZoom]);
   const isLockedByMe = selectedElement?.locked && selectedElement.lockedBy === userId;
 
+  // Function to capture canvas screenshot
+  const captureCanvasScreenshot = useCallback(async () => {
+    // Find the canvas element
+    const canvasElement = document.querySelector('[class*="w-full h-full overflow-hidden bg-white"]') as HTMLElement;
+    if (!canvasElement) {
+      console.log('Canvas element not found');
+      return null;
+    }
+
+    try {
+      const canvas = await html2canvas(canvasElement, {
+        backgroundColor: '#ffffff',
+        scale: 1,
+        useCORS: true,
+        logging: false,
+      });
+
+      // Convert to base64 JPEG for efficiency
+      const screenshot = canvas.toDataURL('image/jpeg', 0.8);
+      return screenshot;
+    } catch (error) {
+      console.error('Failed to capture canvas screenshot:', error);
+      return null;
+    }
+  }, []);
+
+  // Update the generate summary handler to include screenshot
+  const handleGenerateSummary = useCallback(async () => {
+    setIsGeneratingSummary(true);
+
+    // Capture screenshot first
+    const screenshot = await captureCanvasScreenshot();
+
+    // Send screenshot to backend if captured
+    if (screenshot) {
+      emitCanvasScreenshot(screenshot);
+    }
+
+    // Emit generate summary event
+    emitGenerateSummary();
+  }, [captureCanvasScreenshot, emitCanvasScreenshot, emitGenerateSummary]);
+
   const colorSwatches = ['#1f2937', '#ef4444', '#22c55e', '#06b6d4', '#8b5cf6', '#f97316', '#e11d48'];
+
+  // Export handlers
+  const handleExportPNG = useCallback(async () => {
+    const canvasElement = document.querySelector('[class*="w-full h-full overflow-hidden bg-white"]') as HTMLElement;
+    if (!canvasElement) return;
+
+    try {
+      const canvas = await html2canvas(canvasElement, {
+        backgroundColor: '#ffffff',
+        scale: 2, // Higher quality
+        useCORS: true,
+        logging: false,
+      });
+
+      const link = document.createElement('a');
+      link.download = `ligma-canvas-${new Date().toISOString().split('T')[0]}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('Failed to export PNG:', error);
+    }
+  }, []);
+
+  const handleExportJSON = useCallback(() => {
+    const elementsArray = Array.from(elements.values());
+
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      version: '1.0',
+      viewport: {
+        position: viewportPosition,
+        zoom: viewportZoom,
+      },
+      elements: elementsArray,
+      stats: {
+        stickyNotes: elementsArray.filter(e => e.type === 'sticky').length,
+        textBlocks: elementsArray.filter(e => e.type === 'text').length,
+        shapes: elementsArray.filter(e => e.type === 'shape').length,
+        drawings: elementsArray.filter(e => e.type === 'drawing').length,
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ligma-canvas-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [elements, viewportPosition, viewportZoom]);
+
+  const handleExportMarkdown = useCallback(() => {
+    const elementsArray = Array.from(elements.values());
+    const stickyNotes = elementsArray.filter(e => e.type === 'sticky' && e.content);
+    const textBlocks = elementsArray.filter(e => e.type === 'text' && e.content);
+    const shapes = elementsArray.filter(e => e.type === 'shape');
+    const drawings = elementsArray.filter(e => e.type === 'drawing');
+
+    let md = `# Ligma Canvas Export\n\n`;
+    md += `*Exported on ${new Date().toLocaleString()}*\n\n`;
+
+    if (stickyNotes.length > 0) {
+      md += `## Sticky Notes (${stickyNotes.length})\n\n`;
+      stickyNotes.forEach((note, i) => {
+        const color = note.color || '#fef08a';
+        md += `### Note ${i + 1}\n`;
+        md += `- **Color:** ${color}\n`;
+        md += `- **Position:** (${Math.round(note.position.x)}, ${Math.round(note.position.y)})\n`;
+        md += `- **Content:** ${note.content}\n\n`;
+      });
+    }
+
+    if (textBlocks.length > 0) {
+      md += `## Text Blocks (${textBlocks.length})\n\n`;
+      textBlocks.forEach((text, i) => {
+        md += `### Text ${i + 1}\n`;
+        md += `- **Position:** (${Math.round(text.position.x)}, ${Math.round(text.position.y)})\n`;
+        md += `- **Content:** ${text.content}\n`;
+        if (text.textStyle?.fontSize) {
+          md += `- **Font Size:** ${text.textStyle.fontSize}px\n`;
+        }
+        md += '\n';
+      });
+    }
+
+    if (shapes.length > 0) {
+      md += `## Shapes (${shapes.length})\n\n`;
+      const shapeCounts = shapes.reduce((acc, s) => {
+        const type = s.shapeType || 'rectangle';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      md += `Shape summary: ${Object.entries(shapeCounts).map(([type, count]) => `${count}x ${type}`).join(', ')}\n\n`;
+    }
+
+    if (drawings.length > 0) {
+      md += `## Freehand Drawings (${drawings.length})\n\n`;
+      md += `Canvas contains ${drawings.length} freehand drawing(s)\n\n`;
+    }
+
+    // Tasks summary
+    if (tasks.length > 0) {
+      md += `## Tasks (${tasks.length})\n\n`;
+      tasks.forEach(task => {
+        md += `- [${task.status === 'completed' ? 'x' : ' '}] ${task.title}\n`;
+        if (task.description) md += `  - ${task.description}\n`;
+      });
+      md += '\n';
+    }
+
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ligma-canvas-${new Date().toISOString().split('T')[0]}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [elements, tasks]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -460,6 +651,82 @@ export function Toolbar() {
                 <Button onClick={handleCopyBoardLink}>
                   {hasCopiedLink ? 'Copied' : 'Copy Link'}
                 </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-lg text-slate-600 hover:bg-slate-100"
+                title="Export canvas"
+              >
+                <Download className="size-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Download className="size-5" />
+                  Export Canvas
+                </DialogTitle>
+                <DialogDescription>
+                  Download your canvas in different formats.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-4">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-14"
+                  onClick={() => {
+                    handleExportPNG();
+                    setIsExportModalOpen(false);
+                  }}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <Image className="size-5 text-blue-600" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">Export as PNG</div>
+                    <div className="text-xs text-muted-foreground">High-quality image of your canvas</div>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-14"
+                  onClick={() => {
+                    handleExportJSON();
+                    setIsExportModalOpen(false);
+                  }}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                    <FileJson className="size-5 text-green-600" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">Export as JSON</div>
+                    <div className="text-xs text-muted-foreground">Full canvas data with all elements</div>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-14"
+                  onClick={() => {
+                    handleExportMarkdown();
+                    setIsExportModalOpen(false);
+                  }}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <FileText className="size-5 text-purple-600" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">Export as Markdown</div>
+                    <div className="text-xs text-muted-foreground">Formatted document with content</div>
+                  </div>
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsExportModalOpen(false)}>Cancel</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -949,17 +1216,108 @@ export function Toolbar() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-2 justify-start"
+                      className="gap-2 justify-start relative"
                       onClick={() => setRightPanelView('comments')}
                     >
                       <MessageCircle className="size-4" />
                       Comments
+                      {mentionNotificationCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                          {mentionNotificationCount}
+                        </span>
+                      )}
                     </Button>
+                    {mentionNotificationCount > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 justify-start relative"
+                        onClick={() => setRightPanelView('notifications')}
+                      >
+                        <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        Mentions
+                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                          {mentionNotificationCount}
+                        </span>
+                      </Button>
+                    )}
                   </div>
                 )}
                 {rightPanelView === 'tasks' && <TasksPanel onBack={() => setRightPanelView('main')} />}
                 {rightPanelView === 'activity' && <ActivityPanel onBack={() => setRightPanelView('main')} />}
                 {rightPanelView === 'comments' && <CommentsPanel onBack={() => setRightPanelView('main')} />}
+                {rightPanelView === 'notifications' && (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Mention Notifications</span>
+                      {mentionNotifications.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={() => useCanvasStore.getState().clearMentionNotifications()}
+                        >
+                          Clear all
+                        </Button>
+                      )}
+                    </div>
+                    {mentionNotifications.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {mentionNotifications.slice(0, 10).map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={cn(
+                              "p-3 rounded-lg border text-sm",
+                              !notification.read ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-bold"
+                                style={{ backgroundColor: notification.authorColor }}
+                              >
+                                {notification.authorName[0].toUpperCase()}
+                              </div>
+                              <span className="font-medium">{notification.authorName}</span>
+                              <span className="text-xs text-muted-foreground ml-auto">
+                                {formatRelativeTime(notification.timestamp)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1 ml-8">{notification.content}</p>
+                            {!notification.read && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs ml-8 mt-1 text-blue-500"
+                                onClick={() => {
+                                  useCanvasStore.getState().markMentionNotificationRead(notification.id);
+                                  setActiveCommentId(notification.commentId);
+                                  setHoveredCommentId(notification.commentId);
+                                  // Pan to the comment
+                                  const comment = comments.find(c => c.id === notification.commentId);
+                                  if (comment) {
+                                    useCanvasStore.getState().setViewportPosition({
+                                      x: -comment.canvasX + 400,
+                                      y: -comment.canvasY + 300,
+                                    });
+                                  }
+                                }}
+                              >
+                                View comment
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-muted-foreground text-sm">
+                        No mention notifications
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <Separator />
@@ -990,10 +1348,7 @@ export function Toolbar() {
                     variant="outline"
                     size="sm"
                     className="justify-start gap-3 h-10 text-xs rounded-lg px-3 bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 hover:bg-purple-100"
-                    onClick={() => {
-                      setIsGeneratingSummary(true);
-                      emitGenerateSummary();
-                    }}
+                    onClick={handleGenerateSummary}
                     disabled={isGeneratingSummary}
                   >
                     {isGeneratingSummary ? (
@@ -1139,12 +1494,66 @@ export function Toolbar() {
             <Button variant="outline" onClick={() => setIsSummaryDialogOpen(false)}>Close</Button>
             <Button onClick={() => {
               if (summaryData) {
+                // Generate markdown summary
+                let md = `# ${summaryData.overview || 'Canvas Summary'}\n\n`;
+                md += `*Generated on ${new Date(summaryData.generatedAt).toLocaleString()}*\n\n`;
+
+                if (summaryData.participants?.length) {
+                  md += `## Participants\n${summaryData.participants.map((p: string) => `- ${p}`).join('\n')}\n\n`;
+                }
+                if (summaryData.decisions?.length) {
+                  md += `## Decisions\n${summaryData.decisions.map((d: string) => `- ${d}`).join('\n')}\n\n`;
+                }
+                if (summaryData.actionItems?.length) {
+                  md += `## Action Items\n${summaryData.actionItems.map((a: string) => `- [ ] ${a}`).join('\n')}\n\n`;
+                }
+                if (summaryData.openQuestions?.length) {
+                  md += `## Open Questions\n${summaryData.openQuestions.map((q: string) => `- ${q}`).join('\n')}\n\n`;
+                }
+                if (summaryData.nextSteps?.length) {
+                  md += `## Next Steps\n${summaryData.nextSteps.map((n: string) => `- ${n}`).join('\n')}\n\n`;
+                }
+
+                // Download as .md file
+                const blob = new Blob([md], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `canvas-summary-${new Date().toISOString().split('T')[0]}.md`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              }
+            }}>Download Markdown</Button>
+            <Button onClick={() => {
+              if (summaryData) {
                 navigator.clipboard.writeText(JSON.stringify(summaryData, null, 2));
               }
             }}>Copy JSON</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Chat Assistant - Floating Button */}
+      {!isChatOpen && (
+        <Button
+          variant="default"
+          size="icon"
+          onClick={() => setIsChatOpen(true)}
+          className="absolute bottom-24 right-4 z-20 h-12 w-12 rounded-full shadow-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+          title="Open AI Chat Assistant"
+        >
+          <MessageCircle className="size-5 text-white" />
+        </Button>
+      )}
+
+      {/* AI Chat Assistant - Panel */}
+      {isChatOpen && (
+        <div className="absolute bottom-24 right-4 z-20 w-96 h-[500px] shadow-xl">
+          <ChatPanel onClose={() => setIsChatOpen(false)} />
+        </div>
+      )}
     </>
   );
 }

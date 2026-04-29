@@ -6,7 +6,7 @@ import { useSocket } from '@/contexts/socket-context';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image, MessageCircle, Folder, ChevronRight, ChevronDown } from 'lucide-react';
+import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image, MessageCircle, Folder, ChevronRight, ChevronDown, Group, Ungroup } from 'lucide-react';
 import type { CanvasElement, ElementType } from '@/types/canvas';
 
 const LAYER_ICONS: Record<ElementType, React.ReactNode> = {
@@ -24,10 +24,60 @@ interface GroupedLayer {
 }
 
 export function LayersList() {
-  const { elements, selectedIds, setSelectedId, setSelectedIds, deleteElement, lockElement, unlockElement, ungroupElements } = useCanvasStore();
-  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate } = useSocket();
+  const { elements, selectedIds, setSelectedId, setSelectedIds, deleteElement, lockElement, unlockElement, ungroupElements, userRole, groupElements } = useCanvasStore();
+  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate, emitBulkLock, emitBulkUnlock } = useSocket();
   const [lastSelectedId, setLastSelectedId] = React.useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(new Set());
+
+  const canEdit = userRole !== 'Viewer';
+  const selectedCount = selectedIds.size;
+  const hasSelection = selectedCount > 0;
+
+  const selectedElements = React.useMemo(() => {
+    return Array.from(selectedIds).map(id => elements.get(id)).filter(Boolean) as CanvasElement[];
+  }, [selectedIds, elements]);
+
+  const allSelectedLocked = selectedElements.every(el => el.locked);
+  const allSelectedUnlocked = selectedElements.every(el => !el.locked);
+  const hasMixedLockStates = !allSelectedLocked && !allSelectedUnlocked;
+
+  const handleBulkLock = () => {
+    if (!canEdit) return;
+    const unlockedIds = selectedElements.filter(el => !el.locked).map(el => el.id);
+    if (unlockedIds.length > 0) {
+      unlockedIds.forEach(id => lockElement(id));
+      emitBulkLock(unlockedIds);
+    }
+  };
+
+  const handleBulkUnlock = () => {
+    if (!canEdit) return;
+    const lockedIds = selectedElements.filter(el => el.locked).map(el => el.id);
+    if (lockedIds.length > 0) {
+      lockedIds.forEach(id => unlockElement(id));
+      emitBulkUnlock(lockedIds);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (!canEdit) return;
+    selectedIds.forEach(id => {
+      emitElementDelete(id);
+      deleteElement(id);
+    });
+  };
+
+  const handleBulkGroup = () => {
+    if (!canEdit || selectedCount < 2) return;
+    const groupId = groupElements(selectedIds);
+    if (groupId) {
+      const groupedElements = useCanvasStore.getState().elements;
+      selectedIds.forEach(id => {
+        const el = groupedElements.get(id);
+        if (el) emitElementUpdate(el);
+      });
+    }
+  };
 
   const organizedLayers = React.useMemo(() => {
     const elementsArray = Array.from(elements.values()).reverse();
@@ -116,7 +166,65 @@ export function LayersList() {
   }
 
   return (
-    <ScrollArea className="h-[600px]">
+    <>
+      {hasSelection && selectedCount > 1 && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b bg-muted/50">
+          <span className="text-xs text-muted-foreground font-medium">
+            {selectedCount} selected
+          </span>
+          <div className="flex items-center gap-1">
+            {canEdit && (
+              <>
+                {allSelectedUnlocked || hasMixedLockStates ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={handleBulkLock}
+                    title="Lock all"
+                  >
+                    <Lock className="size-3" />
+                  </Button>
+                ) : null}
+                {allSelectedLocked || hasMixedLockStates ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={handleBulkUnlock}
+                    title="Unlock all"
+                  >
+                    <Unlock className="size-3" />
+                  </Button>
+                ) : null}
+                {selectedCount >= 2 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={handleBulkGroup}
+                    title="Group selected"
+                  >
+                    <Group className="size-3" />
+                  </Button>
+                )}
+                <div className="w-px h-4 bg-border mx-1" />
+              </>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive hover:text-destructive"
+              onClick={handleBulkDelete}
+              disabled={!canEdit}
+              title="Delete all"
+            >
+              <Trash2 className="size-3" />
+            </Button>
+          </div>
+        </div>
+      )}
+      <ScrollArea className="h-[600px]">
       <div className="space-y-1">
         {organizedLayers.groups.map((group) => {
           const isGroupSelected = group.children.some(c => selectedIds.has(c.id));
@@ -274,6 +382,7 @@ export function LayersList() {
         })}
       </div>
     </ScrollArea>
+    </>
   );
 }
 

@@ -7,6 +7,7 @@ import { StateReconstructor } from '../events/StateReconstructor';
 import { RBACService } from '../rbac/RBACService';
 import { IntentClassifier, TaskBoard } from '../ai/IntentExtractor';
 import { SummaryGenerator } from '../ai/SummaryGenerator';
+import { RagChatService } from '../ai/RagChatService';
 import {
   CanvasEvent,
   NodeCreatedEvent,
@@ -63,13 +64,16 @@ export class SocketHandler {
   private intentClassifier: IntentClassifier;
   private taskBoard: TaskBoard;
   private summaryGenerator: SummaryGenerator;
+  private ragChatService: RagChatService;
   private persistence: PersistenceService;
   private clientStates: Map<string, ClientState> = new Map();
   private lastEventPerClient: Map<string, string> = new Map();
   private activityByCanvas: Map<string, ActivityEvent[]> = new Map();
   private activityLimit = 200;
   private otManager: OTManager = new OTManager();
-  private nodeContentCache: Map<string, string> = new Map(); // Cache content for OT
+  private nodeContentCache: Map<string, string> = new Map();
+  private canvasConversations: Map<string, Array<{ role: 'user' | 'assistant'; content: string; timestamp: number }>> = new Map(); // Cache content for OT
+  private canvasScreenshots: Map<string, string> = new Map(); // Store canvas screenshots for vision analysis
 
   constructor(io: Server, eventStore: EventStore, rbac: RBACService, canvasStore: CanvasStore) {
     this.io = io;
@@ -81,6 +85,7 @@ export class SocketHandler {
     this.intentClassifier = new IntentClassifier();
     this.taskBoard = new TaskBoard();
     this.summaryGenerator = new SummaryGenerator();
+    this.ragChatService = new RagChatService();
     this.persistence = new PersistenceService();
     this.setupEventHandlers();
   }
@@ -176,12 +181,20 @@ export class SocketHandler {
     });
 
     socket.on('lock_node', (data: { canvasId: string; nodeId: string; durationMs?: number }) => {
-      
+
       this.handleLockNode(socket, data);
     });
 
     socket.on('unlock_node', (data: { canvasId: string; nodeId: string }) => {
       this.handleUnlockNode(socket, data);
+    });
+
+    socket.on('lock_nodes', (data: { canvasId: string; nodeIds: string[]; durationMs?: number }) => {
+      this.handleBulkLock(socket, data);
+    });
+
+    socket.on('unlock_nodes', (data: { canvasId: string; nodeIds: string[] }) => {
+      this.handleBulkUnlock(socket, data);
     });
 
     socket.on('cursor_move', (data: { canvasId: string; position: { x: number; y: number } }) => {
@@ -212,6 +225,27 @@ export class SocketHandler {
       this.handleDeleteTask(socket, data);
     });
 
+    // Comment operations
+    socket.on('create_comment', (data: { canvasId: string; comment: any }) => {
+      this.handleCreateComment(socket, data);
+    });
+
+    socket.on('add_comment_reply', (data: { canvasId: string; commentId: string; reply: any }) => {
+      this.handleAddCommentReply(socket, data);
+    });
+
+    socket.on('delete_comment', (data: { canvasId: string; commentId: string }) => {
+      this.handleDeleteComment(socket, data);
+    });
+
+    socket.on('mention_notification', (data: { canvasId: string; notification: any }) => {
+      this.handleMentionNotification(socket, data);
+    });
+
+    socket.on('update_comment', (data: { canvasId: string; commentId: string; updates: { canvasX: number; canvasY: number } }) => {
+      this.handleUpdateComment(socket, data);
+    });
+
     // OT Text Operations
     socket.on('text_operation', (data: { canvasId: string; nodeId: string; opType: 'insert' | 'delete'; position: number; text?: string; length?: number; baseVersion: number }) => {
       this.handleTextOperation(socket, data);
@@ -220,6 +254,19 @@ export class SocketHandler {
     // AI Summary Generation
     socket.on('generate_summary', (data: { canvasId: string }) => {
       this.handleGenerateSummary(socket, data);
+    });
+
+    // RAG Chat
+    socket.on('chat_message', (data: { canvasId: string; message: string }) => {
+      this.handleChatMessage(socket, data);
+    });
+
+    socket.on('clear_chat', (data: { canvasId: string }) => {
+      this.canvasConversations.delete(data.canvasId);
+    });
+
+    socket.on('canvas_screenshot', (data: { canvasId: string; screenshot: string }) => {
+      this.handleCanvasScreenshot(socket, data);
     });
 
     socket.on('disconnect', () => {
@@ -1009,6 +1056,98 @@ export class SocketHandler {
     });
   }
 
+  private async handleBulkLock(socket: Socket, data: { canvasId: string; nodeIds: string[]; durationMs?: number }): Promise<void> {
+    const { canvasId, nodeIds, durationMs } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    const { successful, failed } = this.rbac.lockNodes(nodeIds, userId, canvasId, durationMs);
+
+    const clientState = this.clientStates.get(canvasId);
+    const user = clientState?.users.get(userId);
+    const vc = user?.vectorClock || new VectorClock();
+
+    const events: NodeLockedEvent[] = [];
+    for (const nodeId of successful) {
+      const event: NodeLockedEvent = {
+        id: uuidv4(),
+        type: 'NodeLocked',
+        canvasId,
+        userId,
+        nodeId,
+        lockedBy: userId,
+        lockExpiry: durationMs ? Date.now() + durationMs : undefined,
+        timestamp: Date.now(),
+        vectorClock: vc.increment(userId).toJSON()
+      };
+      events.push(event);
+      this.eventStore.append(event);
+      await this.persistence.saveEvent(event);
+    }
+
+    this.io.to(canvasId).emit('nodes_locked', { events, failed });
+    this.io.to(canvasId).emit('bulk_lock_result', { successful, failed });
+
+    const userName = clientState?.users.get(userId)?.userName || 'Unknown';
+    for (const nodeId of successful) {
+      this.pushActivity(canvasId, {
+        id: uuidv4(),
+        type: 'lock',
+        elementId: nodeId,
+        userId,
+        userName,
+        timestamp: Date.now(),
+        details: `Locked node (bulk)`
+      });
+    }
+  }
+
+  private async handleBulkUnlock(socket: Socket, data: { canvasId: string; nodeIds: string[] }): Promise<void> {
+    const { canvasId, nodeIds } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    const { successful, failed } = this.rbac.unlockNodes(nodeIds, userId);
+
+    const clientState = this.clientStates.get(canvasId);
+    const user = clientState?.users.get(userId);
+    const vc = user?.vectorClock || new VectorClock();
+
+    const events: NodeUnlockedEvent[] = [];
+    for (const nodeId of successful) {
+      const event: NodeUnlockedEvent = {
+        id: uuidv4(),
+        type: 'NodeUnlocked',
+        canvasId,
+        userId,
+        nodeId,
+        timestamp: Date.now(),
+        vectorClock: vc.increment(userId).toJSON()
+      };
+      events.push(event);
+      this.eventStore.append(event);
+      await this.persistence.saveEvent(event);
+    }
+
+    this.io.to(canvasId).emit('nodes_unlocked', { events, failed });
+    this.io.to(canvasId).emit('bulk_unlock_result', { successful, failed });
+
+    const userName = clientState?.users.get(userId)?.userName || 'Unknown';
+    for (const nodeId of successful) {
+      this.pushActivity(canvasId, {
+        id: uuidv4(),
+        type: 'unlock',
+        elementId: nodeId,
+        userId,
+        userName,
+        timestamp: Date.now(),
+        details: `Unlocked node (bulk)`
+      });
+    }
+  }
+
   private handleCursorMove(socket: Socket, data: { canvasId: string; position: { x: number; y: number } }): void {
     const { canvasId, position } = data;
     const userId = this.getUserIdFromSocket(socket.id, canvasId);
@@ -1158,10 +1297,92 @@ export class SocketHandler {
 
       // Send summary to requester
       socket.emit('summary_result', { canvasId, summary });
+
+      // Update RAG context with the generated summary
+      this.ragChatService.updateFromSummary(
+        canvasId,
+        {
+          overview: summary.overview,
+          decisions: summary.decisions,
+          actionItems: summary.actionItems,
+          openQuestions: summary.openQuestions,
+          participants: summary.participants
+        },
+        elements.map(e => ({ type: e.type, content: e.content })),
+        tasks.map(t => ({ title: t.title, status: t.status, intentType: t.intentType, description: t.description }))
+      );
     } catch (error) {
       console.error('Summary generation error:', error);
       socket.emit('summary_error', { message: 'Failed to generate summary' });
     }
+  }
+
+  private async handleChatMessage(socket: Socket, data: { canvasId: string; message: string }): Promise<void> {
+    const { canvasId, message } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) {
+      socket.emit('chat_error', { message: 'Not authenticated' });
+      return;
+    }
+
+    try {
+      // Get or create conversation history
+      const conversation = this.canvasConversations.get(canvasId) || [];
+
+      // Get RAG context
+      const context = this.ragChatService.getCanvasContext(canvasId);
+
+      // Get screenshot if available (for vision-based analysis)
+      const screenshot = this.canvasScreenshots.get(canvasId);
+
+      // Generate response
+      const response = await this.ragChatService.generateResponse({
+        query: message,
+        context,
+        conversationHistory: conversation.map(c => ({
+          id: '',
+          role: c.role as 'user' | 'assistant',
+          content: c.content,
+          timestamp: c.timestamp
+        }))
+      });
+
+      // Add to conversation history
+      conversation.push({ role: 'user', content: message, timestamp: Date.now() });
+      conversation.push({ role: 'assistant', content: response.answer, timestamp: Date.now() });
+
+      // Keep only last 20 messages
+      if (conversation.length > 20) {
+        conversation.splice(0, conversation.length - 20);
+      }
+
+      this.canvasConversations.set(canvasId, conversation);
+
+      // Send response
+      socket.emit('chat_response', {
+        message: response.answer,
+        sources: response.sources,
+        conversationId: canvasId
+      });
+    } catch (error) {
+      console.error('Chat error:', error);
+      socket.emit('chat_error', { message: 'Failed to generate response' });
+    }
+  }
+
+  private handleCanvasScreenshot(socket: Socket, data: { canvasId: string; screenshot: string }): void {
+    const { canvasId, screenshot } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) {
+      socket.emit('error', { message: 'Not authenticated' });
+      return;
+    }
+
+    // Store the screenshot for use in summary generation
+    this.canvasScreenshots.set(canvasId, screenshot);
+    console.log(`Canvas screenshot received for canvas ${canvasId}`);
   }
 
   private async handleUpdateTaskStatus(socket: Socket, data: { taskId: string; status: 'pending' | 'in_progress' | 'completed' }): Promise<void> {
@@ -1208,6 +1429,65 @@ export class SocketHandler {
       await this.persistence.deleteTask(taskId);
       const canvasId = task.canvasId;
       this.io.to(canvasId).emit('task_deleted', { taskId });
+    }
+  }
+
+  // Comment handlers
+  private async handleCreateComment(socket: Socket, data: { canvasId: string; comment: any }): Promise<void> {
+    const { canvasId, comment } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    // Broadcast to all users in the room
+    this.io.to(canvasId).emit('comment_created', comment);
+    console.log(`Comment created by ${userId} on canvas ${canvasId}`);
+  }
+
+  private async handleAddCommentReply(socket: Socket, data: { canvasId: string; commentId: string; reply: any }): Promise<void> {
+    const { canvasId, commentId, reply } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    // Broadcast to all users in the room
+    this.io.to(canvasId).emit('comment_reply', { commentId, reply });
+    console.log(`Reply added to comment ${commentId} by ${userId}`);
+  }
+
+  private async handleDeleteComment(socket: Socket, data: { canvasId: string; commentId: string }): Promise<void> {
+    const { canvasId, commentId } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    // Broadcast to all users in the room
+    this.io.to(canvasId).emit('comment_deleted', { commentId });
+    console.log(`Comment ${commentId} deleted by ${userId}`);
+  }
+
+  private handleUpdateComment(socket: Socket, data: { canvasId: string; commentId: string; updates: { canvasX: number; canvasY: number } }): void {
+    const { canvasId, commentId, updates } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) return;
+
+    // Broadcast to all users in the room including sender
+    this.io.to(canvasId).emit('comment_updated', { commentId, updates });
+    console.log(`Comment ${commentId} position updated by ${userId}`);
+  }
+
+  private handleMentionNotification(socket: Socket, data: { canvasId: string; notification: any }): void {
+    const { canvasId, notification } = data;
+    const { mentionedUserId } = notification;
+
+    if (!mentionedUserId) return;
+
+    // Find the socket of the mentioned user and send them the notification
+    const mentionedUserSocket = this.findSocketByUserId(mentionedUserId, canvasId);
+    if (mentionedUserSocket) {
+      mentionedUserSocket.emit('mention_notification', notification);
+      console.log(`Mention notification sent to user ${mentionedUserId}`);
     }
   }
 

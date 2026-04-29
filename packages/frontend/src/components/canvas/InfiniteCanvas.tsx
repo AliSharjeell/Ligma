@@ -13,6 +13,7 @@ import { PresenceHeatmap } from './PresenceHeatmap';
 import { PresenceZones } from './PresenceZones';
 import { TimeTravel } from './TimeTravel';
 import { CommentsOverlay } from './CommentsOverlay';
+import { MentionNotifications } from './MentionNotifications';
 import { cn } from '@/lib/utils';
 import { Minus, Plus } from 'lucide-react';
 import type { Position, CanvasElement } from '@/types/canvas';
@@ -63,7 +64,15 @@ export function InfiniteCanvas() {
     updateElement,
     deleteElement,
     lockElement,
+    appendSessionSnapshot,
+    replayFrameElements,
   } = useCanvasStore();
+  const renderedElements = replayFrameElements ?? elements;
+  const isReplayActive = replayFrameElements !== null;
+
+  useEffect(() => {
+    appendSessionSnapshot(elements);
+  }, [appendSessionSnapshot, elements]);
 
   const { emitCursorMove, emitElementCreate, emitElementUpdate, emitElementDelete, emitElementLock, connectionStatus } = useSocket();
   const connectionStatusLabel = connectionStatus === 'connected' ? 'Synced' : connectionStatus === 'connecting' ? 'Syncing' : 'Offline';
@@ -247,6 +256,8 @@ export function InfiniteCanvas() {
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isReplayActive) return;
+
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     if (!canvasRect) return;
 
@@ -405,9 +416,11 @@ export function InfiniteCanvas() {
     // In Excalidraw-like mode, single click on sticky does nothing or just pans if background
     // We keep sticky creation on click for now or move to double? User said "nothing should happen on single click"
     // So let's disable single-click creation for tools
-  }, [tool, viewportPosition, viewportZoom, elements, emitElementDelete, deleteElement, stickyColor, userRole, textColor, textFontSize, textFontFamily, textFontWeight, textAlign]);
+  }, [isReplayActive, tool, viewportPosition, viewportZoom, elements, emitElementDelete, deleteElement, stickyColor, userRole, textColor, textFontSize, textFontFamily, textFontWeight, textAlign]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isReplayActive) return;
+
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     if (!canvasRect) return;
 
@@ -506,9 +519,11 @@ export function InfiniteCanvas() {
       suppressClickClearRef.current = true;
       setBoxEnd({ x, y });
     }
-  }, [isPanning, isDragging, isDrawingShape, isErasing, isBoxSelecting, dragStart, tool, viewportPosition, viewportZoom, shapeStart, boxStart, elements, emitCursorMove, setViewportPosition, emitElementDelete, deleteElement, selectedIds, updateElement]);
+  }, [isReplayActive, isPanning, isDragging, isDrawingShape, isErasing, isBoxSelecting, dragStart, tool, viewportPosition, viewportZoom, shapeStart, boxStart, elements, emitCursorMove, setViewportPosition, emitElementDelete, deleteElement, selectedIds, updateElement]);
 
   const handleMouseUp = useCallback(() => {
+    if (isReplayActive) return;
+
     if (isDragging && tool === 'draw' && drawPoints.length > 1) {
       if (userRole === 'Viewer') {
         alert('You are in Viewer mode. Ask a Lead or Contributor to edit.');
@@ -623,9 +638,11 @@ export function InfiniteCanvas() {
     setBoxStart(null);
     setBoxEnd(null);
     setDragStart(null);
-  }, [isPanning, isDragging, isDrawingShape, isBoxSelecting, tool, drawPoints, shapePreview, shapeType, shapeColor, drawColor, boxStart, boxEnd, elements, addElement, userId, emitElementCreate, emitElementUpdate, setSelectedId, setSelectedIds, clearSelection]);
+  }, [isReplayActive, isPanning, isDragging, isDrawingShape, isBoxSelecting, tool, drawPoints, shapePreview, shapeType, shapeColor, drawColor, boxStart, boxEnd, elements, addElement, userId, emitElementCreate, emitElementUpdate, setSelectedId, setSelectedIds, clearSelection]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
+    if (isReplayActive) return;
+
     if (suppressClickClearRef.current) {
       suppressClickClearRef.current = false;
       return;
@@ -656,9 +673,11 @@ export function InfiniteCanvas() {
     if (e.target === canvasRef.current) {
       clearSelection();
     }
-  }, [clearSelection, isCommentMode, tool, viewportPosition, viewportZoom]);
+  }, [isReplayActive, clearSelection, isCommentMode, tool, viewportPosition, viewportZoom]);
 
   const handleCanvasDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (isReplayActive) return;
+
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     if (!canvasRect) return;
 
@@ -666,7 +685,7 @@ export function InfiniteCanvas() {
     const y = (e.clientY - canvasRect.top - viewportPosition.y) / viewportZoom;
 
     // Check if double clicked an element
-    const elementsArray = Array.from(elements.values());
+    const elementsArray = Array.from(renderedElements.values());
     const clickedElement = elementsArray.reverse().find((element) => isPointInElement(x, y, element));
 
     if (clickedElement && tool === 'select') {
@@ -691,6 +710,8 @@ export function InfiniteCanvas() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isReplayActive) return;
+
       if (e.ctrlKey && e.key === 'g' && !e.shiftKey && selectedIds.size >= 2) {
         e.preventDefault();
         const groupId = useCanvasStore.getState().groupElements(selectedIds);
@@ -732,11 +753,12 @@ export function InfiniteCanvas() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedIds, deleteElement, emitElementDelete, clearSelection, elements]);
+  }, [isReplayActive, selectedIds, deleteElement, emitElementDelete, clearSelection, elements]);
 
   return (
     <div
       ref={canvasRef}
+      data-canvas="true"
       className={cn(
         'w-full h-full overflow-hidden bg-white relative select-none',
         isPanning ? 'cursor-grabbing' : tool === 'pan' ? 'cursor-grab' : tool === 'select' ? 'cursor-custom-select' : tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'
@@ -755,7 +777,7 @@ export function InfiniteCanvas() {
           transform: `translate(${viewportPosition.x}px, ${viewportPosition.y}px) scale(${viewportZoom})`,
         }}
       >
-        {Array.from(elements.values()).map((element) => {
+        {Array.from(renderedElements.values()).map((element) => {
           switch (element.type) {
             case 'sticky':
               return <StickyNote key={element.id} element={element} />;
@@ -793,7 +815,7 @@ export function InfiniteCanvas() {
         {selectedIds.size > 1 && (() => {
           let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
           selectedIds.forEach(id => {
-             const el = elements.get(id);
+             const el = renderedElements.get(id);
              if (el) {
                if (el.type === 'drawing' && el.points && el.points.length > 0) {
                  const pMinX = Math.min(...el.points.map(p => p.x));
@@ -837,6 +859,7 @@ export function InfiniteCanvas() {
       <PresenceZones />
       <TimeTravel />
       <CommentsOverlay />
+      <MentionNotifications />
 
       <div
         className="absolute bottom-4 left-4 flex gap-4 items-center bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 cursor-default"
@@ -866,7 +889,7 @@ export function InfiniteCanvas() {
           </button>
         </div>
         <div className="w-px h-3 bg-slate-300" />
-        <span>{elements.size} Elements</span>
+        <span>{renderedElements.size} Elements</span>
         <div className="w-px h-3 bg-slate-300" />
         <div className="relative flex items-center rounded-full p-1 group cursor-default">
           <div className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-md opacity-0 transition-opacity group-hover:opacity-100">

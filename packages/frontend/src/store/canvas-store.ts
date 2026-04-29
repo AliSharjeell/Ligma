@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { CanvasElement, Position, Tool, ShapeType, Task, CanvasEvent, User, CanvasState, Comment } from '@/types/canvas';
+import type { CanvasElement, Position, Tool, ShapeType, Task, CanvasEvent, User, CanvasState, Comment, Mention, CommentAttachment, MentionNotification, CommentReply } from '@/types/canvas';
 
 interface HistoryEntry {
   elements: Map<string, CanvasElement>;
@@ -8,6 +8,12 @@ interface HistoryEntry {
 }
 
 interface CanvasStore extends CanvasState {
+  // Mention notifications
+  mentionNotifications: MentionNotification[];
+  addMentionNotification: (notification: Omit<MentionNotification, 'id' | 'timestamp' | 'read'>) => void;
+  markMentionNotificationRead: (notificationId: string) => void;
+  clearMentionNotifications: () => void;
+  unreadMentionCount: () => number;
   userRole: 'Lead' | 'Contributor' | 'Viewer';
   setUserRole: (role: 'Lead' | 'Contributor' | 'Viewer') => void;
   setUserName: (name: string) => void;
@@ -33,7 +39,7 @@ interface CanvasStore extends CanvasState {
   toggleSelection: (id: string) => void;
   setViewportPosition: (position: Position) => void;
   setViewportZoom: (zoom: number) => void;
-
+  parseMentions: (content: string) => Mention[];
   addElement: (element: Omit<CanvasElement, 'id' | 'createdAt' | 'updatedAt'>) => CanvasElement;
   addRemoteElement: (element: CanvasElement) => void;
   updateRemoteElement: (id: string, updates: Partial<CanvasElement>) => void;
@@ -66,6 +72,8 @@ interface CanvasStore extends CanvasState {
   setEventLog: (events: CanvasEvent[]) => void;
   setElements: (elements: CanvasElement[]) => void;
   setUsers: (users: User[]) => void;
+  appendSessionSnapshot: (elements?: Map<string, CanvasElement>, timestamp?: number) => void;
+  setReplayFrameElements: (elements: Map<string, CanvasElement> | null) => void;
 
   // Comments
   comments: Comment[];
@@ -77,8 +85,9 @@ interface CanvasStore extends CanvasState {
   setIsCommentMode: (enabled: boolean) => void;
   setActiveCommentId: (id: string | null) => void;
   setHoveredCommentId: (id: string | null) => void;
-  addComment: (x: number, y: number, content: string) => void;
-  addReply: (commentId: string, content: string) => void;
+  addComment: (x: number, y: number, content: string, mentions?: Mention[], attachments?: CommentAttachment[], existingId?: string) => Comment;
+  addReply: (commentId: string, content: string, mentions?: Mention[], attachments?: CommentAttachment[], existingReply?: CommentReply) => CommentReply;
+  updateCommentPosition: (commentId: string, x: number, y: number) => void;
   resolveComment: (commentId: string) => void;
   deleteComment: (commentId: string) => void;
   markRepliesAsRead: (commentId: string) => void;
@@ -92,6 +101,25 @@ interface CanvasStore extends CanvasState {
 }
 
 const getElementsKey = (roomId?: string) => `ligma-canvas-${roomId || 'default'}`;
+
+// Helper to parse @mentions from text
+const parseMentions = (content: string, users: Map<string, User>): Mention[] => {
+  const mentions: Mention[] = [];
+  const regex = /@(\w+)/g;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    const username = match[1].toLowerCase();
+    const user = Array.from(users.values()).find(u =>
+      u.name.toLowerCase().startsWith(username) ||
+      u.name.toLowerCase().replace(/\s+/g, '') === username
+    );
+    if (user) {
+      mentions.push({ userId: user.id, userName: user.name });
+    }
+  }
+  return mentions;
+};
+
 const getCurrentRoomId = (): string | undefined => {
   if (typeof window === 'undefined') return undefined;
   // Filter out empty segments to handle trailing slashes (e.g. /room/abc/ -> abc)
@@ -134,6 +162,9 @@ const getInitialUserName = () => {
   return 'User';
 };
 
+const MAX_SESSION_TIMELINE = 500;
+const SESSION_SNAPSHOT_MIN_INTERVAL_MS = 80;
+
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   elements: new Map(),
   selectedIds: new Set(),
@@ -161,12 +192,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   userName: getInitialUserName(),
   history: [],
   redoStack: [],
+  sessionTimeline: [],
+  replayFrameElements: null,
   comments: [],
   isCommentMode: false,
   activeCommentId: null,
   hoveredCommentId: null,
   pendingCommentX: null,
   pendingCommentY: null,
+  mentionNotifications: [],
 
   setUserRole: (userRole) => set({ userRole }),
   setUserName: (name) => {
@@ -188,7 +222,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setTextAlign: (align) => set({ textAlign: align }),
   setPresenceHeatmapEnabled: (enabled) => set({ presenceHeatmapEnabled: enabled }),
   setPresenceZonesEnabled: (enabled) => set({ presenceZonesEnabled: enabled }),
-  setTimeTravelEnabled: (enabled) => set({ timeTravelEnabled: enabled }),
+  setTimeTravelEnabled: (enabled) =>
+    set((state) => ({
+      timeTravelEnabled: enabled,
+      replayFrameElements: enabled ? state.replayFrameElements : null,
+    })),
   setSelectedId: (id) => set({ selectedIds: id ? new Set([id]) : new Set() }),
   setSelectedIds: (ids) => set({ selectedIds: ids }),
   addToSelection: (id) => set((state) => {
@@ -213,6 +251,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   }),
   setViewportPosition: (viewportPosition) => set({ viewportPosition }),
   setViewportZoom: (viewportZoom) => set({ viewportZoom }),
+
+  parseMentions: (content: string) => {
+    const { users } = get();
+    return parseMentions(content, users);
+  },
 
   addElement: (elementData) => {
     const { userId, userName } = get();
@@ -536,21 +579,50 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     set({ users: newUsers });
   },
 
+  appendSessionSnapshot: (elements, timestamp) => {
+    const snapTimestamp = timestamp ?? Date.now();
+    const sourceElements = elements ?? get().elements;
+
+    set((state) => {
+      const previous = state.sessionTimeline[state.sessionTimeline.length - 1];
+      const nextSnapshot = { elements: new Map(sourceElements), timestamp: snapTimestamp };
+
+      if (!previous) {
+        return { sessionTimeline: [nextSnapshot] };
+      }
+
+      if (snapTimestamp - previous.timestamp < SESSION_SNAPSHOT_MIN_INTERVAL_MS) {
+        const compacted = [...state.sessionTimeline];
+        compacted[compacted.length - 1] = nextSnapshot;
+        return { sessionTimeline: compacted };
+      }
+
+      const nextTimeline = [...state.sessionTimeline, nextSnapshot].slice(-MAX_SESSION_TIMELINE);
+      return { sessionTimeline: nextTimeline };
+    });
+  },
+
+  setReplayFrameElements: (elements) => {
+    set({ replayFrameElements: elements ? new Map(elements) : null });
+  },
+
   setIsCommentMode: (enabled) => set({ isCommentMode: enabled }),
   setActiveCommentId: (id) => set({ activeCommentId: id }),
   setHoveredCommentId: (id) => set({ hoveredCommentId: id }),
 
-  addComment: (x, y, content) => {
+  addComment: (x, y, content, mentions = [], attachments = [], existingId?: string) => {
     const { userId, userName, users } = get();
     const user = users.get(userId);
     const comment: Comment = {
-      id: uuidv4(),
+      id: existingId || uuidv4(),
       canvasX: x,
       canvasY: y,
       authorId: userId,
       authorName: userName,
       authorColor: user?.color || '#6366f1',
       content,
+      mentions,
+      attachments,
       timestamp: Date.now(),
       resolved: false,
       replies: [],
@@ -558,22 +630,25 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     };
     set((state) => ({ comments: [...state.comments, comment] }));
     get().saveComments();
+    return comment;
   },
 
-  addReply: (commentId, content) => {
+  addReply: (commentId, content, mentions = [], attachments = [], existingReply?: CommentReply) => {
     const { userId, userName, users } = get();
     const user = users.get(userId);
+    const reply: CommentReply = existingReply || {
+      id: uuidv4(),
+      authorId: userId,
+      authorName: userName,
+      content,
+      mentions,
+      attachments,
+      timestamp: Date.now(),
+      isRead: false,
+    };
     set((state) => ({
       comments: state.comments.map((c) => {
         if (c.id !== commentId) return c;
-        const reply = {
-          id: uuidv4(),
-          authorId: userId,
-          authorName: userName,
-          content,
-          timestamp: Date.now(),
-          isRead: false,
-        };
         return {
           ...c,
           replies: [...c.replies, reply],
@@ -582,12 +657,22 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       }),
     }));
     get().saveComments();
+    return reply;
   },
 
   resolveComment: (commentId) => {
     set((state) => ({
       comments: state.comments.map((c) =>
         c.id === commentId ? { ...c, resolved: !c.resolved } : c
+      ),
+    }));
+    get().saveComments();
+  },
+
+  updateCommentPosition: (commentId, x, y) => {
+    set((state) => ({
+      comments: state.comments.map((c) =>
+        c.id === commentId ? { ...c, canvasX: x, canvasY: y } : c
       ),
     }));
     get().saveComments();
@@ -630,6 +715,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const currentRoomId = roomId || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : 'default');
       const key = `ligma-comments-${currentRoomId}`;
       console.log('Loading comments with key:', key);
+      // Clear existing comments first to avoid merging from different rooms
+      set({ comments: [] });
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -637,6 +724,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         set({ comments: parsed });
       } else {
         console.log('No saved comments found');
+        set({ comments: [] });
       }
     }
   },
@@ -665,5 +753,37 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     eventLog: [],
     history: [],
     redoStack: [],
+    mentionNotifications: [],
+    sessionTimeline: [],
+    replayFrameElements: null,
   }),
+
+  // Mention notifications
+  addMentionNotification: (notification) => {
+    const newNotification: MentionNotification = {
+      ...notification,
+      id: uuidv4(),
+      timestamp: Date.now(),
+      read: false,
+    };
+    set((state) => ({
+      mentionNotifications: [newNotification, ...state.mentionNotifications].slice(0, 50),
+    }));
+  },
+
+  markMentionNotificationRead: (notificationId) => {
+    set((state) => ({
+      mentionNotifications: state.mentionNotifications.map(n =>
+        n.id === notificationId ? { ...n, read: true } : n
+      ),
+    }));
+  },
+
+  clearMentionNotifications: () => {
+    set({ mentionNotifications: [] });
+  },
+
+  unreadMentionCount: () => {
+    return get().mentionNotifications.filter(n => !n.read).length;
+  },
 }));
