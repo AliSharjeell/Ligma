@@ -117,6 +117,21 @@ export interface CommentReply {
   content: string;
   timestamp: number;
   isRead: boolean;
+  mentions: Mention[];
+  attachments: CommentAttachment[];
+}
+
+export interface Mention {
+  userId: string;
+  userName: string;
+}
+
+export interface CommentAttachment {
+  id: string;
+  name: string;
+  url: string; // base64 data URL
+  type: string; // MIME type
+  size: number;
 }
 
 export interface Comment {
@@ -127,10 +142,28 @@ export interface Comment {
   authorName: string;
   authorColor: string;
   content: string;
+  mentions: Mention[];
+  attachments: CommentAttachment[];
   timestamp: number;
   resolved: boolean;
   replies: CommentReply[];
   unreadCount: number;
+}
+
+export interface CanvasExportData {
+  exportedAt: string;
+  version: string;
+  viewport: {
+    position: Position;
+    zoom: number;
+  };
+  elements: CanvasElement[];
+  stats: {
+    stickyNotes: number;
+    textBlocks: number;
+    shapes: number;
+    drawings: number;
+  };
 }
 
 export interface SocketEvents {
