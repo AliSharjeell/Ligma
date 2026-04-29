@@ -6,7 +6,7 @@ import { useSocket } from '@/contexts/socket-context';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image, MessageCircle, Folder } from 'lucide-react';
+import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image, MessageCircle, Folder, ChevronRight, ChevronDown } from 'lucide-react';
 import type { CanvasElement, ElementType } from '@/types/canvas';
 
 const LAYER_ICONS: Record<ElementType, React.ReactNode> = {
@@ -27,6 +27,7 @@ export function LayersList() {
   const { elements, selectedIds, setSelectedId, setSelectedIds, deleteElement, lockElement, unlockElement, ungroupElements } = useCanvasStore();
   const { emitElementDelete, emitElementLock, emitElementUnlock } = useSocket();
   const [lastSelectedId, setLastSelectedId] = React.useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(new Set());
 
   const organizedLayers = React.useMemo(() => {
     const elementsArray = Array.from(elements.values()).reverse();
@@ -93,6 +94,18 @@ export function LayersList() {
     }
   };
 
+  const toggleGroupCollapse = (groupId: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
   if (elements.size === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -107,6 +120,7 @@ export function LayersList() {
       <div className="space-y-1">
         {organizedLayers.groups.map((group) => {
           const isGroupSelected = group.children.some(c => selectedIds.has(c.id));
+          const isCollapsed = collapsedGroups.has(group.groupId);
           return (
             <div key={group.groupId} className="space-y-1">
               <div
@@ -117,6 +131,15 @@ export function LayersList() {
                 onClick={(e) => handleGroupClick(group.groupId, group.children, e)}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleGroupCollapse(group.groupId);
+                    }}
+                    className="p-0.5 hover:bg-muted rounded"
+                  >
+                    {isCollapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
+                  </button>
                   <Folder className="size-3 text-primary" />
                   <span className="text-xs font-medium text-primary">Group ({group.children.length})</span>
                 </div>
@@ -135,7 +158,7 @@ export function LayersList() {
                   </Button>
                 </div>
               </div>
-              {group.children.map((element) => {
+              {!isCollapsed && group.children.map((element) => {
                 const isSelected = selectedIds.has(element.id);
                 return (
                   <div
@@ -188,6 +211,7 @@ export function LayersList() {
                   </div>
                 );
               })}
+              )}
             </div>
           );
         })}
