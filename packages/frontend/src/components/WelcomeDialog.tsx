@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCanvasStore } from '@/store/canvas-store';
 
@@ -13,6 +13,15 @@ export function WelcomeDialog() {
   const [roomCode, setRoomCode] = useState('');
   const [mode, setMode] = useState<'idle' | 'create' | 'join'>('idle');
   const [error, setError] = useState('');
+
+  // Ping backend on mount to wake it up
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    fetch(`${apiUrl}/health`)
+      .catch(() => {
+        // Silently ignore - backend might not be ready yet
+      });
+  }, []);
 
   const handleCreate = () => {
     if (!name.trim()) {
