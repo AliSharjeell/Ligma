@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import html2canvas from 'html2canvas';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ import { TasksPanel } from '@/components/panels/TaskBoard';
 import { ActivityPanel } from '@/components/panels/EventLog';
 import { LayersList } from '@/components/panels/LayersPanel';
 import { CommentsPanel } from '@/components/panels/CommentsPanel';
+import { ChatPanel } from '@/components/panels/ChatPanel';
 import {
   Dialog,
   DialogContent,
@@ -99,6 +101,8 @@ export function Toolbar() {
   const [summaryData, setSummaryData] = useState<any>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const { connected, socket, emitChangeRole, emitRoleRequest, emitApproveRoleRequest, emitDenyRoleRequest, emitTransferOwnership, emitGenerateSummary, connectionStatus } = useSocket();
 
@@ -153,7 +157,7 @@ export function Toolbar() {
     viewportPosition,
     viewportZoom,
   } = useCanvasStore();
-  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate, emitElementLock: emitLock } = useSocket();
+  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate, emitElementLock: emitLock, emitCanvasScreenshot } = useSocket();
 
   // Room Management Logic
   const currentRoom = (typeof window !== 'undefined' && window.location.pathname.split('/').pop()) || 'default';
@@ -314,6 +318,48 @@ export function Toolbar() {
     return { left, top };
   }, [selectedElement, viewportPosition.x, viewportPosition.y, viewportZoom]);
   const isLockedByMe = selectedElement?.locked && selectedElement.lockedBy === userId;
+
+  // Function to capture canvas screenshot
+  const captureCanvasScreenshot = useCallback(async () => {
+    // Find the canvas element
+    const canvasElement = document.querySelector('[class*="w-full h-full overflow-hidden bg-white"]') as HTMLElement;
+    if (!canvasElement) {
+      console.log('Canvas element not found');
+      return null;
+    }
+
+    try {
+      const canvas = await html2canvas(canvasElement, {
+        backgroundColor: '#ffffff',
+        scale: 1,
+        useCORS: true,
+        logging: false,
+      });
+
+      // Convert to base64 JPEG for efficiency
+      const screenshot = canvas.toDataURL('image/jpeg', 0.8);
+      return screenshot;
+    } catch (error) {
+      console.error('Failed to capture canvas screenshot:', error);
+      return null;
+    }
+  }, []);
+
+  // Update the generate summary handler to include screenshot
+  const handleGenerateSummary = useCallback(async () => {
+    setIsGeneratingSummary(true);
+
+    // Capture screenshot first
+    const screenshot = await captureCanvasScreenshot();
+
+    // Send screenshot to backend if captured
+    if (screenshot) {
+      emitCanvasScreenshot(screenshot);
+    }
+
+    // Emit generate summary event
+    emitGenerateSummary();
+  }, [captureCanvasScreenshot, emitCanvasScreenshot, emitGenerateSummary]);
 
   const colorSwatches = ['#1f2937', '#ef4444', '#22c55e', '#06b6d4', '#8b5cf6', '#f97316', '#e11d48'];
 
@@ -982,10 +1028,7 @@ export function Toolbar() {
                     variant="outline"
                     size="sm"
                     className="justify-start gap-3 h-10 text-xs rounded-lg px-3 bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 hover:bg-purple-100"
-                    onClick={() => {
-                      setIsGeneratingSummary(true);
-                      emitGenerateSummary();
-                    }}
+                    onClick={handleGenerateSummary}
                     disabled={isGeneratingSummary}
                   >
                     {isGeneratingSummary ? (
@@ -1131,12 +1174,66 @@ export function Toolbar() {
             <Button variant="outline" onClick={() => setIsSummaryDialogOpen(false)}>Close</Button>
             <Button onClick={() => {
               if (summaryData) {
+                // Generate markdown summary
+                let md = `# ${summaryData.overview || 'Canvas Summary'}\n\n`;
+                md += `*Generated on ${new Date(summaryData.generatedAt).toLocaleString()}*\n\n`;
+
+                if (summaryData.participants?.length) {
+                  md += `## Participants\n${summaryData.participants.map((p: string) => `- ${p}`).join('\n')}\n\n`;
+                }
+                if (summaryData.decisions?.length) {
+                  md += `## Decisions\n${summaryData.decisions.map((d: string) => `- ${d}`).join('\n')}\n\n`;
+                }
+                if (summaryData.actionItems?.length) {
+                  md += `## Action Items\n${summaryData.actionItems.map((a: string) => `- [ ] ${a}`).join('\n')}\n\n`;
+                }
+                if (summaryData.openQuestions?.length) {
+                  md += `## Open Questions\n${summaryData.openQuestions.map((q: string) => `- ${q}`).join('\n')}\n\n`;
+                }
+                if (summaryData.nextSteps?.length) {
+                  md += `## Next Steps\n${summaryData.nextSteps.map((n: string) => `- ${n}`).join('\n')}\n\n`;
+                }
+
+                // Download as .md file
+                const blob = new Blob([md], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `canvas-summary-${new Date().toISOString().split('T')[0]}.md`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              }
+            }}>Download Markdown</Button>
+            <Button onClick={() => {
+              if (summaryData) {
                 navigator.clipboard.writeText(JSON.stringify(summaryData, null, 2));
               }
             }}>Copy JSON</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Chat Assistant - Floating Button */}
+      {!isChatOpen && (
+        <Button
+          variant="default"
+          size="icon"
+          onClick={() => setIsChatOpen(true)}
+          className="absolute bottom-24 right-4 z-20 h-12 w-12 rounded-full shadow-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+          title="Open AI Chat Assistant"
+        >
+          <MessageCircle className="size-5 text-white" />
+        </Button>
+      )}
+
+      {/* AI Chat Assistant - Panel */}
+      {isChatOpen && (
+        <div className="absolute bottom-24 right-4 z-20 w-96 h-[500px] shadow-xl">
+          <ChatPanel onClose={() => setIsChatOpen(false)} />
+        </div>
+      )}
     </>
   );
 }

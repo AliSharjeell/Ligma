@@ -13,6 +13,7 @@ export interface CanvasSummaryInput {
     position: { x: number; y: number };
     color?: string;
     textStyle?: Record<string, unknown>;
+    shapeType?: string;
   }>;
   tasks: Array<{
     id: string;
@@ -153,17 +154,48 @@ export class SummaryGenerator {
       lines.push(`PARTICIPANTS: ${input.users.map(u => `${u.name} (${u.role})`).join(', ')}`);
     }
 
-    // Add sticky notes and text content
-    const textElements = input.elements.filter(e =>
-      e.type === 'sticky' || e.type === 'text'
-    );
+    // Add canvas overview with element counts
+    const textElements = input.elements.filter(e => e.type === 'sticky' || e.type === 'text');
+    const shapes = input.elements.filter(e => e.type === 'shape');
+    const drawings = input.elements.filter(e => e.type === 'drawing');
+
+    lines.push(`\nCANVAS OVERVIEW:`);
+    lines.push(`- ${textElements.length} text elements (sticky notes, text blocks)`);
+    lines.push(`- ${shapes.length} shapes`);
+    lines.push(`- ${drawings.length} freehand drawings`);
+
+    // Add text content
     if (textElements.length > 0) {
-      lines.push('\nCANVAS CONTENT:');
+      lines.push('\nTEXT CONTENT:');
       textElements.forEach((el, i) => {
         if (el.content) {
-          lines.push(`[${i + 1}] ${el.content}`);
+          lines.push(`[${i + 1}] [${el.type}] ${el.content}`);
         }
       });
+    }
+
+    // Add shape descriptions
+    if (shapes.length > 0) {
+      lines.push('\nSHAPES:');
+      const shapeCounts = shapes.reduce((acc, s) => {
+        const type = s.shapeType || 'rectangle';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      Object.entries(shapeCounts).forEach(([type, count]) => {
+        lines.push(`- ${count}x ${type}`);
+      });
+
+      // Add any shapes with labels
+      shapes.filter(s => s.content).forEach((s, i) => {
+        lines.push(`  Label: ${s.content}`);
+      });
+    }
+
+    // Add drawing info
+    if (drawings.length > 0) {
+      lines.push(`\nDRAWINGS: ${drawings.length} freehand sketch(es)`);
     }
 
     // Add tasks grouped by intent type
