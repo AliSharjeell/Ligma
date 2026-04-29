@@ -53,7 +53,7 @@ export function CommentPin({
   onMouseEnter,
   onMouseLeave,
 }: CommentPinProps) {
-  const { resolveComment, deleteComment, setHoveredCommentId } = useCanvasStore();
+  const { resolveComment, deleteComment } = useCanvasStore();
   const [showPopover, setShowPopover] = useState(false);
   const [replyText, setReplyText] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -221,7 +221,7 @@ export function CommentPin({
 }
 
 export function CommentsOverlay() {
-  const { comments, isCommentMode, viewportPosition, viewportZoom, activeCommentId, hoveredCommentId, setActiveCommentId, setHoveredCommentId, addComment, clearSelection, setTool, setIsCommentMode, pendingCommentX, pendingCommentY } = useCanvasStore();
+  const { comments, isCommentMode, viewportPosition, viewportZoom, activeCommentId, hoveredCommentId, setActiveCommentId, setHoveredCommentId, addComment, setTool, setIsCommentMode, pendingCommentX, pendingCommentY } = useCanvasStore();
   const [newCommentText, setNewCommentText] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -240,65 +240,12 @@ export function CommentsOverlay() {
     [viewportPosition, viewportZoom]
   );
 
-  // Convert screen coordinates to canvas coordinates
-  const screenToCanvas = useCallback(
-    (screenX: number, screenY: number) => {
-      const canvasX = screenX / viewportZoom - viewportPosition.x;
-      const canvasY = screenY / viewportZoom - viewportPosition.y;
-      return { canvasX, canvasY };
-    },
-    [viewportPosition, viewportZoom]
-  );
-
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    if (!isCommentMode) return;
-    if (e.target !== e.currentTarget) return;
-
-    clearSelection();
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
-    const { canvasX, canvasY } = screenToCanvas(screenX, screenY);
-
-    setPendingComment({ x: canvasX, y: canvasY });
-    setTimeout(() => inputRef.current?.focus(), 0);
-  };
-
-  const handleCreateComment = () => {
-    if (!pendingComment || !newCommentText.trim()) return;
-    addComment(pendingComment.x, pendingComment.y, newCommentText.trim());
-    setPendingComment(null);
-    setNewCommentText('');
-    setIsCommentMode(false);
-    setTool('select');
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleCreateComment();
-    }
-    if (e.key === 'Escape') {
-      setPendingComment(null);
-      setNewCommentText('');
-      setIsCommentMode(false);
-      setTool('select');
-    }
-  };
-
   // Mark replies as read when comment is opened
   useEffect(() => {
     if (activeCommentId) {
       useCanvasStore.getState().markRepliesAsRead(activeCommentId);
     }
   }, [activeCommentId]);
-
-  // Close popover when clicking outside
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      setActiveCommentId(null);
-    }
-  };
 
   // Only show when there are comments or in comment mode
   const shouldShow = comments.length > 0 || isCommentMode || pendingComment;
