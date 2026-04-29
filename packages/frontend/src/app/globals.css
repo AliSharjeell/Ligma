@@ -57,3 +57,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* @layer utilities {
+  .cursor-custom-select {
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='black' stroke='white' stroke-width='1.5'><path d='M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z'/></svg>") 3 3, default;
+  }
+}
+*/
+
+@layer utilities {
+  .cursor-custom-select {
+    cursor: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>\
+<filter id='shadow' x='-20%' y='-20%' width='150%' height='150%'>\
+<feDropShadow dx='1' dy='2' stdDeviation='1.5' flood-opacity='0.3'/>\
+</filter>\
+<path d='M4 4 L4 24 L11 17 L20 17 Z' fill='black' stroke='white' stroke-width='2' stroke-linejoin='round' filter='url(%23shadow)'/>\
+</svg>") 4 4, pointer;
+  }
+}

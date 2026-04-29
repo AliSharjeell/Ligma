@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
@@ -39,6 +39,7 @@ import {
   Star,
   CheckSquare,
   MessageCircle,
+  Share2,
 } from 'lucide-react';
 import type { CanvasElement, Tool, ShapeType } from '@/types/canvas';
 import { TasksPanel } from '@/components/panels/TaskBoard';
@@ -84,6 +85,8 @@ export function Toolbar() {
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [hasCopiedLink, setHasCopiedLink] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [pendingRequests, setPendingRequests] = useState<{ userId: string; userName: string }[]>([]);
   const [hasRequested, setHasRequested] = useState(false);
@@ -136,6 +139,8 @@ export function Toolbar() {
     canUndo,
     canRedo,
     users,
+    viewportPosition,
+    viewportZoom,
   } = useCanvasStore();
   const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate, emitElementLock: emitLock } = useSocket();
 
@@ -227,8 +232,48 @@ export function Toolbar() {
     }
   };
 
+  const boardShareLink = typeof window !== 'undefined' ? window.location.href : '';
+
+  const handleCopyBoardLink = async () => {
+    if (!boardShareLink) return;
+    try {
+      await navigator.clipboard.writeText(boardShareLink);
+      setHasCopiedLink(true);
+      window.setTimeout(() => setHasCopiedLink(false), 1800);
+    } catch {
+      alert('Could not copy automatically. Please copy the link manually.');
+    }
+  };
+
   const selectedId = selectedIds.size === 1 ? Array.from(selectedIds)[0] : null;
   const selectedElement = selectedId ? getElement(selectedId) : null;
+  const selectionToolbarPosition = useMemo(() => {
+    if (!selectedElement) return null;
+
+    const margin = 16;
+    const toolbarWidth = 360;
+    const toolbarHeight = 56;
+    const elementCenterX = selectedElement.position.x + selectedElement.size.width / 2;
+    const elementTopY = selectedElement.position.y;
+    const elementBottomY = selectedElement.position.y + selectedElement.size.height;
+
+    const centerX = viewportPosition.x + elementCenterX * viewportZoom;
+    const topY = viewportPosition.y + elementTopY * viewportZoom;
+    const bottomY = viewportPosition.y + elementBottomY * viewportZoom;
+
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1920;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
+    const minLeft = margin + toolbarWidth / 2;
+    const maxLeft = viewportWidth - margin - toolbarWidth / 2;
+
+    const left = Math.min(Math.max(centerX, minLeft), maxLeft);
+    let top = topY - 68;
+    if (top < margin) top = bottomY + 14;
+    const maxTop = viewportHeight - margin - toolbarHeight;
+    top = Math.min(Math.max(top, margin), maxTop);
+
+    return { left, top };
+  }, [selectedElement, viewportPosition.x, viewportPosition.y, viewportZoom]);
   const isLockedByMe = selectedElement?.locked && selectedElement.lockedBy === userId;
 
   const colorSwatches = ['#1f2937', '#ef4444', '#22c55e', '#06b6d4', '#8b5cf6', '#f97316', '#e11d48'];
@@ -280,8 +325,49 @@ export function Toolbar() {
 
   return (
     <>
-      {/* Top Left Layers Button */}
+      {/* Top Left Branding + Export */}
       <div className="absolute top-4 left-4 z-20">
+        <div className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 shadow-excalidraw px-3 py-2">
+          <h1
+            className="text-2xl font-bold tracking-tight text-primary leading-none select-none"
+            style={{ fontFamily: 'var(--font-lora), serif' }}
+          >
+            Ligma
+          </h1>
+          <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-lg text-slate-600 hover:bg-slate-100"
+                title="Export board link"
+              >
+                <Share2 className="size-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[460px]">
+              <DialogHeader>
+                <DialogTitle>Export Board Link</DialogTitle>
+                <DialogDescription>
+                  Copy this board link to share it with your team.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <Label htmlFor="board-link">Board Link</Label>
+                <Input id="board-link" value={boardShareLink} readOnly />
+              </div>
+              <DialogFooter>
+                <Button onClick={handleCopyBoardLink}>
+                  {hasCopiedLink ? 'Copied' : 'Copy Link'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Middle Left Layers Button */}
+      <div className="absolute top-1/2 -translate-y-1/2 left-4 z-20">
         <Button
           variant="ghost"
           size="icon"
@@ -415,8 +501,8 @@ export function Toolbar() {
         <div
           className="absolute z-20 flex items-center gap-2 bg-white rounded-full shadow-excalidraw border border-slate-200 py-3 px-4"
           style={{
-            left: selectedElement.position.x + selectedElement.size.width / 2,
-            top: selectedElement.position.y - 80,
+            left: selectionToolbarPosition?.left ?? 0,
+            top: selectionToolbarPosition?.top ?? 0,
             transform: 'translateX(-50%)',
           }}
         >
@@ -569,7 +655,7 @@ export function Toolbar() {
           <div className="flex items-center justify-between shrink-0">
             <h3 className="text-sm font-semibold text-slate-700">Layers</h3>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsLeftPanelOpen(false)}>
-              <ChevronRight className="size-4" />
+              <ChevronLeft className="size-4" />
             </Button>
           </div>
 
@@ -612,7 +698,7 @@ export function Toolbar() {
                       {connected ? 'Live' : 'Offline'}
                     </div>
                   </div>
-                  
+
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm" className="w-full h-8 text-xs rounded-lg mt-1">
@@ -658,79 +744,79 @@ export function Toolbar() {
                   Online Users ({users.size})
                 </label>
                 <div className="flex flex-col gap-2">
-                   {/* Current User */}
-                   <div className="flex items-center justify-between bg-slate-50 pl-1 pr-3 py-1.5 rounded-xl border border-slate-100">
-                     <div className="flex items-center gap-2">
-                       <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs text-white font-bold">
-                          ME
-                       </div>
-                       <div className="flex flex-col">
-                         <span className="text-xs font-bold text-slate-700">{userName} (You)</span>
-                         <span className={cn(
-                           "text-[10px] font-medium",
-                           userRole === 'Lead' ? "text-amber-600" : userRole === 'Contributor' ? "text-blue-600" : "text-slate-500"
-                         )}>
-                           {userRole}
-                         </span>
-                       </div>
-                     </div>
-                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsJoinModalOpen(true)}>
-                       <Settings className="size-3" />
-                     </Button>
-                   </div>
+                  {/* Current User */}
+                  <div className="flex items-center justify-between bg-slate-50 pl-1 pr-3 py-1.5 rounded-xl border border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs text-white font-bold">
+                        ME
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-slate-700">{userName} (You)</span>
+                        <span className={cn(
+                          "text-[10px] font-medium",
+                          userRole === 'Lead' ? "text-amber-600" : userRole === 'Contributor' ? "text-blue-600" : "text-slate-500"
+                        )}>
+                          {userRole}
+                        </span>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsJoinModalOpen(true)}>
+                      <Settings className="size-3" />
+                    </Button>
+                  </div>
 
-                   {/* Other Users (exclude current user) */}
-                   {Array.from(users.values()).filter(u => u.id !== userId).map((user) => (
-                     <div key={user.id} className="flex items-center justify-between bg-white pl-1 pr-3 py-1.5 rounded-xl border border-slate-100 shadow-sm">
-                       <div className="flex items-center gap-2">
-                         <div 
-                           className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-bold"
-                           style={{ backgroundColor: user.color }}
+                  {/* Other Users (exclude current user) */}
+                  {Array.from(users.values()).filter(u => u.id !== userId).map((user) => (
+                    <div key={user.id} className="flex items-center justify-between bg-white pl-1 pr-3 py-1.5 rounded-xl border border-slate-100 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-bold"
+                          style={{ backgroundColor: user.color }}
+                        >
+                          {user.name[0].toUpperCase()}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium text-slate-700">{user.name}</span>
+                          <span className={cn(
+                            "text-[10px] font-medium",
+                            user.role === 'Lead' ? "text-amber-600" : user.role === 'Contributor' ? "text-blue-600" : "text-slate-500"
+                          )}>
+                            {user.role}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Lead Controls */}
+                      {userRole === 'Lead' && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title={user.role === 'Contributor' ? 'Demote to Viewer' : 'Promote to Contributor'}
+                            onClick={() => emitChangeRole(user.id, user.role === 'Contributor' ? 'Viewer' : 'Contributor')}
                           >
-                            {user.name[0].toUpperCase()}
-                         </div>
-                         <div className="flex flex-col">
-                           <span className="text-xs font-medium text-slate-700">{user.name}</span>
-                           <span className={cn(
-                             "text-[10px] font-medium",
-                             user.role === 'Lead' ? "text-amber-600" : user.role === 'Contributor' ? "text-blue-600" : "text-slate-500"
-                           )}>
-                             {user.role}
-                           </span>
-                         </div>
-                       </div>
-
-                       {/* Lead Controls */}
-                       {userRole === 'Lead' && (
-                         <div className="flex gap-1">
-                           <Button
-                             variant="ghost"
-                             size="icon"
-                             className="h-7 w-7"
-                             title={user.role === 'Contributor' ? 'Demote to Viewer' : 'Promote to Contributor'}
-                             onClick={() => emitChangeRole(user.id, user.role === 'Contributor' ? 'Viewer' : 'Contributor')}
-                            >
-                             {user.role === 'Contributor' ? <ArrowRight className="size-3 rotate-90 text-slate-400" /> : <PlusCircle className="size-3 text-blue-500" />}
-                           </Button>
-                           <Button
-                             variant="ghost"
-                             size="icon"
-                             className="h-7 w-7"
-                             title="Transfer Ownership"
-                             onClick={() => {
-                               if (confirm(`Transfer ownership to ${user.name}? You will become a Contributor.`)) {
-                                 emitTransferOwnership(user.id);
-                               }
-                             }}
-                           >
-                             <svg className="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                             </svg>
-                           </Button>
-                         </div>
-                       )}
-                     </div>
-                   ))}
+                            {user.role === 'Contributor' ? <ArrowRight className="size-3 rotate-90 text-slate-400" /> : <PlusCircle className="size-3 text-blue-500" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Transfer Ownership"
+                            onClick={() => {
+                              if (confirm(`Transfer ownership to ${user.name}? You will become a Contributor.`)) {
+                                emitTransferOwnership(user.id);
+                              }
+                            }}
+                          >
+                            <svg className="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -808,7 +894,7 @@ export function Toolbar() {
       <Dialog open={isJoinModalOpen} onOpenChange={setIsJoinModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Welcome to LIGMA</DialogTitle>
+            <DialogTitle>Welcome to Ligma</DialogTitle>
             <DialogDescription>
               Please enter your name to start collaborating.
             </DialogDescription>

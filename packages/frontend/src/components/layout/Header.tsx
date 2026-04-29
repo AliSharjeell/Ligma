@@ -49,9 +49,9 @@ export function Header({ className, currentRoom = 'default' }: HeaderProps) {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg">L</span>
+            <span className="text-primary-foreground font-bold text-lg" style={{ fontFamily: 'var(--font-lora), serif' }}>L</span>
           </div>
-          <h1 className="text-xl font-semibold">LIGMA</h1>
+          <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-lora), serif' }}>Ligma</h1>
         </div>
         <span className="text-xs text-muted-foreground">Collaborative Canvas</span>
       </div>

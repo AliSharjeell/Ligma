@@ -14,6 +14,7 @@ import { PresenceZones } from './PresenceZones';
 import { TimeTravel } from './TimeTravel';
 import { CommentsOverlay } from './CommentsOverlay';
 import { cn } from '@/lib/utils';
+import { Minus, Plus } from 'lucide-react';
 import type { Position, CanvasElement } from '@/types/canvas';
 
 export function InfiniteCanvas() {
@@ -63,6 +64,14 @@ export function InfiniteCanvas() {
   } = useCanvasStore();
 
   const { emitCursorMove, emitElementCreate, emitElementUpdate, emitElementDelete, emitElementLock, connectionStatus } = useSocket();
+  const connectionStatusLabel = connectionStatus === 'connected' ? 'Synced' : connectionStatus === 'connecting' ? 'Syncing' : 'Offline';
+  const updateZoom = (direction: 'in' | 'out') => {
+    const step = direction === 'in' ? 1.1 : 0.9;
+    setViewportZoom(Math.min(Math.max(viewportZoom * step, 0.1), 5));
+  };
+  const stopCanvasInteraction = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+  };
 
   const gridStyle = useMemo<React.CSSProperties>(() => {
     const baseWorldSize = 120;
@@ -653,7 +662,7 @@ export function InfiniteCanvas() {
       ref={canvasRef}
       className={cn(
         'w-full h-full overflow-hidden bg-white relative select-none',
-        isPanning ? 'cursor-grabbing' : (tool === 'pan' || tool === 'select') ? 'cursor-grab' : tool === 'eraser' ? 'cursor-cell' : tool === 'comment' ? 'cursor-crosshair' : 'cursor-crosshair'
+        isPanning ? 'cursor-grabbing' : tool === 'pan' ? 'cursor-grab' : tool === 'select' ? 'cursor-custom-select' : tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'
       )}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -728,21 +737,44 @@ export function InfiniteCanvas() {
       <TimeTravel />
       <CommentsOverlay />
 
-      <div className="absolute bottom-4 left-4 flex gap-4 items-center bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600">
-        <span>Zoom: {Math.round(viewportZoom * 100)}%</span>
+      <div
+        className="absolute bottom-4 left-4 flex gap-4 items-center bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 cursor-default"
+        onMouseDown={stopCanvasInteraction}
+        onMouseUp={stopCanvasInteraction}
+        onClick={stopCanvasInteraction}
+        onDoubleClick={stopCanvasInteraction}
+        onWheelCapture={stopCanvasInteraction}
+      >
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => updateZoom('out')}
+            className="h-8 w-8 rounded-md border border-slate-200 bg-white hover:bg-slate-100 flex items-center justify-center"
+            title="Zoom out"
+          >
+            <Minus className="size-4" />
+          </button>
+          <span className="min-w-14 text-center">{Math.round(viewportZoom * 100)}%</span>
+          <button
+            type="button"
+            onClick={() => updateZoom('in')}
+            className="h-8 w-8 rounded-md border border-slate-200 bg-white hover:bg-slate-100 flex items-center justify-center"
+            title="Zoom in"
+          >
+            <Plus className="size-4" />
+          </button>
+        </div>
         <div className="w-px h-3 bg-slate-300" />
         <span>{elements.size} Elements</span>
         <div className="w-px h-3 bg-slate-300" />
-        <div className="flex items-center gap-1.5">
+        <div className="relative flex items-center rounded-full p-1 group cursor-default">
+          <div className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-md opacity-0 transition-opacity group-hover:opacity-100">
+            {connectionStatusLabel}
+          </div>
           <div className={cn(
-            "w-2 h-2 rounded-full",
+            "w-3 h-3 rounded-full",
             connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
           )} />
-          <span className={cn(
-            connectionStatus === 'connected' ? 'text-green-600' : connectionStatus === 'connecting' ? 'text-yellow-600' : 'text-red-600'
-          )}>
-            {connectionStatus === 'connected' ? 'Synced' : connectionStatus === 'connecting' ? 'Syncing...' : 'Offline'}
-          </span>
         </div>
       </div>
     </div>

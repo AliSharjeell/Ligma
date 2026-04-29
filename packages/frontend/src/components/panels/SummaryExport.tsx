@@ -65,7 +65,7 @@ export function SummaryExport({ className }: SummaryExportProps) {
 
     const timestamp = new Date().toLocaleString();
 
-    let markdown = `# LIGMA Canvas Summary\n\n`;
+    let markdown = `# Ligma Canvas Summary\n\n`;
     markdown += `*Generated on ${timestamp}*\n\n`;
     markdown += `---\n\n`;
 
