@@ -71,9 +71,13 @@ export default function DashboardPage() {
     const shareUrl = `${window.location.origin}/room/${roomId}`;
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopiedId(roomId);
-      setTimeout(() => setCopiedId(null), 2000);
+      setTimeout(() => {
+        setCopiedId(null);
+        setOpenMenuId(null);
+      }, 1500);
+    }).catch(() => {
+      setOpenMenuId(null);
     });
-    setOpenMenuId(null);
   };
 
   const handleDeleteRoom = (roomId: string) => {
