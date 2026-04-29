@@ -410,8 +410,20 @@ export function InfiniteCanvas() {
       const dx = (e.clientX - dragStart.x) / viewportZoom;
       const dy = (e.clientY - dragStart.y) / viewportZoom;
 
-      // Move all selected elements (skip locked ones)
+      // Get all elements that need to move (selected + their group members)
+      const elementsToMove = new Set<string>();
       selectedIds.forEach(id => {
+        elementsToMove.add(id);
+        const el = elements.get(id);
+        if (el?.groupId) {
+          elements.forEach((e, eid) => {
+            if (e.groupId === el.groupId) elementsToMove.add(eid);
+          });
+        }
+      });
+
+      // Move all elements (skip locked ones)
+      elementsToMove.forEach(id => {
         const element = elements.get(id);
         if (element && !element.locked) {
           updateElement(id, {
@@ -520,7 +532,19 @@ export function InfiniteCanvas() {
 
     // Sync moved elements to server (skip locked ones)
     if (isDragging && tool === 'select' && userRole !== 'Viewer' && selectedIds.size > 0) {
+      // Get all elements that were moved (selected + their group members)
+      const elementsMoved = new Set<string>();
       selectedIds.forEach(id => {
+        elementsMoved.add(id);
+        const el = elements.get(id);
+        if (el?.groupId) {
+          elements.forEach((e, eid) => {
+            if (e.groupId === el.groupId) elementsMoved.add(eid);
+          });
+        }
+      });
+
+      elementsMoved.forEach(id => {
         const element = elements.get(id);
         if (element && !element.locked) {
           emitElementUpdate(element);
