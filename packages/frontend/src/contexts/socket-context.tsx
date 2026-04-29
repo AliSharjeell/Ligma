@@ -266,7 +266,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       createdBy: event.userId,
       createdAt: now,
       updatedAt: now,
-      groupId: event.metadata?.groupId as string | undefined,
+      groupId: 'groupId' in (event.metadata || {}) ? (event.metadata as any).groupId as string | undefined : undefined,
     };
   }, []);
 
@@ -507,14 +507,21 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     });
 
     newSocket.on('node_updated', (event: NodeUpdatedEvent) => {
-      const nextChanges: Partial<CanvasElement> = {
-        ...event.changes,
-      };
-      if (event.changes.style) {
-        nextChanges.textStyle = event.changes.style as CanvasElement['textStyle'];
-      }
-      if (event.changes.groupId === null) {
-        nextChanges.groupId = undefined;
+      // Build changes object carefully to handle type mismatches
+      const nextChanges: Partial<CanvasElement> = {};
+      if (event.changes.content !== undefined) nextChanges.content = event.changes.content;
+      if (event.changes.position !== undefined) nextChanges.position = event.changes.position;
+      if (event.changes.style !== undefined) nextChanges.textStyle = event.changes.style as CanvasElement['textStyle'];
+      if (event.changes.size !== undefined) nextChanges.size = event.changes.size;
+      if (event.changes.color !== undefined) nextChanges.color = event.changes.color;
+      if (event.changes.shapeType !== undefined) nextChanges.shapeType = event.changes.shapeType;
+      if (event.changes.points !== undefined) nextChanges.points = event.changes.points;
+      if ('groupId' in event.changes) {
+        if (event.changes.groupId === null) {
+          nextChanges.groupId = undefined;
+        } else if (event.changes.groupId !== undefined) {
+          nextChanges.groupId = event.changes.groupId as string;
+        }
       }
       updateRemoteElement(event.nodeId, nextChanges);
       console.log('Node updated:', event);

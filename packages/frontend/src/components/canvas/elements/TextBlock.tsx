@@ -5,6 +5,7 @@ import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
 import { cn } from '@/lib/utils';
 import type { CanvasElement } from '@/types/canvas';
+import { ClientOTManager, Operation } from '@/crdt/ClientOT';
 
 interface TextBlockProps {
   element: CanvasElement;
@@ -21,8 +22,12 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
   const inputRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
 
+  // OT state per element
+  const otManagerRef = useRef<ClientOTManager>(new ClientOTManager());
+  const [otDoc, setOtDoc] = useState<any>(null);
+
   const {
-    selectedIds, setSelectedId, updateElement, lockElement, unlockElement,
+    selectedIds, setSelectedId, updateElement, updateRemoteElement, lockElement, unlockElement,
     userId, userRole, clearSelection,
     textFontSize,
     viewportZoom,
@@ -31,10 +36,46 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
   const { emitElementUpdate, emitElementLock, emitElementUnlock } = useSocket();
 
   const isSelected = selectedIds.has(element.id);
-  // Only faded when locked by ANOTHER user, not yourself
   const isLockedByOther = element.locked && element.lockedBy !== userId;
   const isLocked = element.locked;
   const isBeingEdited = element.locked && element.lockedBy === userId;
+
+  // Initialize or get OT document for this element
+  useEffect(() => {
+    const manager = otManagerRef.current;
+    if (!manager.hasDocument(element.id)) {
+      const doc = manager.createDocument(element.id, userId, element.content || '');
+      setOtDoc(doc);
+    } else {
+      setOtDoc(manager.getDocument(element.id));
+    }
+  }, [element.id, userId, element.content]);
+
+  // Listen for remote text operations
+  const { socket } = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleRemoteOp = (data: { nodeId: string; operation: Operation; mergedContent: string }) => {
+      if (data.nodeId !== element.id) return;
+      if (data.operation.clientId === userId) return; // Ignore own ops
+
+      const doc = otManagerRef.current.getDocument(element.id);
+      if (doc) {
+        doc.applyRemote(data.operation);
+        const newContent = doc.getContent();
+        if (newContent !== localContent) {
+          setLocalContent(newContent);
+          updateRemoteElement(element.id, { content: newContent });
+        }
+      }
+    };
+
+    socket.on('text_operation', handleRemoteOp);
+    return () => {
+      socket.off('text_operation', handleRemoteOp);
+    };
+  }, [element.id, userId, localContent]);
 
   const currentFontSize = element.textStyle?.fontSize || textFontSize || 20;
   const fontFamily = element.textStyle?.fontFamily || 'var(--font-handwritten), cursive';
@@ -191,10 +232,22 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       return;
     }
     clearSelection();
-    updateElement(element.id, { content: localContent });
-    const updatedElement = useCanvasStore.getState().getElement(element.id);
-    if (updatedElement) {
-      emitElementUpdate(updatedElement);
+
+    // Use OT to determine the final content
+    if (otDoc) {
+      // Reconcile any pending ops
+      const finalContent = otDoc.getContent();
+      updateElement(element.id, { content: finalContent });
+      const updatedElement = useCanvasStore.getState().getElement(element.id);
+      if (updatedElement) {
+        emitElementUpdate(updatedElement);
+      }
+    } else {
+      updateElement(element.id, { content: localContent });
+      const updatedElement = useCanvasStore.getState().getElement(element.id);
+      if (updatedElement) {
+        emitElementUpdate(updatedElement);
+      }
     }
 
     if (element.locked && element.lockedBy === userId) {
@@ -217,6 +270,33 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
       }
     }
   };
+
+  // Handle input changes with OT
+  const handleInputChange = useCallback((newValue: string) => {
+    const currentContent = otDoc?.getContent() || localContent;
+
+    // Simple diff: find the first difference and create OT op
+    let diffPos = 0;
+    while (diffPos < currentContent.length && diffPos < newValue.length && currentContent[diffPos] === newValue[diffPos]) {
+      diffPos++;
+    }
+
+    if (newValue.length > currentContent.length) {
+      // Insert
+      const insertedText = newValue.slice(diffPos);
+      if (otDoc && insertedText) {
+        otDoc.insert(diffPos, insertedText);
+      }
+    } else if (newValue.length < currentContent.length) {
+      // Delete
+      const deletedLength = currentContent.length - newValue.length;
+      if (otDoc && deletedLength > 0) {
+        otDoc.delete(diffPos, deletedLength);
+      }
+    }
+
+    setLocalContent(newValue);
+  }, [localContent, otDoc]);
 
   const handleSize = 8;
 
@@ -353,7 +433,7 @@ export function TextBlock({ element, skipSelectionBorder = false }: TextBlockPro
           ref={inputRef}
           type="text"
           value={localContent}
-          onChange={(e) => setLocalContent(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           className="px-1 py-0 bg-white bg-opacity-80 border-2 border-blue-400 rounded outline-none relative z-10 w-auto min-w-[1ch]"
