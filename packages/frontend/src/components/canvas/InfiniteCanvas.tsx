@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import rough from 'roughjs';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useSocket } from '@/contexts/socket-context';
@@ -63,6 +63,38 @@ export function InfiniteCanvas() {
   } = useCanvasStore();
 
   const { emitCursorMove, emitElementCreate, emitElementUpdate, emitElementDelete, emitElementLock, connectionStatus } = useSocket();
+
+  const gridStyle = useMemo<React.CSSProperties>(() => {
+    const baseWorldSize = 120;
+    const targetMajorPx = 96;
+    const zoomSafe = Math.max(viewportZoom, 0.0001);
+    const stepExponent = Math.round(Math.log2(targetMajorPx / (baseWorldSize * zoomSafe)));
+    const clampedExponent = Math.max(-8, Math.min(8, stepExponent));
+    const majorWorldSize = baseWorldSize * Math.pow(2, clampedExponent);
+    const majorStepPx = majorWorldSize * zoomSafe;
+    const minorStepPx = majorStepPx / 4;
+    const minorOpacity = Math.max(0, Math.min(0.08, (minorStepPx - 6) * 0.003));
+
+    const minorLine = `rgba(148, 163, 184, ${minorOpacity.toFixed(3)})`;
+    const majorLine = 'rgba(148, 163, 184, 0.16)';
+    const position = `${viewportPosition.x}px ${viewportPosition.y}px`;
+
+    return {
+      backgroundImage: `
+        linear-gradient(to right, ${minorLine} 1px, transparent 1px),
+        linear-gradient(to bottom, ${minorLine} 1px, transparent 1px),
+        linear-gradient(to right, ${majorLine} 1px, transparent 1px),
+        linear-gradient(to bottom, ${majorLine} 1px, transparent 1px)
+      `,
+      backgroundSize: `
+        ${minorStepPx}px ${minorStepPx}px,
+        ${minorStepPx}px ${minorStepPx}px,
+        ${majorStepPx}px ${majorStepPx}px,
+        ${majorStepPx}px ${majorStepPx}px
+      `,
+      backgroundPosition: `${position}, ${position}, ${position}, ${position}`,
+    };
+  }, [viewportPosition.x, viewportPosition.y, viewportZoom]);
 
   // Update rough preview
   useEffect(() => {
@@ -629,6 +661,8 @@ export function InfiniteCanvas() {
       onClick={handleCanvasClick}
       onDoubleClick={handleCanvasDoubleClick}
     >
+      <div className="absolute inset-0 pointer-events-none" style={gridStyle} />
+
       <div
         className="absolute inset-0 origin-top-left"
         style={{
