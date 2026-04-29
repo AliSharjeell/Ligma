@@ -71,8 +71,8 @@
     },
     {
       "path": "packages\\frontend\\src\\store\\canvas-store.ts",
-      "accessCount": 32,
-      "lastAccessed": 1777411960733,
+      "accessCount": 34,
+      "lastAccessed": 1777429454617,
       "type": "file"
     },
     {
@@ -89,8 +89,8 @@
     },
     {
       "path": "packages\\frontend\\src\\components\\canvas\\InfiniteCanvas.tsx",
-      "accessCount": 12,
-      "lastAccessed": 1777410938378,
+      "accessCount": 16,
+      "lastAccessed": 1777429531208,
       "type": "file"
     },
     {
@@ -232,6 +232,12 @@
       "type": "directory"
     },
     {
+      "path": "packages\\frontend",
+      "accessCount": 2,
+      "lastAccessed": 1777429341633,
+      "type": "directory"
+    },
+    {
       "path": "C:\\Users\\HP\\.claude\\plugins\\cache\\omc\\oh-my-claudecode\\4.13.5\\skills\\omc-setup\\phases\\01-install-claude-md.md",
       "accessCount": 1,
       "lastAccessed": 1777376523183,
@@ -254,12 +260,6 @@
       "accessCount": 1,
       "lastAccessed": 1777401511323,
       "type": "file"
-    },
-    {
-      "path": "packages\\frontend",
-      "accessCount": 1,
-      "lastAccessed": 1777401558696,
-      "type": "directory"
     },
     {
       "path": "packages\\backend\\src\\events\\types.ts",

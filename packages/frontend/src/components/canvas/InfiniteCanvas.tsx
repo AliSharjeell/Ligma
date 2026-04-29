@@ -162,9 +162,27 @@ export function InfiniteCanvas() {
     const handleNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
       const state = useCanvasStore.getState();
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Math.min(Math.max(state.viewportZoom * delta, 0.1), 5);
-      state.setViewportZoom(newZoom);
+      const { viewportPosition, viewportZoom } = state;
+
+      // Pan with 2-finger scroll (horizontal or vertical)
+      if (e.deltaX !== 0) {
+        state.setViewportPosition({
+          x: viewportPosition.x - e.deltaX,
+          y: viewportPosition.y,
+        });
+      } else if (e.deltaY !== 0 && !e.ctrlKey) {
+        state.setViewportPosition({
+          x: viewportPosition.x,
+          y: viewportPosition.y - e.deltaY,
+        });
+      }
+
+      // Zoom only with Ctrl (pinch or ctrl+scroll)
+      if (e.ctrlKey) {
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.min(Math.max(viewportZoom * delta, 0.1), 5);
+        state.setViewportZoom(newZoom);
+      }
     };
 
     canvas.addEventListener('wheel', handleNativeWheel, { passive: false });
