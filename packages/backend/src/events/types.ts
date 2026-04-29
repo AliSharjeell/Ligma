@@ -115,6 +115,7 @@ export interface NodeState {
   createdAt: number;
   createdBy: string;
   updatedAt: number;
+  groupId?: string;
 }
 
 export interface CanvasState {
