@@ -9,7 +9,11 @@ export type EventType =
   | 'CursorMoved'
   | 'UserJoined'
   | 'UserLeft'
-  | 'RoleChanged';
+  | 'RoleChanged'
+  | 'GroupCreated'
+  | 'GroupDeleted'
+  | 'GroupOwnerAdded'
+  | 'GroupOwnerRemoved';
 
 export interface BaseEvent {
   id: string;
@@ -98,6 +102,29 @@ export interface RoleChangedEvent extends BaseEvent {
   newRole: 'Lead' | 'Contributor' | 'Viewer';
 }
 
+export interface GroupCreatedEvent extends BaseEvent {
+  type: 'GroupCreated';
+  groupId: string;
+  nodeIds: string[];
+}
+
+export interface GroupDeletedEvent extends BaseEvent {
+  type: 'GroupDeleted';
+  groupId: string;
+}
+
+export interface GroupOwnerAddedEvent extends BaseEvent {
+  type: 'GroupOwnerAdded';
+  groupId: string;
+  targetUserId: string;
+}
+
+export interface GroupOwnerRemovedEvent extends BaseEvent {
+  type: 'GroupOwnerRemoved';
+  groupId: string;
+  targetUserId: string;
+}
+
 export type CanvasEvent =
   | NodeCreatedEvent
   | NodeUpdatedEvent
@@ -107,7 +134,11 @@ export type CanvasEvent =
   | CursorMovedEvent
   | UserJoinedEvent
   | UserLeftEvent
-  | RoleChangedEvent;
+  | RoleChangedEvent
+  | GroupCreatedEvent
+  | GroupDeletedEvent
+  | GroupOwnerAddedEvent
+  | GroupOwnerRemovedEvent;
 
 export interface NodeState {
   id: string;
@@ -126,6 +157,17 @@ export interface NodeState {
   createdBy: string;
   updatedAt: number;
   groupId?: string;
+  groupOwnerId?: string; // Creator of the group
+}
+
+export interface GroupState {
+  id: string;
+  canvasId: string;
+  nodeIds: string[];
+  ownerId: string; // Primary owner (creator)
+  coOwners: string[]; // Additional owners promoted by primary owner
+  createdAt: number;
+  createdBy: string;
 }
 
 export interface CanvasState {

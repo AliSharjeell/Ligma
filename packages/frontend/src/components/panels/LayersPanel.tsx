@@ -6,7 +6,7 @@ import { useSocket } from '@/contexts/socket-context';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image, MessageCircle, Folder, ChevronRight, ChevronDown, Group, Ungroup } from 'lucide-react';
+import { Layers, Trash2, Lock, Unlock, Pencil, Square, StickyNote, Type, Image, MessageCircle, Folder, ChevronRight, ChevronDown, Group, Ungroup, Users } from 'lucide-react';
 import type { CanvasElement, ElementType } from '@/types/canvas';
 
 const LAYER_ICONS: Record<ElementType, React.ReactNode> = {
@@ -24,14 +24,27 @@ interface GroupedLayer {
 }
 
 export function LayersList() {
-  const { elements, selectedIds, setSelectedId, setSelectedIds, deleteElement, lockElement, unlockElement, ungroupElements, userRole, groupElements } = useCanvasStore();
-  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate, emitBulkLock, emitBulkUnlock } = useSocket();
+  const { elements, selectedIds, setSelectedId, setSelectedIds, deleteElement, lockElement, unlockElement, ungroupElements, userRole, groupElements, users, groupStates, userId } = useCanvasStore();
+  const { emitElementDelete, emitElementLock, emitElementUnlock, emitElementUpdate, emitBulkLock, emitBulkUnlock, emitCreateGroup, emitDeleteGroup, emitAddGroupOwner, emitRemoveGroupOwner } = useSocket();
   const [lastSelectedId, setLastSelectedId] = React.useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(new Set());
+  const [showOwnerMenu, setShowOwnerMenu] = React.useState<string | null>(null);
 
   const canEdit = userRole !== 'Viewer';
+  const isLead = userRole === 'Lead';
   const selectedCount = selectedIds.size;
   const hasSelection = selectedCount > 0;
+
+  const getGroupInfo = (groupId: string) => {
+    const groupState = groupStates.get(groupId);
+    const owner = groupState ? users.get(groupState.ownerId) : null;
+    const coOwners = groupState?.coOwners || [];
+    const isOwner = groupState?.ownerId === userId || isLead;
+    const isCoOwner = coOwners.includes(userId);
+    const canManage = isOwner && (userRole === 'Lead' || groupState?.ownerId === userId);
+    const canEdit = isOwner || isCoOwner || isLead; // Only owners/co-owners/global Lead can edit
+    return { groupState, owner, coOwners, isOwner, isCoOwner, canManage, canEdit };
+  };
 
   const selectedElements = React.useMemo(() => {
     return Array.from(selectedIds).map(id => elements.get(id)).filter(Boolean) as CanvasElement[];
@@ -61,6 +74,18 @@ export function LayersList() {
 
   const handleBulkDelete = () => {
     if (!canEdit) return;
+
+    // Check if any selected element is in a group without edit permissions
+    for (const element of selectedElements) {
+      if (element.groupId) {
+        const info = getGroupInfo(element.groupId);
+        if (!info.canEdit) {
+          alert('Cannot delete elements inside locked groups. Contact group owner.');
+          return;
+        }
+      }
+    }
+
     selectedIds.forEach(id => {
       emitElementDelete(id);
       deleteElement(id);
@@ -69,14 +94,29 @@ export function LayersList() {
 
   const handleBulkGroup = () => {
     if (!canEdit || selectedCount < 2) return;
-    const groupId = groupElements(selectedIds);
-    if (groupId) {
-      const groupedElements = useCanvasStore.getState().elements;
-      selectedIds.forEach(id => {
-        const el = groupedElements.get(id);
-        if (el) emitElementUpdate(el);
-      });
+
+    // Check if any selected element is in a locked group
+    for (const element of selectedElements) {
+      if (element.groupId) {
+        const info = getGroupInfo(element.groupId);
+        if (!info.canEdit) {
+          alert('Cannot add to locked groups. Contact group owner.');
+          return;
+        }
+      }
     }
+
+    // Emit to server - server will create group and emit back
+    const nodeIds = Array.from(selectedIds);
+    emitCreateGroup(nodeIds);
+  };
+
+  const handleDeleteGroup = (groupId: string) => {
+    emitDeleteGroup(groupId);
+  };
+
+  const handleAddGroupOwner = (groupId: string, targetUserId: string) => {
+    emitAddGroupOwner(groupId, targetUserId);
   };
 
   const organizedLayers = React.useMemo(() => {
@@ -250,20 +290,71 @@ export function LayersList() {
                   </button>
                   <Folder className="size-3 text-primary" />
                   <span className="text-xs font-medium text-primary">Group ({group.children.length})</span>
+                  {(() => {
+                    const { owner, isOwner, isCoOwner } = getGroupInfo(group.groupId);
+                    const ownerName = owner?.name || 'Unknown';
+                    return (
+                      <span className={cn(
+                        "text-[10px] px-1.5 py-0.5 rounded",
+                        isOwner ? "bg-green-100 text-green-700" : isCoOwner ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
+                      )}>
+                        {isOwner ? "Owner" : isCoOwner ? "Co-owner" : `Owner: ${ownerName}`}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-1">
+                  {(() => {
+                    const { canManage, coOwners } = getGroupInfo(group.groupId);
+                    const contributors = Array.from(users.values()).filter(
+                      u => u.role !== 'Viewer' && u.id !== userId && !coOwners.includes(u.id)
+                    );
+                    return (
+                      <div className="relative">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowOwnerMenu(showOwnerMenu === group.groupId ? null : group.groupId);
+                          }}
+                          title="Manage owners"
+                          disabled={!canManage}
+                        >
+                          <Users className={cn("size-3", canManage ? "text-muted-foreground" : "text-gray-300")} />
+                        </Button>
+                        {showOwnerMenu === group.groupId && canManage && (
+                          <div className="absolute right-0 top-6 z-50 bg-white border rounded-md shadow-lg p-2 min-w-[150px]">
+                            <div className="text-xs font-medium text-muted-foreground mb-1">Add co-owner:</div>
+                            {contributors.length > 0 ? (
+                              contributors.map(u => (
+                                <button
+                                  key={u.id}
+                                  className="w-full text-left px-2 py-1 text-xs hover:bg-muted rounded"
+                                  onClick={() => {
+                                    handleAddGroupOwner(group.groupId, u.id);
+                                    setShowOwnerMenu(null);
+                                  }}
+                                >
+                                  {u.name} ({u.role})
+                                </button>
+                              ))
+                            ) : (
+                              <div className="text-xs text-muted-foreground px-2 py-1">No eligible users</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-5 w-5"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const affectedIds = ungroupElements(group.groupId);
-                      const currentElements = useCanvasStore.getState().elements;
-                      affectedIds.forEach(id => {
-                        const el = currentElements.get(id);
-                        if (el) emitElementUpdate(el);
-                      });
+                      handleDeleteGroup(group.groupId);
                     }}
                     title="Ungroup"
                   >
