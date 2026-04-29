@@ -272,13 +272,32 @@ export function InfiniteCanvas() {
 
     // If clicking on an element with select tool
     if (tool === 'select' && clickedElement) {
-      // If element is not selected, select it
-      if (!selectedIds.has(clickedElement.id)) {
-        setSelectedId(clickedElement.id);
+      // If element is part of a group, select all group members
+      let idsToSelect = new Set<string>([clickedElement.id]);
+      if (clickedElement.groupId) {
+        elements.forEach((e, id) => {
+          if (e.groupId === clickedElement.groupId) {
+            idsToSelect.add(id);
+          }
+        });
+      } else if (selectedIds.size > 0) {
+        // Check if any selected element is part of a group - include all group members
+        selectedIds.forEach(id => {
+          const el = elements.get(id);
+          if (el?.groupId) {
+            elements.forEach((e, eid) => {
+              if (e.groupId === el.groupId) idsToSelect.add(eid);
+            });
+          } else {
+            idsToSelect.add(id);
+          }
+        });
       }
+
+      setSelectedIds(idsToSelect);
+
       // Viewers can select but not move elements.
       if (userRole !== 'Viewer') {
-        // Start dragging (either single or multiple)
         setIsDragging(true);
         setDragStart({ x: e.clientX, y: e.clientY });
       }
