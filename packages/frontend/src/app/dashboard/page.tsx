@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCanvasStore } from '@/store/canvas-store';
 import { generateRoomCode } from '@/lib/utils';
 import * as Dialog from '@radix-ui/react-dialog';
-import { LogOut, Plus, Users, Clock, Layers, User, ChevronDown, MoreHorizontal, Share2, Trash2 } from 'lucide-react';
+import { LogOut, Plus, Users, Clock, Layers, User, ChevronDown, MoreVertical, Share2, Trash2 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 const BRAND_COLOR = '#50B5FF';
@@ -285,7 +285,7 @@ export default function DashboardPage() {
                         className="p-1.5 hover:bg-gray-100 rounded-lg transition"
                         title="More options"
                       >
-                        <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                        <MoreVertical className="w-4 h-4 text-gray-400" />
                       </button>
                       {openMenuId === room.id && (
                         <div className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
