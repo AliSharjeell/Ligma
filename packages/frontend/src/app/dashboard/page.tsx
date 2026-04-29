@@ -161,9 +161,6 @@ export default function DashboardPage() {
           backgroundPosition: 'center',
         }}
       >
-        {/* Dark overlay */}
-        <div className="absolute inset-0 bg-black/40" />
-
         {/* User dropdown - top right corner */}
         <div className="absolute top-4 right-4 z-10" ref={dropdownRef}>
           {isSignedIn ? (
@@ -207,14 +204,10 @@ export default function DashboardPage() {
             className="text-6xl font-bold text-white"
             style={{
               fontFamily: 'var(--font-lora), serif',
-              textShadow: '2px 2px 8px rgba(0, 0, 0, 0.5)',
             }}
           >
             Ligma
           </h1>
-          <p className="mt-4 text-xl text-white" style={{ textShadow: '1px 1px 4px rgba(0, 0, 0, 0.5)' }}>
-            Welcome, {userName}!
-          </p>
 
           {/* Compact Action Buttons */}
           <div className="flex items-center justify-center gap-3 mt-6">
