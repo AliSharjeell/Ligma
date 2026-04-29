@@ -100,7 +100,7 @@ export function InfiniteCanvas() {
             [x, y + h / 2]
           ], options);
         } else if (shapeType === 'hexagon') {
-          const hexPoints = [];
+          const hexPoints: [number, number][] = [];
           for (let i = 0; i < 6; i++) {
             const angle = (Math.PI / 3) * i - Math.PI / 2;
             hexPoints.push([
@@ -110,7 +110,7 @@ export function InfiniteCanvas() {
           }
           node = rc.polygon(hexPoints, options);
         } else if (shapeType === 'star') {
-          const starPoints = [];
+          const starPoints: [number, number][] = [];
           const outerR = Math.min(w, h) / 2;
           const innerR = outerR * 0.4;
           for (let i = 0; i < 10; i++) {

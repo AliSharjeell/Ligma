@@ -71,7 +71,7 @@ export function Shape({ element }: ShapeProps) {
         [padding, height / 2]
       ], options);
     } else if (element.shapeType === 'hexagon') {
-      const hexPoints = [];
+      const hexPoints: [number, number][] = [];
       for (let i = 0; i < 6; i++) {
         const angle = (Math.PI / 3) * i - Math.PI / 2;
         hexPoints.push([
@@ -81,7 +81,7 @@ export function Shape({ element }: ShapeProps) {
       }
       node = rc.polygon(hexPoints, options);
     } else if (element.shapeType === 'star') {
-      const starPoints = [];
+      const starPoints: [number, number][] = [];
       const outerRadius = Math.min(width, height) / 2 - padding;
       const innerRadius = outerRadius * 0.4;
       for (let i = 0; i < 10; i++) {
