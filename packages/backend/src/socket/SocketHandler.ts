@@ -6,6 +6,7 @@ import { EventBus } from '../events/EventBus';
 import { StateReconstructor } from '../events/StateReconstructor';
 import { RBACService } from '../rbac/RBACService';
 import { IntentClassifier, TaskBoard } from '../ai/IntentExtractor';
+import { SummaryGenerator } from '../ai/SummaryGenerator';
 import {
   CanvasEvent,
   NodeCreatedEvent,
@@ -61,6 +62,7 @@ export class SocketHandler {
   private rbac: RBACService;
   private intentClassifier: IntentClassifier;
   private taskBoard: TaskBoard;
+  private summaryGenerator: SummaryGenerator;
   private persistence: PersistenceService;
   private clientStates: Map<string, ClientState> = new Map();
   private lastEventPerClient: Map<string, string> = new Map();
@@ -78,6 +80,7 @@ export class SocketHandler {
     this.stateReconstructor = new StateReconstructor();
     this.intentClassifier = new IntentClassifier();
     this.taskBoard = new TaskBoard();
+    this.summaryGenerator = new SummaryGenerator();
     this.persistence = new PersistenceService();
     this.setupEventHandlers();
   }
@@ -212,6 +215,11 @@ export class SocketHandler {
     // OT Text Operations
     socket.on('text_operation', (data: { canvasId: string; nodeId: string; opType: 'insert' | 'delete'; position: number; text?: string; length?: number; baseVersion: number }) => {
       this.handleTextOperation(socket, data);
+    });
+
+    // AI Summary Generation
+    socket.on('generate_summary', (data: { canvasId: string }) => {
+      this.handleGenerateSummary(socket, data);
     });
 
     socket.on('disconnect', () => {
@@ -1070,6 +1078,90 @@ export class SocketHandler {
     const { canvasId } = data;
     const tasks = this.taskBoard.getTasksByCanvas(canvasId);
     socket.emit('tasks_list', { tasks });
+  }
+
+  private async handleGenerateSummary(socket: Socket, data: { canvasId: string }): Promise<void> {
+    const { canvasId } = data;
+    const userId = this.getUserIdFromSocket(socket.id, canvasId);
+
+    if (!userId) {
+      socket.emit('summary_error', { message: 'Not authenticated' });
+      return;
+    }
+
+    // Emit loading state
+    socket.emit('summary_generating', { canvasId });
+
+    try {
+      // Gather all data for summary
+      const events = this.eventStore.getEvents(canvasId);
+      const tasks = this.taskBoard.getTasksByCanvas(canvasId);
+      const clientState = this.clientStates.get(canvasId);
+
+      // Extract elements from events
+      const elements: Array<{ id: string; type: string; content: string; position: { x: number; y: number }; color?: string; textStyle?: Record<string, unknown> }> = [];
+      const activityLog: Array<{ type: string; details?: string; userName: string; timestamp: number }> = [];
+
+      events.forEach(event => {
+        if (event.type === 'NodeCreated') {
+          const nodeEvent = event as NodeCreatedEvent;
+          elements.push({
+            id: nodeEvent.nodeId,
+            type: nodeEvent.nodeType,
+            content: nodeEvent.content,
+            position: nodeEvent.position,
+            color: nodeEvent.metadata?.color as string,
+            textStyle: nodeEvent.metadata?.style as Record<string, unknown>
+          });
+        }
+        if (event.type === 'NodeUpdated') {
+          const nodeEvent = event as NodeUpdatedEvent;
+          if (nodeEvent.changes.content) {
+            const existing = elements.find(e => e.id === nodeEvent.nodeId);
+            if (existing) {
+              existing.content = nodeEvent.changes.content;
+            }
+          }
+        }
+        // Add to activity log
+        activityLog.push({
+          type: event.type,
+          details: event.type === 'NodeCreated' ? `Created ${(event as NodeCreatedEvent).nodeType}` :
+                   event.type === 'NodeUpdated' ? 'Updated node' :
+                   event.type === 'NodeDeleted' ? 'Deleted node' : undefined,
+          userName: this.clientStates.get(canvasId)?.users.get(event.userId)?.userName || 'Unknown',
+          timestamp: event.timestamp
+        });
+      });
+
+      // Get users
+      const users = clientState ? Array.from(clientState.users.values()).map(u => ({
+        id: u.userId,
+        name: u.userName,
+        role: u.role
+      })) : [];
+
+      // Generate summary
+      const summary = await this.summaryGenerator.generateSummary({
+        elements,
+        tasks: tasks.map(t => ({
+          id: t.id,
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          priority: t.priority,
+          intentType: t.intentType
+        })),
+        users,
+        activityLog
+      });
+
+      // Send summary to requester
+      socket.emit('summary_result', { canvasId, summary });
+    } catch (error) {
+      console.error('Summary generation error:', error);
+      socket.emit('summary_error', { message: 'Failed to generate summary' });
+    }
   }
 
   private async handleUpdateTaskStatus(socket: Socket, data: { taskId: string; status: 'pending' | 'in_progress' | 'completed' }): Promise<void> {

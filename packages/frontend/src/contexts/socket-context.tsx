@@ -143,6 +143,7 @@ interface SocketContextType {
   emitApproveRoleRequest: (targetUserId: string) => void;
   emitDenyRoleRequest: (targetUserId: string) => void;
   emitTransferOwnership: (targetUserId: string) => void;
+  emitGenerateSummary: () => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -164,6 +165,7 @@ const SocketContext = createContext<SocketContextType>({
   emitApproveRoleRequest: () => {},
   emitDenyRoleRequest: () => {},
   emitTransferOwnership: () => {},
+  emitGenerateSummary: () => {},
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -588,6 +590,21 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
       console.log('Intent classified for node:', nodeId, intent);
     });
 
+    // Summary generation events
+    newSocket.on('summary_generating', ({ canvasId }: { canvasId: string }) => {
+      console.log('Generating summary for canvas:', canvasId);
+      // Could add loading state here
+    });
+
+    newSocket.on('summary_result', ({ canvasId, summary }: { canvasId: string; summary: any }) => {
+      console.log('Summary generated for canvas:', canvasId, summary);
+      // Store summary or trigger callback
+    });
+
+    newSocket.on('summary_error', ({ message }: { message: string }) => {
+      console.error('Summary generation error:', message);
+    });
+
     setSocket(newSocket);
 
     if (typeof window !== 'undefined') {
@@ -764,6 +781,12 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
     }
   }, [socket, canvasId, connected, addToQueue]);
 
+  const emitGenerateSummary = useCallback(() => {
+    if (connected && socket) {
+      socket.emit('generate_summary', { canvasId });
+    }
+  }, [socket, canvasId, connected]);
+
   return (
     <SocketContext.Provider
       value={{
@@ -785,6 +808,7 @@ export function SocketProvider({ children, url = process.env.NEXT_PUBLIC_API_URL
         emitApproveRoleRequest,
         emitDenyRoleRequest,
         emitTransferOwnership,
+        emitGenerateSummary,
       }}
     >
       {children}

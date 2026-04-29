@@ -113,6 +113,68 @@ app.get('/api/tasks/:canvasId', (req, res) => {
   res.json({ tasks });
 });
 
+app.post('/api/canvases/:canvasId/summary', async (req, res) => {
+  const { canvasId } = req.params;
+  const info = canvasStore.getCanvasInfo(canvasId);
+
+  if (!info) {
+    return res.status(404).json({ error: 'Canvas not found' });
+  }
+
+  try {
+    const events = eventStore.getEvents(canvasId);
+    const tasks = socketHandler.getTaskBoard().getTasksByCanvas(canvasId);
+    const users = socketHandler.getConnectedUsers(canvasId).map(u => ({
+      id: u.userId,
+      name: u.userName,
+      role: u.role
+    }));
+
+    // Extract elements from events
+    const elements: Array<{ id: string; type: string; content: string; position: { x: number; y: number }; color?: string }> = [];
+
+    events.forEach(event => {
+      if (event.type === 'NodeCreated') {
+        const nodeEvent = event as any;
+        elements.push({
+          id: nodeEvent.nodeId,
+          type: nodeEvent.nodeType,
+          content: nodeEvent.content || '',
+          position: nodeEvent.position,
+          color: nodeEvent.metadata?.color
+        });
+      }
+      if (event.type === 'NodeUpdated' && (event as any).changes?.content) {
+        const nodeEvent = event as any;
+        const existing = elements.find(e => e.id === nodeEvent.nodeId);
+        if (existing) existing.content = nodeEvent.changes.content;
+      }
+    });
+
+    const { SummaryGenerator } = await import('./ai/SummaryGenerator');
+    const summaryGenerator = new SummaryGenerator();
+
+    const summary = await summaryGenerator.generateSummary({
+      elements,
+      tasks: tasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        priority: t.priority,
+        intentType: t.intentType
+      })),
+      users,
+      activityLog: []
+    });
+
+    res.json({ summary, canvasId });
+  } catch (error) {
+    console.error('Summary generation error:', error);
+    res.status(500).json({ error: 'Failed to generate summary' });
+  }
+});
+
 const eventStore = new EventStore();
 const rbac = new RBACService();
 const canvasStore = new CanvasStore(eventStore, rbac);
