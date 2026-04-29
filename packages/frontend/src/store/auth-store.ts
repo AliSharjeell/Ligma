@@ -20,6 +20,27 @@ interface AuthUser {
   passwordHash: string;
 }
 
+const USERS_KEY = 'ligma-users';
+
+const getUsersDb = (): Record<string, AuthUser> => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const stored = localStorage.getItem(USERS_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveUserToDb = (user: AuthUser) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const users = getUsersDb();
+    users[user.username] = user;
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  } catch {}
+};
+
 interface AuthStore {
   userId: string | null;
   username: string | null;
@@ -85,8 +106,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
 
     // Check if username already exists
-    const existing = getStoredAuth();
-    if (existing && existing.username === username) {
+    const usersDb = getUsersDb();
+    if (usersDb[username]) {
       return { success: false, error: 'Username already exists' };
     }
 
@@ -94,6 +115,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const passwordHash = hashPassword(password);
     const auth: AuthUser = { userId, username, passwordHash };
 
+    saveUserToDb(auth);
     saveAuthToStorage(auth);
     set({ userId, username, isAuthenticated: true });
 
@@ -105,22 +127,20 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       return { success: false, error: 'Username and password are required' };
     }
 
-    const stored = getStoredAuth();
+    const usersDb = getUsersDb();
+    const user = usersDb[username];
 
-    if (!stored) {
+    if (!user) {
       return { success: false, error: 'No account found with this username' };
     }
 
-    if (stored.username !== username) {
-      return { success: false, error: 'Invalid username or password' };
-    }
-
     const passwordHash = hashPassword(password);
-    if (stored.passwordHash !== passwordHash) {
+    if (user.passwordHash !== passwordHash) {
       return { success: false, error: 'Invalid username or password' };
     }
 
-    set({ userId: stored.userId, username: stored.username, isAuthenticated: true });
+    saveAuthToStorage(user);
+    set({ userId: user.userId, username: user.username, isAuthenticated: true });
 
     return { success: true };
   },
