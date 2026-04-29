@@ -14,6 +14,7 @@ A hackathon project for building a real-time collaborative workspace that bridge
 - **AI Intent Extraction** - Auto-classifies content as action items, decisions, questions, or references
 - **Append-Only Event Log** - Immutable history of all canvas mutations
 - **Task Board** - Auto-populated from canvas content with author, timestamp, and source link
+- **Element Grouping** - Select multiple elements, press Ctrl+G to group; all members move together
 
 ### Bonus Features
 
@@ -21,6 +22,7 @@ A hackathon project for building a real-time collaborative workspace that bridge
 - **Time-Travel Replay** - Scrub through session history step by step
 - **AI Summary Export** - One-click export to structured markdown/JSON
 - **Presence Zones** - Named focus areas showing active team members
+- **Element Grouping** - Group elements with Ctrl+G, ungroup with Ctrl+Shift+G, collapsible in layers panel
 
 ## Quick Start
 
@@ -54,6 +56,15 @@ Open **http://localhost:3000** in your browser.
 | Shape | Click to place (rectangle, ellipse, diamond, line) |
 | Text | Click to place text block |
 | Drawing | Click and drag to freehand draw |
+
+### Element Grouping
+
+1. **Select multiple elements** on the canvas (click + drag or Ctrl+click)
+2. **Press Ctrl+G** to group them together
+3. **Click any element** in the group - all members get selected
+4. **Drag** - all group members move together as one unit
+5. **Press Ctrl+Shift+G** to ungroup
+6. In the **Layers panel**, groups are collapsible folders with chevron toggle
 
 ### Task Extraction
 
@@ -135,19 +146,19 @@ packages/
 │   └── src/
 │       ├── app/           # Next.js pages
 │       ├── components/
-│       │   ├── canvas/    # Canvas, elements, cursor
-│       │   ├── toolbar/  # Tool selection
-│       │   └── panels/   # Task board, export
-│       ├── contexts/      # Socket provider
-│       ├── store/        # Zustand stores
-│       └── types/        # TypeScript types
+│       │   ├── canvas/    # InfiniteCanvas, elements (StickyNote, Shape, Text, Drawing)
+│       │   ├── toolbar/   # Tool selection
+│       │   └── panels/   # LayersPanel (grouping UI), Task board, export
+│       ├── contexts/      # Socket provider for real-time sync
+│       ├── store/         # Zustand stores (canvas-store with groupElements/ungroupElements)
+│       └── types/         # TypeScript types (CanvasElement with groupId)
 └── backend/
     └── src/
-        ├── index.ts      # Server entry
-        ├── socket/      # WebSocket handlers
-        ├── events/      # Event store
+        ├── index.ts       # Server entry (Express + Socket.io)
+        ├── socket/       # WebSocket handlers
+        ├── events/       # Event store & types (NodeState with groupId)
         ├── rbac/         # Permission checks
-        └── ai/          # Intent parsing
+        └── ai/           # Intent parsing
 ```
 
 ## Socket Events

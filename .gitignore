@@ -16,6 +16,11 @@ out/
 .env.test.local
 .env.production.local
 
+# Backend environment
+packages/backend/.env
+packages/backend/.env.local
+packages/backend/.env.production
+
 # IDE
 .vscode/
 .idea/
